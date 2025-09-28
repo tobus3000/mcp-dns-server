@@ -1,0 +1,110 @@
+id: dns_troubleshooting_common_issues
+title: "DNS Troubleshooting: Common Issues and Solutions"
+category: "troubleshooting"
+tags:
+  - "dns"
+  - "troubleshooting"
+  - "issues"
+  - "solutions"
+  - "resolution"
+author: "Tobias Hildebrand"
+created: "2025-09-27"
+updated: "2025-09-27"
+content: |
+  # DNS Troubleshooting: Common Issues and Solutions
+  
+  This guide covers the most common DNS issues and their solutions. Use this as a reference when diagnosing DNS problems.
+  
+  ## Common DNS Issues
+  
+  ### 1. DNS Resolution Failure
+    **Symptoms**: Hostnames not resolving to IP addresses
+    **Possible Causes**:
+      - Incorrect DNS server configuration
+      - Network connectivity issues to DNS servers
+      - Missing or incorrect DNS records
+      - DNS server not running
+  
+    **Solutions**:
+      - Verify DNS server settings on the client
+      - Test connectivity to DNS servers (ping, telnet)
+      - Check DNS server logs for errors
+      - Verify DNS records exist and are correct
+      - Restart DNS service if necessary
+  
+  ### 2. Slow DNS Resolution
+    **Symptoms**: Long delays when resolving hostnames
+    **Possible Causes**:
+      - High DNS server load
+      - Recursive query loops
+      - Network latency issues
+      - DNS cache problems
+  
+    **Solutions**:
+      - Check DNS server performance and resource usage
+      - Review DNS forwarding configuration
+      - Implement DNS caching where appropriate
+      - Clear DNS cache if stale
+  
+  ### 3. Incorrect DNS Records
+    **Symptoms**: Hostnames resolving to wrong IP addresses
+    **Possible Causes**:
+      - Typo in DNS record
+      - DNS cache with outdated information
+      - Incorrect zone configuration
+  
+    **Solutions**:
+      - Verify DNS record in the management interface
+      - Clear DNS cache on clients and servers
+      - Check zone transfer settings
+      - Review DNS delegation configuration
+  
+  ### 4. DNSSEC Validation Failures
+    **Symptoms**: DNSSEC validation errors
+    **Possible Causes**:
+      - Key mismatch
+      - Outdated DNSKEY or DS records
+      - Time synchronization issues
+  
+    **Solutions**:
+      - Verify DNSSEC key configuration
+      - Check time synchronization
+      - Update DNSSEC records as needed
+  
+  ## Troubleshooting Commands
+  
+  ### Linux/Unix:
+    ```bash
+    # Test DNS resolution
+    dig example.com
+    nslookup example.com
+    host example.com
+  
+    # Check DNS server configuration
+    cat /etc/resolv.conf
+  
+    # Check DNS cache
+    sudo systemd-resolve --flush-caches  # For systemd-resolved
+    ```
+  
+  ### Windows:
+    ```cmd
+    # Test DNS resolution
+    nslookup example.com
+    Resolve-DnsName example.com  # PowerShell
+  
+    # Check DNS cache
+    ipconfig /displaydns
+    ipconfig /flushdns
+  
+    # Test connectivity to DNS server
+    Test-NetConnection -ComputerName 8.8.8.8 -Port 53
+    ```
+  
+  ## Advanced Debugging
+  - Use packet capture tools (Wireshark, tcpdump) to analyze DNS traffic
+  - Check DNS server logs for detailed error messages
+  - Verify firewall rules allow DNS traffic (UDP/TCP port 53)
+  - Test from different network locations to isolate network-specific issues
+
+summary: "Comprehensive guide to troubleshooting common DNS issues with practical solutions"

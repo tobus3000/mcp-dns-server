@@ -1,0 +1,85 @@
+id: dns_security_best_practices
+title: "DNS Security Best Practices"
+category: "security"
+tags:
+  - "dns"
+  - "security"
+  - "best-practices"
+  - "configuration"
+  - "protection"
+author: "Tobias Hildebrand"
+created: "2025-09-27"
+updated: "2025-09-27"
+content: |
+  # DNS Security Best Practices
+  
+  This document outlines essential security practices for DNS infrastructure to protect against common threats and vulnerabilities.
+  
+  ## DNS Security Threats
+  
+  ### Common Attack Vectors
+    - DNS Cache Poisoning/Spoofing
+    - DNS Amplification Attacks (DDoS)
+    - DNS Tunneling
+    - Domain Hijacking
+    - DNS-based Malware Distribution
+  
+  ## Best Practices
+  
+  ### 1. Implement DNS Security Extensions (DNSSEC)
+    - Enable DNSSEC to provide authentication and integrity
+    - Use strong cryptographic algorithms (RSA, ECDSA)
+    - Regularly rotate DNSSEC keys
+    - Monitor DNSSEC validation status
+  
+  ### 2. Secure DNS Server Configuration
+    - Run DNS servers with minimal privileges
+    - Hide version information
+    - Limit recursive queries to authorized clients
+    - Restrict zone transfers to authorized servers only
+    - Use TSIG for secure dynamic updates
+  
+  ### 3. Network Security
+    - Filter DNS traffic at network boundaries
+    - Implement DNS over HTTPS (DoH) or DNS over TLS (DoT)
+    - Use DNS firewalls to block malicious domains
+    - Monitor for unusual DNS query patterns
+  
+  ### 4. Monitoring and Logging
+    - Enable detailed DNS query logging
+    - Set up alerts for suspicious activities
+    - Monitor DNS server performance
+    - Regularly audit DNS configurations and access logs
+  
+  ### 5. Access Control
+    - Implement proper access controls for DNS management
+    - Use strong authentication for DNS administration
+    - Limit administrative access to DNS servers
+    - Regularly review and update access permissions
+  
+  ### 6. DNS Infrastructure Design
+    - Deploy geographically distributed DNS servers
+    - Use authoritative and recursive servers separately
+    - Implement proper backup and recovery procedures
+    - Regularly update DNS software and apply security patches
+  
+  ## DNS over HTTPS (DoH) and DNS over TLS (DoT)
+  
+  ### Implementation Guidelines:
+    - Configure DoH/DoT endpoints for encrypted DNS resolution
+    - Use proper certificates and maintain certificate lifecycles
+    - Ensure performance impact is acceptable
+    - Plan for certificate renewal and key rotation
+  
+  ## DNS Response Rate Limiting (RRL)
+    - Configure RRL to mitigate DNS amplification attacks
+    - Tune RRL parameters based on traffic patterns
+    - Monitor RRL effectiveness regularly
+  
+  ## Incident Response
+    - Develop DNS-specific incident response procedures
+    - Maintain contact information for DNS stakeholders
+    - Have backup DNS configurations ready
+    - Establish communication protocols for DNS incidents
+
+summary: "Essential security practices for protecting DNS infrastructure from common threats"

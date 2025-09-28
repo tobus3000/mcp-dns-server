@@ -1,0 +1,55 @@
+id: dns_extranet_setup
+title: "DNS Extranet Setup Guide"
+category: "configuration"
+tags:
+  - "dns"
+  - "extranet"
+  - "setup"
+  - "configuration"
+author: "Tobias Hildebrand"
+created: "2025-09-27"
+updated: "2025-09-27"
+content: |
+  # DNS Extranet Setup Guide
+  
+  This guide explains how to set up a DNS Extranet configuration, which allows external partners or clients to access specific internal resources securely through DNS resolution.
+  
+  ## Overview
+  A DNS Extranet enables controlled access to internal services for external entities while maintaining security boundaries. It typically involves setting up split DNS, conditional forwarding, or DNS delegation.
+  
+  ## Prerequisites
+  - Internal DNS infrastructure (Windows Server DNS, BIND, etc.)
+  - Network connectivity between internal and external networks
+  - Security policies defined for external access
+  - Domain name for the extranet zone
+  
+  ## Configuration Steps
+  
+  ### 1. Plan Your DNS Structure
+    - Define the domain namespace for your extranet
+    - Determine which internal resources need extranet access
+    - Identify security requirements and access controls
+  
+  ### 2. Set Up DNS Zones
+    - Create a separate zone for extranet resources
+    - Configure conditional forwarding if needed
+    - Set up appropriate resource records (A, CNAME, SRV, etc.)
+  
+  ### 3. Configure Security
+    - Implement DNS query filtering if available
+    - Set up appropriate firewall rules
+    - Consider DNS over HTTPS (DoH) or DNS over TLS (DoT) for encrypted queries
+  
+  ### 4. Test the Configuration
+    - Verify external DNS resolution works correctly
+    - Test access to internal resources from extranet
+    - Validate security controls are functioning
+  
+  ## Best Practices
+  - Use dedicated DNS servers for extranet zones
+  - Implement monitoring and logging for extranet DNS queries
+  - Regularly review and audit access permissions
+  - Keep DNS servers updated with security patches
+  - Consider implementing DNSSEC for authentication and integrity
+
+summary: "Complete guide to setting up DNS Extranet for secure external access to internal resources"
