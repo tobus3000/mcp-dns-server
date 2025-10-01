@@ -1,5 +1,6 @@
 import dns.resolver
-import dns.reversename
+import dns.name, dns.reversename, dns.dnssec, dns.query, dns.message, dns.rdatatype, dns.rdataclass
+import traceback
 import socket
 from typing import Dict, Any
 
@@ -121,34 +122,89 @@ async def reverse_dns_lookup_impl(resolver, ip_address: str) -> Dict[str, Any]:
         }
 
 async def check_dnssec_impl(resolver, domain: str) -> Dict[str, Any]:
+    result_log = []
     try:
-        dnskey_result = resolver.resolve(domain, 'DNSKEY')
-        dnssec_enabled = len(dnskey_result) > 0
-        rrsig_result = resolver.resolve(domain, 'RRSIG')
-        rrsig_present = len(rrsig_result) > 0
+        # Split domain into labels for traversal
+        labels = dns.name.from_text(domain).labels
+        zones = []
+        # Build zone hierarchy from root to domain
+        for i in range(len(labels)):
+            zone = b'.'.join(labels[-(i+1):]).decode()
+            zones.insert(0, zone if zone else '.')
+        # Traverse zones: root, tld, sld, ... domain
+        prev_ds = None
+        for idx, zone in enumerate(zones):
+            result_log.append(f"{zone}\t")
+            # Get authoritative nameservers for this zone
+            try:
+                ns_response = resolver.resolve(zone, 'NS')
+                ns_list = [str(rdata) for rdata in ns_response]
+            except Exception:
+                ns_list = []
+            # Query one nameserver for DNSKEY, DS, RRSIG
+            ns_ip = None
+            for ns in ns_list:
+                try:
+                    ns_ip_resp = resolver.resolve(ns, 'A')
+                    ns_ip = str(ns_ip_resp[0])
+                    #TODO: Verify all authoritative Name servers to find possible misconfigurations.
+                    break
+                except Exception:
+                    continue
+            if not ns_ip:
+                result_log.append(f"\tNo authoritative NS found for {zone}")
+                continue
+            # Query DNSKEY
+            try:
+                query = dns.message.make_query(zone, dns.rdatatype.DNSKEY, want_dnssec=True)
+                response = dns.query.udp(query, ns_ip, timeout=5)
+                dnskey_rrset = response.find_rrset(response.answer, dns.name.from_text(zone), dns.rdataclass.IN, dns.rdatatype.DNSKEY)
+                rrsig_rrset = response.find_rrset(response.answer, dns.name.from_text(zone), dns.rdataclass.IN, dns.rdatatype.RRSIG, dns.rdatatype.DNSKEY)
+                result_log.append(f"\tFound {len(dnskey_rrset)} DNSKEY records for {zone}.")
+                result_log.append(f"\tFound {len(rrsig_rrset)} RRSIGs over DNSKEY RRset")
+            except Exception as e:
+                result_log.append(f"\tDNSKEY query failed for {zone}: {e}")
+                continue
+            # Query DS from parent zone (except root)
+            if idx > 0:
+                parent_zone = zones[idx-1]
+                try:
+                    query = dns.message.make_query(zone, dns.rdatatype.DS, want_dnssec=True)
+                    parent_ns_ip = ns_ip
+                    response = dns.query.udp(query, parent_ns_ip, timeout=5)
+                    ds_rrset = response.find_rrset(response.answer, dns.name.from_text(zone), dns.rdataclass.IN, dns.rdatatype.DS)
+                    result_log.append(f"\tFound {len(ds_rrset)} DS records for {zone} in the {parent_zone} zone")
+                except Exception:
+                    result_log.append(f"\tNo DS records found for {zone} in the {parent_zone} zone")
+            # Verify DNSKEY RRset with RRSIG
+            try:
+                dns.dnssec.validate(dnskey_rrset, rrsig_rrset, {dns.name.from_text(zone): dnskey_rrset})
+                result_log.append(f"\tRRSIG and DNSKEY verifies the A RRset for {zone}")
+            except Exception as e:
+                result_log.append(f"\tDNSKEY RRset validation failed for {zone}: {e}")
+            # For leaf zone, verify A RR and its RRSIG
+            if idx == len(zones)-1:
+                try:
+                    query = dns.message.make_query(zone, dns.rdatatype.A, want_dnssec=True)
+                    response = dns.query.udp(query, ns_ip, timeout=5)
+                    a_rrset = response.find_rrset(response.answer, dns.name.from_text(zone), dns.rdataclass.IN, dns.rdatatype.A)
+                    rrsig_a_rrset = response.find_rrset(response.answer, dns.name.from_text(zone), dns.rdataclass.IN, dns.rdatatype.RRSIG, dns.rdatatype.A)
+                    result_log.append(f"\t{zone} A RR has value {[str(rdata) for rdata in a_rrset]}")
+                    result_log.append(f"\tFound {len(rrsig_a_rrset)} RRSIGs over A RRset")
+                    dns.dnssec.validate(a_rrset, rrsig_a_rrset, {dns.name.from_text(zone): dnskey_rrset})
+                    result_log.append(f"\tRRSIG and DNSKEY verifies the A RRset for {zone}")
+                except Exception as e:
+                    result_log.append(f"\tA RRset DNSSEC validation failed for {zone}: {e}")
         return {
             "domain": domain,
-            "dnssec_enabled": dnssec_enabled,
-            "rrsig_present": rrsig_present,
-            "status": "success"
-        }
-    except dns.resolver.NXDOMAIN:
-        return {
-            "domain": domain,
-            "error": f"Domain {domain} does not exist",
-            "status": "error"
-        }
-    except dns.resolver.NoAnswer:
-        return {
-            "domain": domain,
-            "dnssec_enabled": False,
-            "rrsig_present": False,
+            "dnssec_log": result_log,
             "status": "success"
         }
     except Exception as e:
         return {
             "domain": domain,
             "error": str(e),
+            "traceback": traceback.format_exc(),
             "status": "error"
         }
 
