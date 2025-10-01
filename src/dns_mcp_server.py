@@ -113,6 +113,14 @@ class DNSMCPServer:
         async def dns_troubleshooting(domain: str) -> Dict[str, Any]:
             return await self._dns_troubleshooting_impl(domain)
 
+        # Register DNSSEC validation check tool
+        @self.server.tool(
+            name="check_dnssec",
+            description="Check DNSSEC validation for a given domain"
+        )
+        async def check_dnssec(domain: str) -> Dict[str, Any]:
+            return await self._check_dnssec_impl(domain)
+
     async def _simple_dns_lookup_impl(self, hostname: str) -> Dict[str, Any]:
         """Implementation of simple DNS lookup for hostname resolution."""
         try:
@@ -237,9 +245,77 @@ class DNSMCPServer:
                 "status": "error"
             }
 
+    async def _check_dnssec_impl(self, domain: str) -> Dict[str, Any]:
+        """Implementation of DNSSEC validation check for a given domain."""
+        try:
+            # Check for DNSKEY record
+            dnskey_result = self.resolver.resolve(domain, 'DNSKEY')
+            dnssec_enabled = len(dnskey_result) > 0
+
+            # Check for RRSIG record
+            rrsig_result = self.resolver.resolve(domain, 'RRSIG')
+            rrsig_present = len(rrsig_result) > 0
+
+            return {
+                "domain": domain,
+                "dnssec_enabled": dnssec_enabled,
+                "rrsig_present": rrsig_present,
+                "status": "success"
+            }
+        except dns.resolver.NXDOMAIN:
+            return {
+                "domain": domain,
+                "error": f"Domain {domain} does not exist",
+                "status": "error"
+            }
+        except dns.resolver.NoAnswer:
+            return {
+                "domain": domain,
+                "dnssec_enabled": False,
+                "rrsig_present": False,
+                "status": "success"
+            }
+        except Exception as e:
+            return {
+                "domain": domain,
+                "error": str(e),
+                "status": "error"
+            }
+
     async def _dns_troubleshooting_impl(self, domain: str) -> Dict[str, Any]:
         """Implementation of comprehensive DNS troubleshooting for a given domain."""
         troubleshooting_results = {}
+
+        # Check SOA record
+        try:
+            soa_result = self.resolver.resolve(domain, 'SOA')
+            troubleshooting_results['SOA'] = [{
+                "mname": str(rdata.mname),
+                "rname": str(rdata.rname),
+                "serial": rdata.serial,
+                "refresh": rdata.refresh,
+                "retry": rdata.retry,
+                "expire": rdata.expire,
+                "minimum": rdata.minimum
+            } for rdata in soa_result]
+        except dns.resolver.NXDOMAIN:
+            troubleshooting_results['SOA'] = {"error": "NXDOMAIN"}
+        except dns.resolver.NoAnswer:
+            troubleshooting_results['SOA'] = {"error": "NoAnswer"}
+        except dns.resolver.NoNameservers:
+            troubleshooting_results['SOA'] = {"error": "NoNameservers"}
+        except dns.exception.Timeout:
+            troubleshooting_results['SOA'] = {"error": "Timeout"}
+        except (ConnectionError, socket.gaierror, OSError, IOError, RuntimeError):
+            troubleshooting_results['SOA'] = {"error": "System error during DNS resolution"}
+        except Exception as e:
+            # For other unexpected exceptions that indicate system problems,
+            # return error status for the entire operation
+            return {
+                "domain": domain,
+                "error": str(e),
+                "status": "error"
+            }
 
         # Check A record
         try:
@@ -502,6 +578,30 @@ class DNSMCPServer:
             """Get help with DNS security best practices using the knowledge base."""
             return "When asked about DNS security, search the knowledge base for security best practices and implementation guidelines."
 
+        @self.server.prompt
+        def resolve_hostname(hostname: str) -> str:
+            """Resolve a hostname to its IP address using the simple DNS lookup tool."""
+            return f"Resolve {hostname} to its IP address using the simple dns lookup tool provided by the DNS MCP Server."
+
+        @self.server.prompt
+        def resolve_ip(ip: str) -> str:
+            """Resolve a IP address to hostname using the reverse DNS lookup tool."""
+            return f"Resolve {ip} to its hostname using the reverse DNS lookup tool provided by the DNS MCP Server."
+
+        @self.server.prompt
+        def advanced_lookup(hostname: str, record_type: str) -> str:
+            """Perform an advanced DNS lookup for a hostname and record type using the advanced DNS lookup tool."""
+            return f"Perform an advanced DNS lookup for {hostname} with record type {record_type} using the advanced dns lookup tool provided by the DNS MCP Server."
+
+        @self.server.prompt
+        def dns_troubleshoot(domain: str) -> str:
+            """Perform comprehensive DNS troubleshooting for a domain using the DNS troubleshooting tool."""
+            return f"Perform DNS troubleshooting for {domain} using the dns troubleshooting tool provided by the DNS MCP Server."
+
+        @self.server.prompt
+        def check_dnssec(domain: str) -> str:
+            """Check DNSSEC validation for a domain using the DNSSEC validation check tool."""
+            return f"Check DNSSEC validation for {domain} using the check_dnssec tool provided by the DNS MCP Server."
 
 async def main() -> None:
     """Main entry point."""
