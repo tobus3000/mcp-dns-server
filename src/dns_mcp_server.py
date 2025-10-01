@@ -1,23 +1,30 @@
 """MCP DNS Server - An MCP server for DNS name resolution and troubleshooting."""
 import asyncio
 import logging
-import socket
 from typing import Any, Dict
-
-import dns.exception
 import dns.resolver
-import dns.reversename
 import yaml
 from fastmcp import FastMCP
-
 try:
     # Try relative import first (when used as part of the package)
     from .knowledge_base.manager import KnowledgeBaseManager
+    from .tools import (
+        simple_dns_lookup_impl,
+        advanced_dns_lookup_impl,
+        reverse_dns_lookup_impl,
+        check_dnssec_impl,
+        dns_troubleshooting_impl
+    )
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
     from knowledge_base.manager import KnowledgeBaseManager
-
-
+    from tools import (
+        simple_dns_lookup_impl,
+        advanced_dns_lookup_impl,
+        reverse_dns_lookup_impl,
+        check_dnssec_impl,
+        dns_troubleshooting_impl
+    )
 class DNSMCPServer:
     """MCP Server implementation for DNS operations."""
 
@@ -81,389 +88,42 @@ class DNSMCPServer:
     def register_tools(self) -> None:
         """Register all DNS-related tools with the MCP server."""
 
-        # Register simple DNS lookup tool
         @self.server.tool(
             name="simple_dns_lookup",
             description="Perform a simple DNS lookup for a hostname to get its IP address"
         )
         async def simple_dns_lookup(hostname: str) -> Dict[str, Any]:
-            return await self._simple_dns_lookup_impl(hostname)
+            return await simple_dns_lookup_impl(self.resolver, hostname)
 
-        # Register advanced DNS lookup tool
         @self.server.tool(
             name="advanced_dns_lookup",
             description="Perform an advanced DNS lookup supporting multiple record types"
         )
         async def advanced_dns_lookup(hostname: str, record_type: str) -> Dict[str, Any]:
-            return await self._advanced_dns_lookup_impl(hostname, record_type)
+            return await advanced_dns_lookup_impl(self.resolver, hostname, record_type)
 
-        # Register reverse DNS lookup tool
         @self.server.tool(
             name="reverse_dns_lookup",
             description="Perform a reverse DNS lookup to get hostname from IP address"
         )
         async def reverse_dns_lookup(ip_address: str) -> Dict[str, Any]:
-            return await self._reverse_dns_lookup_impl(ip_address)
+            return await reverse_dns_lookup_impl(self.resolver, ip_address)
 
-        # Register DNS troubleshooting tool
         @self.server.tool(
             name="dns_troubleshooting",
             description="Perform comprehensive DNS troubleshooting for a given domain"
         )
         async def dns_troubleshooting(domain: str) -> Dict[str, Any]:
-            return await self._dns_troubleshooting_impl(domain)
+            return await dns_troubleshooting_impl(self.resolver, domain)
 
-        # Register DNSSEC validation check tool
         @self.server.tool(
             name="check_dnssec",
             description="Check DNSSEC validation for a given domain"
         )
         async def check_dnssec(domain: str) -> Dict[str, Any]:
-            return await self._check_dnssec_impl(domain)
+            return await check_dnssec_impl(self.resolver, domain)
 
-    async def _simple_dns_lookup_impl(self, hostname: str) -> Dict[str, Any]:
-        """Implementation of simple DNS lookup for hostname resolution."""
-        try:
-            result = self.resolver.resolve(hostname, 'A')
-            ip_addresses = [str(ip) for ip in result]
-            return {
-                "hostname": hostname,
-                "ip_addresses": ip_addresses,
-                "status": "success"
-            }
-        except dns.resolver.NXDOMAIN:
-            return {
-                "hostname": hostname,
-                "error": f"Hostname {hostname} does not exist",
-                "status": "error"
-            }
-        except dns.resolver.NoAnswer:
-            return {
-                "hostname": hostname,
-                "error": f"No A record found for {hostname}",
-                "status": "error"
-            }
-        except Exception as e:
-            return {
-                "hostname": hostname,
-                "error": str(e),
-                "status": "error"
-            }
-
-    async def _advanced_dns_lookup_impl(self, hostname: str, record_type: str) -> Dict[str, Any]:
-        """Implementation of advanced DNS lookup supporting multiple record types."""
-        try:
-            result = self.resolver.resolve(hostname, record_type)
-            records = []
-
-            for rdata in result:
-                if record_type == "MX":
-                    records.append({
-                        "preference": rdata.preference,
-                        "exchange": str(rdata.exchange)
-                    })
-                elif record_type == "SRV":
-                    records.append({
-                        "priority": rdata.priority,
-                        "weight": rdata.weight,
-                        "port": rdata.port,
-                        "target": str(rdata.target)
-                    })
-                elif record_type == "SOA":
-                    records.append({
-                        "mname": str(rdata.mname),
-                        "rname": str(rdata.rname),
-                        "serial": rdata.serial,
-                        "refresh": rdata.refresh,
-                        "retry": rdata.retry,
-                        "expire": rdata.expire,
-                        "minimum": rdata.minimum
-                    })
-                else:
-                    records.append(str(rdata))
-
-            return {
-                "hostname": hostname,
-                "record_type": record_type,
-                "records": records,
-                "status": "success"
-            }
-        except dns.resolver.NXDOMAIN:
-            return {
-                "hostname": hostname,
-                "record_type": record_type,
-                "error": f"Hostname {hostname} does not exist",
-                "status": "error"
-            }
-        except dns.resolver.NoAnswer:
-            return {
-                "hostname": hostname,
-                "record_type": record_type,
-                "error": f"No {record_type} record found for {hostname}",
-                "status": "error"
-            }
-        except Exception as e:
-            return {
-                "hostname": hostname,
-                "record_type": record_type,
-                "error": str(e),
-                "status": "error"
-            }
-
-    async def _reverse_dns_lookup_impl(self, ip_address: str) -> Dict[str, Any]:
-        """Implementation of reverse DNS lookup to get hostname from IP address."""
-        try:
-            # Validate IP address format
-            socket.inet_aton(ip_address)
-
-            # Perform reverse DNS lookup
-            rev_name = dns.reversename.from_address(ip_address)
-            result = self.resolver.resolve(rev_name, "PTR")
-            hostnames = [str(rdata) for rdata in result]
-
-            return {
-                "ip_address": ip_address,
-                "hostnames": hostnames,
-                "status": "success"
-            }
-        except socket.error:
-            return {
-                "ip_address": ip_address,
-                "error": f"Invalid IP address: {ip_address}",
-                "status": "error"
-            }
-        except dns.resolver.NXDOMAIN:
-            return {
-                "ip_address": ip_address,
-                "error": f"No PTR record found for {ip_address}",
-                "status": "error"
-            }
-        except Exception as e:
-            return {
-                "ip_address": ip_address,
-                "error": str(e),
-                "status": "error"
-            }
-
-    async def _check_dnssec_impl(self, domain: str) -> Dict[str, Any]:
-        """Implementation of DNSSEC validation check for a given domain."""
-        try:
-            # Check for DNSKEY record
-            dnskey_result = self.resolver.resolve(domain, 'DNSKEY')
-            dnssec_enabled = len(dnskey_result) > 0
-
-            # Check for RRSIG record
-            rrsig_result = self.resolver.resolve(domain, 'RRSIG')
-            rrsig_present = len(rrsig_result) > 0
-
-            return {
-                "domain": domain,
-                "dnssec_enabled": dnssec_enabled,
-                "rrsig_present": rrsig_present,
-                "status": "success"
-            }
-        except dns.resolver.NXDOMAIN:
-            return {
-                "domain": domain,
-                "error": f"Domain {domain} does not exist",
-                "status": "error"
-            }
-        except dns.resolver.NoAnswer:
-            return {
-                "domain": domain,
-                "dnssec_enabled": False,
-                "rrsig_present": False,
-                "status": "success"
-            }
-        except Exception as e:
-            return {
-                "domain": domain,
-                "error": str(e),
-                "status": "error"
-            }
-
-    async def _dns_troubleshooting_impl(self, domain: str) -> Dict[str, Any]:
-        """Implementation of comprehensive DNS troubleshooting for a given domain."""
-        troubleshooting_results = {}
-
-        # Check SOA record
-        try:
-            soa_result = self.resolver.resolve(domain, 'SOA')
-            troubleshooting_results['SOA'] = [{
-                "mname": str(rdata.mname),
-                "rname": str(rdata.rname),
-                "serial": rdata.serial,
-                "refresh": rdata.refresh,
-                "retry": rdata.retry,
-                "expire": rdata.expire,
-                "minimum": rdata.minimum
-            } for rdata in soa_result]
-        except dns.resolver.NXDOMAIN:
-            troubleshooting_results['SOA'] = {"error": "NXDOMAIN"}
-        except dns.resolver.NoAnswer:
-            troubleshooting_results['SOA'] = {"error": "NoAnswer"}
-        except dns.resolver.NoNameservers:
-            troubleshooting_results['SOA'] = {"error": "NoNameservers"}
-        except dns.exception.Timeout:
-            troubleshooting_results['SOA'] = {"error": "Timeout"}
-        except (ConnectionError, socket.gaierror, OSError, IOError, RuntimeError):
-            troubleshooting_results['SOA'] = {"error": "System error during DNS resolution"}
-        except Exception as e:
-            # For other unexpected exceptions that indicate system problems,
-            # return error status for the entire operation
-            return {
-                "domain": domain,
-                "error": str(e),
-                "status": "error"
-            }
-
-        # Check A record
-        try:
-            a_result = self.resolver.resolve(domain, 'A')
-            troubleshooting_results['A'] = [str(ip) for ip in a_result]
-        except dns.resolver.NXDOMAIN:
-            troubleshooting_results['A'] = {"error": "NXDOMAIN"}
-        except dns.resolver.NoAnswer:
-            troubleshooting_results['A'] = {"error": "NoAnswer"}
-        except dns.resolver.NoNameservers:
-            troubleshooting_results['A'] = {"error": "NoNameservers"}
-        except dns.exception.Timeout:
-            troubleshooting_results['A'] = {"error": "Timeout"}
-        except (ConnectionError, socket.gaierror, OSError, IOError, RuntimeError):
-            # System-level errors that suggest a more serious issue
-            troubleshooting_results['A'] = {"error": "System error during DNS resolution"}
-        except Exception as e:
-            # For other unexpected exceptions that indicate system problems,
-            # return error status for the entire operation
-            return {
-                "domain": domain,
-                "error": str(e),
-                "status": "error"
-            }
-
-        # Check AAAA record
-        try:
-            aaaa_result = self.resolver.resolve(domain, 'AAAA')
-            troubleshooting_results['AAAA'] = [str(ip) for ip in aaaa_result]
-        except dns.resolver.NXDOMAIN:
-            troubleshooting_results['AAAA'] = {"error": "NXDOMAIN"}
-        except dns.resolver.NoAnswer:
-            troubleshooting_results['AAAA'] = {"error": "NoAnswer"}
-        except dns.resolver.NoNameservers:
-            troubleshooting_results['AAAA'] = {"error": "NoNameservers"}
-        except dns.exception.Timeout:
-            troubleshooting_results['AAAA'] = {"error": "Timeout"}
-        except (ConnectionError, socket.gaierror, OSError, IOError, RuntimeError):
-            troubleshooting_results['AAAA'] = {"error": "System error during DNS resolution"}
-        except Exception as e:
-            # For other unexpected exceptions that indicate system problems,
-            # return error status for the entire operation
-            return {
-                "domain": domain,
-                "error": str(e),
-                "status": "error"
-            }
-
-        # Check CNAME
-        try:
-            cname_result = self.resolver.resolve(domain, 'CNAME')
-            troubleshooting_results['CNAME'] = [str(rdata) for rdata in cname_result]
-        except dns.resolver.NXDOMAIN:
-            troubleshooting_results['CNAME'] = {"error": "NXDOMAIN"}
-        except dns.resolver.NoAnswer:
-            troubleshooting_results['CNAME'] = {"error": "NoAnswer"}
-        except dns.resolver.NoNameservers:
-            troubleshooting_results['CNAME'] = {"error": "NoNameservers"}
-        except dns.exception.Timeout:
-            troubleshooting_results['CNAME'] = {"error": "Timeout"}
-        except (ConnectionError, socket.gaierror, OSError, IOError, RuntimeError):
-            troubleshooting_results['CNAME'] = {"error": "System error during DNS resolution"}
-        except Exception as e:
-            # For other unexpected exceptions that indicate system problems,
-            # return error status for the entire operation
-            return {
-                "domain": domain,
-                "error": str(e),
-                "status": "error"
-            }
-
-        # Check MX records
-        try:
-            mx_result = self.resolver.resolve(domain, 'MX')
-            troubleshooting_results['MX'] = [
-                {"preference": rdata.preference, "exchange": str(rdata.exchange)}
-                for rdata in mx_result
-            ]
-        except dns.resolver.NXDOMAIN:
-            troubleshooting_results['MX'] = {"error": "NXDOMAIN"}
-        except dns.resolver.NoAnswer:
-            troubleshooting_results['MX'] = {"error": "NoAnswer"}
-        except dns.resolver.NoNameservers:
-            troubleshooting_results['MX'] = {"error": "NoNameservers"}
-        except dns.exception.Timeout:
-            troubleshooting_results['MX'] = {"error": "Timeout"}
-        except (ConnectionError, socket.gaierror, OSError, IOError, RuntimeError):
-            troubleshooting_results['MX'] = {"error": "System error during DNS resolution"}
-        except Exception as e:
-            # For other unexpected exceptions that indicate system problems,
-            # return error status for the entire operation
-            return {
-                "domain": domain,
-                "error": str(e),
-                "status": "error"
-            }
-
-        # Check NS records
-        try:
-            ns_result = self.resolver.resolve(domain, 'NS')
-            troubleshooting_results['NS'] = [str(rdata) for rdata in ns_result]
-        except dns.resolver.NXDOMAIN:
-            troubleshooting_results['NS'] = {"error": "NXDOMAIN"}
-        except dns.resolver.NoAnswer:
-            troubleshooting_results['NS'] = {"error": "NoAnswer"}
-        except dns.resolver.NoNameservers:
-            troubleshooting_results['NS'] = {"error": "NoNameservers"}
-        except dns.exception.Timeout:
-            troubleshooting_results['NS'] = {"error": "Timeout"}
-        except (ConnectionError, socket.gaierror, OSError, IOError, RuntimeError):
-            troubleshooting_results['NS'] = {"error": "System error during DNS resolution"}
-        except Exception as e:
-            # For other unexpected exceptions that indicate system problems,
-            # return error status for the entire operation
-            return {
-                "domain": domain,
-                "error": str(e),
-                "status": "error"
-            }
-
-        # Check TXT records
-        try:
-            txt_result = self.resolver.resolve(domain, 'TXT')
-            troubleshooting_results['TXT'] = [str(rdata) for rdata in txt_result]
-        except dns.resolver.NXDOMAIN:
-            troubleshooting_results['TXT'] = {"error": "NXDOMAIN"}
-        except dns.resolver.NoAnswer:
-            troubleshooting_results['TXT'] = {"error": "NoAnswer"}
-        except dns.resolver.NoNameservers:
-            troubleshooting_results['TXT'] = {"error": "NoNameservers"}
-        except dns.exception.Timeout:
-            troubleshooting_results['TXT'] = {"error": "Timeout"}
-        except (ConnectionError, socket.gaierror, OSError, IOError, RuntimeError):
-            troubleshooting_results['TXT'] = {"error": "System error during DNS resolution"}
-        except Exception as e:
-            # For other unexpected exceptions that indicate system problems,
-            # return error status for the entire operation
-            return {
-                "domain": domain,
-                "error": str(e),
-                "status": "error"
-            }
-
-        return {
-            "domain": domain,
-            "troubleshooting_results": troubleshooting_results,
-            "status": "success"
-        }
+    # ...existing code...
 
     async def start(self, host: str = "127.0.0.1", port: int = 3000) -> None:
         """Start the MCP server using HTTP transport.
