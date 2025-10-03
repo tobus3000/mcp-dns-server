@@ -5,6 +5,11 @@ from typing import Any, Dict
 import dns.resolver
 import yaml
 from fastmcp import FastMCP
+
+try:
+    from . import nstests
+except ImportError:
+    import nstests
 try:
     # Try relative import first (when used as part of the package)
     from .knowledge_base.manager import KnowledgeBaseManager
@@ -110,11 +115,32 @@ class DNSMCPServer:
             return await reverse_dns_lookup_impl(self.resolver, ip_address)
 
         @self.server.tool(
-            name="dns_troubleshooting",
+            name="dns_domain_troubleshooting",
             description="Perform comprehensive DNS troubleshooting for a given domain"
         )
-        async def dns_troubleshooting(domain: str) -> Dict[str, Any]:
+        async def dns_domain_troubleshooting(domain: str) -> Dict[str, Any]:
             return await dns_troubleshooting_impl(self.resolver, domain)
+
+        @self.server.tool(
+            name="dns_server_troubleshooting",
+            description="Perform comprehensive DNS server troubleshooting for a given domain and nameserver"
+        )
+        async def dns_server_troubleshooting(domain: str, nameserver: str) -> Dict[str, Any]:
+            return await nstests.run_comprehensive_tests(domain, nameserver)
+
+        @self.server.tool(
+            name="dns_server_edns_test",
+            description="Perform EDNS tests on a given domain and nameserver"
+        )
+        async def dns_server_edns_test(domain: str, nameserver: str) -> Dict[str, Any]:
+            return await nstests.test_edns_support(domain, nameserver)
+
+        @self.server.tool(
+            name="dns_udp_tcp_test",
+            description="Perform UDP and TCP behavior tests on a given domain and nameserver"
+        )
+        async def dns_udp_tcp_test(domain: str, nameserver: str) -> Dict[str, Any]:
+            return await nstests.test_tcp_behavior(domain, nameserver)
 
         @self.server.tool(
             name="check_dnssec",
@@ -254,9 +280,24 @@ class DNSMCPServer:
             return f"Perform an advanced DNS lookup for {hostname} with record type {record_type} using the advanced dns lookup tool provided by the DNS MCP Server."
 
         @self.server.prompt
-        def dns_troubleshoot(domain: str) -> str:
+        def dns_domain_troubleshoot(domain: str) -> str:
             """Perform comprehensive DNS troubleshooting for a domain using the DNS troubleshooting tool."""
-            return f"Perform DNS troubleshooting for {domain} using the dns troubleshooting tool provided by the DNS MCP Server."
+            return f"Perform DNS troubleshooting for {domain} using the dns domain troubleshooting tool provided by the DNS MCP Server."
+
+        @self.server.prompt
+        def dns_server_troubleshoot(domain: str, nameserver: str) -> str:
+            """Perform comprehensive DNS server troubleshooting for a nameserver using the DNS server troubleshooting tool."""
+            return f"Perform DNS server troubleshooting for domain {domain} and nameserver {nameserver} using the dns server troubleshooting tool provided by the DNS MCP Server."
+
+        @self.server.prompt
+        def dns_edns_test(domain: str, nameserver: str) -> str:
+            """Perform EDNS tests for a nameserver using the DNS EDNS test tool."""
+            return f"Perform EDNS tests for domain {domain} and nameserver {nameserver} using the dns server edns test tool provided by the DNS MCP Server."
+
+        @self.server.prompt
+        def dns_udp_tcp_test(domain: str, nameserver: str) -> str:
+            """Perform UDP and TCP behavior tests for a nameserver using the DNS UDP/TCP test tool."""
+            return f"Perform UDP and TCP behavior tests for domain {domain} and nameserver {nameserver} using the dns udp tcp test tool provided by the DNS MCP Server."
 
         @self.server.prompt
         def check_dnssec(domain: str) -> str:

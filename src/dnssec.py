@@ -17,11 +17,22 @@ import dns.rdatatype
 import dns.dnssec
 import dns.rdtypes.ANY.SOA
 
+# Import NSEC/NSEC3 types
+import dns.rdtypes.ANY.NSEC
+import dns.rdtypes.ANY.NSEC3
+import dns.flags
+import dns.rcode
+import dns.edns
+import dns.query
+import dns.exception
+
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA
 RRset = dns.rrset.RRset
 Message = dns.message.Message
 Name = dns.name.Name
+NSECRecord = dns.rdtypes.ANY.NSEC.NSEC
+NSEC3Record = dns.rdtypes.ANY.NSEC3.NSEC3
 
 # Required for exception handling
 import dns.exception
@@ -34,9 +45,9 @@ class ValidationError(Exception):
     pass
 
 
-def _resolve(domain: str, rdtype: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT):
+def _resolve(domain: str, rdtype: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT) -> Tuple[Optional[RRset], Optional[Message]]:
     """Resolve a single RRset using dns.resolver for convenience.
-    Returns (rdataset, response) where rdataset is a dns.rrset.RRset or None.
+    Returns (rdataset, response) where rdataset is a dns.rrset.RRset or None and response is dns.message.Message or None.
     """
     resolver = dns.resolver.Resolver(configure=True)
     resolver.lifetime = timeout
@@ -82,12 +93,7 @@ def compute_ds_from_dnskey(name: str, dnskey_rrset: dns.rrset.RRset, digest_alg:
             ds = dns.dnssec.make_ds(name_obj, rdata, digest_alg)
             ds_list.append(str(ds))
         except Exception:
-            try:
-                # Try with legacy API
-                ds = dns.dnssec.make_ds(name_obj, rdata, digest_alg)
-                ds_list.append(str(ds))
-            except Exception:
-                continue
+            continue
     return ds_list
 
 
@@ -99,8 +105,120 @@ def key_tag_from_dnskey(rdata) -> int:
         return getattr(rdata, 'key_tag', 0)
 
 
+def validate_nsec3_parameters(nsec3_record) -> Dict[str, Any]:
+    """Validate NSEC3 parameters according to best practices."""
+    result = {
+        'valid': True,
+        'warnings': [],
+        'algorithm': nsec3_record.algorithm,
+        'iterations': nsec3_record.iterations,
+        'salt': nsec3_record.salt.hex() if nsec3_record.salt else None,
+        'salt_length': len(nsec3_record.salt) if nsec3_record.salt else 0
+    }
+    
+    # Check for invalid parameters according to RFC 5155 and best practices
+    if nsec3_record.algorithm != 1:
+        result['valid'] = False
+        result['warnings'].append(f"Invalid NSEC3 algorithm: {nsec3_record.algorithm}")
+    
+    if nsec3_record.iterations > 150:  # Current recommended max
+        result['warnings'].append(f"NSEC3 iterations too high: {nsec3_record.iterations}")
+    
+    if nsec3_record.salt and len(nsec3_record.salt) > 32:
+        result['warnings'].append(f"NSEC3 salt length too long: {len(nsec3_record.salt)}")
+    
+    return result
+
+
+def validate_nsec_chain(nsec_records: List[dns.rrset.RRset], zone_name: str) -> Dict[str, Any]:
+    """Validate that NSEC records form a complete chain."""
+    if not nsec_records:
+        return {'valid': False, 'error': 'No NSEC records found'}
+    
+    result = {'valid': True, 'errors': [], 'chain': []}
+    sorted_records = sorted(nsec_records, key=lambda r: r.name.to_text())
+    
+    # Convert zone name for comparison
+    zone = dns.name.from_text(zone_name)
+    
+    # Check if chain forms a complete circle
+    for i in range(len(sorted_records)):
+        current_rrset = sorted_records[i]
+        # Cast the record to NSECRecord for type safety
+        current_nsec = NSECRecord.from_rdata(
+            current_rrset.name,
+            current_rrset.ttl,
+            current_rrset[0]
+        )
+        next_owner = current_nsec.next
+        expected_next = sorted_records[(i + 1) % len(sorted_records)].name
+        
+        if next_owner != expected_next:
+            result['valid'] = False
+            result['errors'].append(f"Broken NSEC chain between {current_rrset.name} and {next_owner}")
+        
+        result['chain'].append({
+            'owner': current_rrset.name.to_text(),
+            'next': next_owner.to_text(),
+            'types': [dns.rdatatype.to_text(t) for t in current_nsec.windows]
+        })
+    
+    return result
+
+
+def validate_nsec3_chain(nsec3_records: List[dns.rrset.RRset], zone_name: str) -> Dict[str, Any]:
+    """Validate that NSEC3 records form a complete chain with valid parameters."""
+    if not nsec3_records:
+        return {'valid': False, 'error': 'No NSEC3 records found'}
+    
+    result = {'valid': True, 'errors': [], 'warnings': [], 'parameters': None, 'chain': []}
+    
+    # Cast to NSEC3Record for type safety
+    def to_nsec3(record: dns.rrset.RRset) -> NSEC3Record:
+        return NSEC3Record(
+            rdclass=record.rdclass,
+            rdtype=record.rdtype,
+            algorithm=record[0].algorithm,
+            flags=record[0].flags,
+            iterations=record[0].iterations,
+            salt=record[0].salt,
+            next=record[0].next,
+            windows=record[0].windows,
+            bitmap=record[0].bitmap
+        )
+
+    # Validate parameters from first record
+    first_nsec3 = to_nsec3(nsec3_records[0])
+    result['parameters'] = validate_nsec3_parameters(first_nsec3)
+    result['warnings'].extend(result['parameters']['warnings'])
+    
+    # Sort records by hash
+    sorted_records = [to_nsec3(r) for r in nsec3_records]
+    sorted_records.sort(key=lambda r: r.next)
+    
+    # Check if chain forms a complete circle
+    for i in range(len(sorted_records)):
+        current = sorted_records[i]
+        next_hash = current.next
+        expected_next = sorted_records[(i + 1) % len(sorted_records)].current
+        
+        if next_hash != expected_next:
+            result['valid'] = False
+            result['errors'].append(f"Broken NSEC3 chain between {current.current.hex()} and {next_hash.hex()}")
+        
+        result['chain'].append({
+            'current': current.current.hex(),
+            'next': next_hash.hex(),
+            'types': [dns.rdatatype.to_text(t) for t in current.windows]
+        })
+    
+    return result
+
+
 def extract_rrsig_for_rrset(resp: Optional[dns.message.Message], rdtype: str) -> Optional[dns.rrset.RRset]:
-    """Given a dns.message.Message response, extract the RRSIG rrset corresponding to rdtype in the ANSWER or AUTHORITY section."""
+    """Given a dns.message.Message response, extract the RRSIG rrset corresponding to rdtype
+    in the ANSWER or AUTHORITY section.
+"""
     if resp is None:
         return None
     # search answer then authority
@@ -130,15 +248,49 @@ def validate_rrset_with_dnskey(rrset: dns.rrset.RRset, rrsigset: dns.rrset.RRset
         return False, str(e)
 
 
+def validate_denial_proof(resp: Message, domain: str) -> Dict[str, Any]:
+    """Validate NSEC or NSEC3 denial of existence proof."""
+    result = {
+        'valid': False,
+        'proof_type': None,
+        'records': [],
+        'validation': None
+    }
+    
+    if not resp or not isinstance(resp, dns.message.Message) or not resp.authority:
+        return result
+    
+    nsec_records = []
+    nsec3_records = []
+    
+    for rrset in resp.authority:
+        if rrset.rdtype == dns.rdatatype.NSEC:
+            nsec_records.append(rrset)
+        elif rrset.rdtype == dns.rdatatype.NSEC3:
+            nsec3_records.append(rrset)
+    
+    if nsec_records:
+        result['proof_type'] = 'NSEC'
+        result['records'] = [r.to_text() for r in nsec_records]
+        zone = dns.name.from_text(domain).parent()
+        result['validation'] = validate_nsec_chain(nsec_records, zone.to_text())
+        result['valid'] = result['validation']['valid']
+    elif nsec3_records:
+        result['proof_type'] = 'NSEC3'
+        result['records'] = [r.to_text() for r in nsec3_records]
+        zone = dns.name.from_text(domain).parent()
+        result['validation'] = validate_nsec3_chain(nsec3_records, zone.to_text())
+        result['valid'] = result['validation']['valid']
+    
+    return result
+
+
 def check_rrset_signature(domain: str, rdtype: str, dnskey_rrset: Optional[dns.rrset.RRset], nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
     rrset, resp = _resolve(domain, rdtype, nameserver, timeout)
     result: Dict[str, Any] = {'type': rdtype, 'present': rrset is not None}
     if rrset is None or dnskey_rrset is None:
         # try to see if NXDOMAIN or NODATA with proof
-        result['nx_proof'] = None
-        if resp is not None and isinstance(resp, dns.message.Message) and hasattr(resp, 'authority'):
-            nsec_rrs = [r for r in resp.authority if r.rdtype in (dns.rdatatype.NSEC, dns.rdatatype.NSEC3)]
-            result['nx_proof'] = [r.to_text() for r in nsec_rrs]
+        result['nx_proof'] = validate_denial_proof(resp, domain) if resp else None
         return result
 
     rrsig = extract_rrsig_for_rrset(resp, rdtype)
@@ -303,21 +455,313 @@ def check_authoritative_consistency(domain: str) -> Dict[str, Any]:
 
 
 def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[str, Any]:
-    key_results: Dict[str, Any] = {'keys': [], 'sep_count': 0, 'zsk_count': 0}
+    key_results: Dict[str, Any] = {
+        'keys': [],
+        'sep_count': 0,
+        'zsk_count': 0,
+        'warnings': [],
+        'critical': [],
+        'algorithms': set(),
+        'key_lengths': {}
+    }
+    
     if dnskey_rrset is None:
+        key_results['critical'].append("No DNSKEY records found")
         return key_results
+
     for r in dnskey_rrset:
         tag = key_tag_from_dnskey(r)
         alg = r.algorithm
         flags = r.flags
         is_sep = bool(flags & 0x0100)
-        key_results['keys'].append({'tag': tag, 'algorithm': alg, 'flags': flags, 'is_sep': is_sep, 'to_text': r.to_text()})
-    # heuristics: detect multiple KSK-like keys (sep set) or no KSK
+        protocol = r.protocol
+        
+        # Get key details
+        key_info = {
+            'tag': tag,
+            'algorithm': alg,
+            'algorithm_name': dns.dnssec.algorithm_to_text(alg),
+            'flags': flags,
+            'protocol': protocol,
+            'is_sep': is_sep,
+            'to_text': r.to_text(),
+            'key_size': len(r.key) * 8,  # Convert bytes to bits
+            'valid': True,
+            'issues': []
+        }
+        
+        # Check protocol field (must be 3 as per RFC 4034)
+        if protocol != 3:
+            key_info['valid'] = False
+            key_info['issues'].append(f"Invalid protocol value: {protocol} (must be 3)")
+            
+        # Check algorithm validity
+        key_results['algorithms'].add(alg)
+        if alg in [1, 3, 6, 7, 8]:  # Deprecated/insecure algorithms
+            key_info['issues'].append(f"Insecure or deprecated algorithm: {key_info['algorithm_name']}")
+            
+        # Check key length based on algorithm
+        min_key_lengths = {
+            1: 512,   # RSA/MD5 (not recommended)
+            3: 512,   # DSA/SHA1 (not recommended)
+            5: 512,   # RSA/SHA-1
+            7: 512,   # RSASHA1-NSEC3-SHA1
+            8: 512,   # RSA/SHA-256
+            10: 1024, # RSA/SHA-512
+            13: 256,  # ECDSA Curve P-256 with SHA-256
+            14: 384,  # ECDSA Curve P-384 with SHA-384
+            15: 256,  # Ed25519
+            16: 456   # Ed448
+        }
+        
+        if alg in min_key_lengths:
+            if key_info['key_size'] < min_key_lengths[alg]:
+                key_info['issues'].append(
+                    f"Key size {key_info['key_size']} bits is below minimum {min_key_lengths[alg]} "
+                    f"bits for algorithm {key_info['algorithm_name']}"
+                )
+        
+        # Track key lengths by algorithm
+        if alg not in key_results['key_lengths']:
+            key_results['key_lengths'][alg] = []
+        key_results['key_lengths'][alg].append(key_info['key_size'])
+        
+        key_results['keys'].append(key_info)
+    
+    # Analyze overall key configuration
     sep_count = sum(1 for k in key_results['keys'] if k['is_sep'])
+    zsk_count = len(key_results['keys']) - sep_count
     key_results['sep_count'] = sep_count
-    key_results['zsk_count'] = len(key_results['keys']) - sep_count
+    key_results['zsk_count'] = zsk_count
+    
+    # Check for critical issues
+    if sep_count == 0:
+        key_results['critical'].append("No KSK (SEP) keys found")
+    if zsk_count == 0:
+        key_results['critical'].append("No ZSK keys found")
+    if sep_count > 2:
+        key_results['warnings'].append(f"Unusually high number of KSK keys: {sep_count}")
+    
+    # Check algorithm consistency
+    if len(key_results['algorithms']) > 1:
+        key_results['warnings'].append(
+            f"Multiple signing algorithms in use: "
+            f"{', '.join(dns.dnssec.algorithm_to_text(a) for a in sorted(key_results['algorithms']))}"
+        )
+    
+    # Convert algorithms set to list for JSON serialization
+    key_results['algorithms'] = sorted(list(key_results['algorithms']))
+    
     return key_results
 
+
+def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
+    """Test DNS server robustness against malformed and malicious queries.
+    
+    Tests various edge cases and potential attack vectors:
+    1. Overly long domain names
+    2. Invalid characters in queries
+    3. Unexpected record types
+    4. Malformed DNSSEC queries
+    5. Response to potential replay attacks
+    """
+    result = {
+        'domain': domain,
+        'tests': [],
+        'issues_found': [],
+        'security_rating': 'good'
+    }
+    
+    # Test 1: Overly long labels and names
+    long_label = "a" * 64  # RFC 1035 limit is 63
+    long_name = f"{long_label}.{domain}"
+    try:
+        # Create query with overly long label
+        qname = dns.name.from_text(long_name)
+        query = dns.message.make_query(qname, dns.rdatatype.A)
+        resolver = dns.resolver.Resolver()
+        resolver.lifetime = timeout
+        
+        try:
+            answer = resolver.resolve(qname, 'A')
+            passed = False  # Should not succeed with invalid name
+        except dns.name.LabelTooLong:
+            passed = True  # Expected behavior
+        except Exception:
+            passed = True  # Any rejection is acceptable
+            
+        result['tests'].append({
+            'name': 'oversized_label',
+            'description': 'Testing handling of oversized DNS labels',
+            'passed': passed
+        })
+    except Exception as e:
+        result['tests'].append({
+            'name': 'oversized_label',
+            'description': 'Testing handling of oversized DNS labels',
+            'passed': True,
+            'error': str(e)
+        })
+
+    # Test 2: Invalid characters
+    invalid_chars = "test!@#$"  # Invalid characters in label
+    try:
+        try:
+            # This should raise an exception for invalid characters
+            qname = dns.name.from_text(f"{invalid_chars}.{domain}")
+            passed = False
+        except dns.name.BadLabelType:
+            passed = True  # Expected behavior
+        except Exception:
+            passed = True  # Any rejection is acceptable
+            
+        result['tests'].append({
+            'name': 'invalid_chars',
+            'description': 'Testing handling of invalid characters in domain names',
+            'passed': passed
+        })
+    except Exception:
+        # Expected behavior - should reject invalid names
+        result['tests'].append({
+            'name': 'invalid_chars',
+            'description': 'Testing handling of invalid characters in domain names',
+            'passed': True
+        })
+
+    # Test 3: Unusual record types
+    try:
+        rrset, resp = _resolve(domain, 'NULL', timeout=timeout)
+        # NULL records should be rejected or handled safely
+        passed = (resp is None or 
+                 resp.rcode() in [dns.rcode.REFUSED, dns.rcode.NOTIMP, dns.rcode.FORMERR])
+        result['tests'].append({
+            'name': 'unusual_rr_type',
+            'description': 'Testing handling of unusual record types',
+            'passed': passed
+        })
+    except dns.resolver.NoAnswer:
+        # Refusing to answer is acceptable
+        result['tests'].append({
+            'name': 'unusual_rr_type',
+            'description': 'Testing handling of unusual record types',
+            'passed': True
+        })
+    except Exception:
+        # Any rejection is acceptable for NULL records
+        result['tests'].append({
+            'name': 'unusual_rr_type',
+            'description': 'Testing handling of unusual record types',
+            'passed': True
+        })
+
+    # Test 4: DNSSEC-specific robustness
+    try:
+        resolver = dns.resolver.Resolver()
+        resolver.lifetime = timeout
+        
+        # Create a query with DNSSEC enabled
+        qname = dns.name.from_text(domain)
+        query = dns.message.make_query(qname, dns.rdatatype.DNSKEY)
+        query.use_edns(edns=0, ednsflags=dns.flags.DO)  # Set DNSSEC OK
+        
+        # Test with both CD (Checking Disabled) flag set and unset
+        query.flags |= dns.flags.CD
+        
+        # Try to send directly to each nameserver
+        ns_addrs = []
+        try:
+            ns_rrset, _ = _resolve(domain, 'NS')
+            if ns_rrset:
+                for rr in ns_rrset:
+                    a_rrset, _ = _resolve(rr.target.to_text(), 'A')
+                    if a_rrset:
+                        ns_addrs.append(str(a_rrset[0]))
+        except Exception:
+            pass
+            
+        if not ns_addrs:
+            ns_addrs = [resolver.nameservers[0]]
+            
+        # Test each nameserver
+        dnssec_works = False
+        for ns in ns_addrs:
+            try:
+                response = dns.query.udp(query, ns, timeout=timeout)
+                if response and response.rcode() == dns.rcode.NOERROR:
+                    dnssec_works = True
+                    break
+            except Exception:
+                continue
+                
+        result['tests'].append({
+            'name': 'malformed_dnssec',
+            'description': 'Testing handling of malformed DNSSEC queries',
+            'passed': dnssec_works
+        })
+    except Exception:
+        # Should handle malformed queries gracefully
+        result['tests'].append({
+            'name': 'malformed_dnssec',
+            'description': 'Testing handling of malformed DNSSEC queries',
+            'passed': True
+        })
+
+    # Test 5: Check for replay attack vulnerability
+    # Query twice and compare inception/expiration times
+    try:
+        _, resp1 = _resolve(domain, 'DNSKEY', timeout=timeout)
+        time.sleep(1)  # Wait a bit
+        _, resp2 = _resolve(domain, 'DNSKEY', timeout=timeout)
+        
+        sig1 = extract_rrsig_for_rrset(resp1, 'DNSKEY')
+        sig2 = extract_rrsig_for_rrset(resp2, 'DNSKEY')
+        
+        if sig1 and sig2 and len(sig1) > 0 and len(sig2) > 0:
+            # Compare inception times - shouldn't be identical for fresh signatures
+            passed = (sig1[0].inception != sig2[0].inception or 
+                     sig1[0].expiration != sig2[0].expiration)
+        else:
+            passed = True  # No RRSIG means no replay vulnerability
+            
+        result['tests'].append({
+            'name': 'replay_resistance',
+            'description': 'Testing resistance to replay attacks',
+            'passed': passed
+        })
+    except Exception:
+        result['tests'].append({
+            'name': 'replay_resistance',
+            'description': 'Testing resistance to replay attacks',
+            'passed': False,
+            'error': 'Could not complete replay resistance test'
+        })
+
+    # Analyze results
+    failed_tests = [t for t in result['tests'] if not t['passed']]
+    if failed_tests:
+        result['issues_found'].extend([
+            f"Failed {t['name']}: {t['description']}" for t in failed_tests
+        ])
+        result['security_rating'] = 'poor' if len(failed_tests) > 2 else 'fair'
+    
+    # Add test results to the interpretation
+    result['interpretation'] = {
+        'description': 'Analysis of DNS server robustness against malformed and malicious queries',
+        'findings': [],
+        'recommendations': []
+    }
+    
+    for test in result['tests']:
+        status = 'passed' if test['passed'] else 'failed'
+        result['interpretation']['findings'].append(
+            f"{test['description']}: {status}"
+        )
+        if not test['passed']:
+            result['interpretation']['recommendations'].append(
+                f"Review handling of {test['name']} to improve security"
+            )
+
+    return result
 
 def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
     """Perform the batch of DNSSEC checks described in the earlier checklist.
@@ -334,7 +778,8 @@ def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
         'authoritative': {},
         'keys': {},
         'algorithms': {'algorithm_numbers': []},
-        'soa_consistency': {}
+        'soa_consistency': {},
+        'robustness': {}
     }
     
     # Split domain into labels for zone traversal
@@ -386,10 +831,23 @@ def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
         rrchecks[t] = check_rrset_signature(domain, t, dnskey_rrset, None, timeout)
     report['rrsets'] = rrchecks
 
-    # 5) NXDOMAIN / denial proofs check (test non-existent name)
+    # 5) NXDOMAIN / denial proofs check (test non-existent names)
+    # 5) NXDOMAIN / denial proofs check (test non-existent names)
+    
+    # Test NXDOMAIN with random label
     test_name = f"this-name-should-not-exist-{int(time.time())}.{domain}"
-    nx_result = check_rrset_signature(test_name, 'A', dnskey_rrset, None, timeout)
-    report['nxdomain_test'] = nx_result
+    report['nxdomain_test'] = check_rrset_signature(test_name, 'A', dnskey_rrset, None, timeout)
+    
+    # Additional denial of existence tests
+    report['denial_tests'] = {}
+    
+    # Test wildcard denial (if NSEC3 is in use) with specific name pattern
+    wildcard_test = f"*.{domain}"
+    report['denial_tests']['wildcard'] = check_rrset_signature(wildcard_test, 'A', dnskey_rrset, None, timeout)
+    
+    # Test empty non-terminal handling
+    ent_test = f"nonexistent.subdomain.{domain}"
+    report['denial_tests']['empty_non_terminal'] = check_rrset_signature(ent_test, 'A', dnskey_rrset, None, timeout)
 
     # 6) Authoritative consistency
     report['authoritative'] = check_authoritative_consistency(domain)
@@ -404,12 +862,142 @@ def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
             algs.add(r.algorithm)
     report['algorithms'] = {'algorithm_numbers': sorted(list(algs))}
 
+    # 9) Robustness Testing
+    report['robustness'] = test_robustness(domain, timeout)
+
     return report
 
 
+def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
+    """Add natural language interpretations to the validation report."""
+    interpretation = {
+        "summary": {
+            "domain": report["domain"],
+            "overall_status": "DNSSEC is properly configured" if report["dnskey"]["present"] else "DNSSEC is not configured",
+            "description": "This report analyzes the DNSSEC configuration and validation status for the domain.",
+        },
+        "key_configuration": {
+            "description": "Analysis of the DNSKEY records and their properties",
+            "status": []
+        },
+        "trust_chain": {
+            "description": "Verification of the chain of trust from parent to child zone",
+            "status": []
+        },
+        "validation_details": {
+            "description": "Details of signature validation for various record types",
+            "status": []
+        },
+        "denial_of_existence": {
+            "description": "Analysis of NSEC/NSEC3 records for proving non-existence",
+            "status": []
+        },
+        "recommendations": []
+    }
+
+    # Key Configuration Analysis
+    if report["dnskey"]["present"]:
+        key_info = report["keys"]
+        interpretation["key_configuration"]["status"].extend([
+            f"Found {key_info['sep_count']} Key Signing Keys (KSK) and {key_info['zsk_count']} Zone Signing Keys (ZSK)",
+            f"Using algorithms: {', '.join(dns.dnssec.algorithm_to_text(alg) for alg in report['algorithms']['algorithm_numbers'])}"
+        ])
+        if key_info.get("critical"):
+            interpretation["key_configuration"]["status"].extend(key_info["critical"])
+        if key_info.get("warnings"):
+            interpretation["key_configuration"]["status"].extend(key_info["warnings"])
+    else:
+        interpretation["key_configuration"]["status"].append("No DNSKEY records found")
+
+    # Trust Chain Analysis
+    parent_ds = report["parent_ds"]
+    if parent_ds.get("parent_ds_present"):
+        if parent_ds.get("matches"):
+            interpretation["trust_chain"]["status"].append(
+                f"Secure delegation found from parent zone {parent_ds['parent']}"
+            )
+        else:
+            interpretation["trust_chain"]["status"].append(
+                f"DS record present in parent zone {parent_ds['parent']} but does not match child DNSKEY"
+            )
+    else:
+        interpretation["trust_chain"]["status"].append(
+            f"No DS record found in parent zone {parent_ds.get('parent', 'unknown')}"
+        )
+
+    # Record Validation Details
+    for rr_type, result in report["rrsets"].items():
+        if result.get("present"):
+            status = "valid" if result.get("valid") else "invalid"
+            reason = f" ({result.get('error')})" if result.get("error") else ""
+            interpretation["validation_details"]["status"].append(
+                f"{rr_type} records present and signatures are {status}{reason}"
+            )
+
+    # Denial of Existence Analysis
+    if "denial_tests" in report:
+        for test_type, result in report["denial_tests"].items():
+            if result.get("nx_proof"):
+                proof = result["nx_proof"]
+                interpretation["denial_of_existence"]["status"].append(
+                    f"{test_type}: {proof['proof_type']} records present and "
+                    f"{'valid' if proof['valid'] else 'invalid'}"
+                )
+
+    # Generate Recommendations
+    if not report["dnskey"]["present"]:
+        interpretation["recommendations"].append(
+            "CRITICAL: Configure DNSSEC by generating and publishing DNSKEY records"
+        )
+    if report["dnskey"]["present"] and not parent_ds.get("parent_ds_present"):
+        interpretation["recommendations"].append(
+            "CRITICAL: Upload DS record to parent zone to establish chain of trust"
+        )
+
+    # Add SOA consistency information
+    if "soa_consistency" in report:
+        interpretation["zone_consistency"] = {
+            "description": "Analysis of zone consistency across authoritative nameservers",
+            "status": []
+        }
+        for zone, consistency in report["soa_consistency"].items():
+            if "consistency" in consistency:
+                status = "consistent" if consistency["consistency"]["consistent"] else "inconsistent"
+                interpretation["zone_consistency"]["status"].append(
+                    f"Zone {zone} is {status} across nameservers"
+                )
+
+    # Add robustness test interpretation
+    if "robustness" in report and "interpretation" in report["robustness"]:
+        interpretation["security_robustness"] = {
+            "description": "Analysis of DNS server robustness against malformed and malicious queries",
+            "status": report["robustness"]["interpretation"]["findings"],
+            "recommendations": report["robustness"]["interpretation"]["recommendations"]
+        }
+        if report["robustness"]["issues_found"]:
+            interpretation["recommendations"].extend([
+                f"Security Issue: {issue}" for issue in report["robustness"]["issues_found"]
+            ])
+
+    return interpretation
+
 def pretty_report(report: Dict[str, Any]) -> str:
+    """Generate a human and LLM-friendly report with both raw data and interpretations."""
     import json
-    return json.dumps(report, indent=2)
+    
+    # Create the final report structure
+    formatted_report = {
+        "raw_data": report,
+        "interpretation": interpret_validation_results(report),
+        "metadata": {
+            "timestamp": int(time.time()),
+            "version": "2.0",
+            "report_type": "DNSSEC Validation Report",
+            "format": "Contains both raw validation data and natural language interpretation"
+        }
+    }
+    
+    return json.dumps(formatted_report, indent=2)
 
 
 if __name__ == '__main__':

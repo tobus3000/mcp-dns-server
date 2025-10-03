@@ -21,6 +21,8 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 requires-python = ">=3.8"
 dependencies = [
@@ -40,7 +42,7 @@ mcp-dns-server = "launch:main"
 
 [project.urls]
 Homepage = "https://github.com/tobus3000/mcp-dns-server"
-Repository = "https://github.com/tobus3000/mcp-dns-server"
+Repository = "https://github.com/tobus3000/mcp-dns-server.git"
 
 [tool.setuptools.packages.find]
 where = ["src"]

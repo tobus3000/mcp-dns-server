@@ -7,10 +7,10 @@ import traceback
 
 try:
     # Try relative import first (when used as part of the package)
-    from .dnssec import validate_domain
+    from .dnssec import validate_domain, pretty_report
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
-    from dnssec import validate_domain
+    from dnssec import validate_domain, pretty_report
 
 # Use dns.resolver.Timeout instead of dns.exception.Timeout
 
@@ -133,7 +133,7 @@ async def check_dnssec_impl(resolver, domain: str) -> Dict[str, Any]:
     try:
         return {
             "domain": domain,
-            "dnssec_validation": validate_domain(domain),
+            "dnssec_validation": pretty_report(validate_domain(domain)),
             "status": "success"
         }
     except Exception as e:
