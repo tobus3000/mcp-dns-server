@@ -260,8 +260,8 @@ class DNSMCPServer:
 
         @self.server.prompt
         def check_dnssec(domain: str) -> str:
-            """Check DNSSEC validation for a domain using the DNSSEC validation check tool."""
-            return f"Check DNSSEC validation for {domain} using the check_dnssec tool provided by the DNS MCP Server."
+            """Get DNSSEC status of a domain using the DNSSEC validation check tool."""
+            return f"Get DNSSEC status of domain {domain} using the check_dnssec tool provided by the DNS MCP Server."
 
 async def main() -> None:
     """Main entry point."""
@@ -272,4 +272,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-# End of file
