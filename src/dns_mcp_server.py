@@ -1,6 +1,8 @@
 """MCP DNS Server - An MCP server for DNS name resolution and troubleshooting."""
 import asyncio
 import logging
+import signal
+import sys
 from typing import Any, Dict
 import dns.resolver
 import yaml
@@ -35,14 +37,18 @@ class DNSMCPServer:
 
     def __init__(self, config_path: str = "config/config.yaml") -> None:
         """Initialize the DNS MCP server.
-        
+
         Args:
-            config_path: Path to the configuration file. Defaults to "config/config.yaml"
+            config_path: Path to the configuration file.
+                Defaults to "config/config.yaml"
         """
         self.config_path = config_path
         self.server = FastMCP(
             name="DNS Resolver MCP Server",
-            instructions="An MCP server that provides DNS resolution and troubleshooting capabilities.",
+            instructions=(
+                "An MCP server that provides DNS resolution and troubleshooting"
+                " capabilities."
+            ),
         )
         self.setup_logging()
         self.configure_resolver()
@@ -79,16 +85,22 @@ class DNSMCPServer:
                 self.resolver.lifetime = 5.0  # Default timeout
 
         except FileNotFoundError:
-            self.logger.info(f"Config file {self.config_path} not found, using default DNS servers")
+            self.logger.info(
+                "Config file %s not found, using default DNS servers",
+                self.config_path
+            )
             self.resolver = dns.resolver.Resolver()
-        except Exception as e:
-            self.logger.error(f"Error loading config: {e}")
+        except (yaml.YAMLError, OSError) as e:
+            self.logger.error("Error loading config: %s", e)
             self.resolver = dns.resolver.Resolver()
 
     def initialize_knowledge_base(self) -> None:
         """Initialize the knowledge base manager."""
         self.kb_manager = KnowledgeBaseManager()
-        self.logger.info(f"Knowledge base initialized with {len(self.kb_manager.get_all_articles())} articles")
+        self.logger.info(
+            "Knowledge base initialized with %d articles",
+            len(self.kb_manager.get_all_articles())
+        )
 
     def register_tools(self) -> None:
         """Register all DNS-related tools with the MCP server."""
@@ -123,9 +135,15 @@ class DNSMCPServer:
 
         @self.server.tool(
             name="dns_server_troubleshooting",
-            description="Perform comprehensive DNS server troubleshooting for a given domain and nameserver"
+            description=(
+                "Perform comprehensive DNS server troubleshooting for a given"
+                " domain and nameserver"
+            )
         )
-        async def dns_server_troubleshooting(domain: str, nameserver: str) -> Dict[str, Any]:
+        async def dns_server_troubleshooting(
+            domain: str,
+            nameserver: str
+        ) -> Dict[str, Any]:
             return await nstests.run_comprehensive_tests(domain, nameserver)
 
         @self.server.tool(
@@ -151,6 +169,34 @@ class DNSMCPServer:
 
     # ...existing code...
 
+    def setup_signal_handlers(self) -> None:
+        """Set up signal handlers for graceful shutdown."""
+        if sys.platform == "win32":
+            # Windows doesn't support SIGTERM properly, use SIGBREAK instead
+            signals = (signal.SIGINT, signal.SIGBREAK)
+        else:
+            signals = (signal.SIGINT, signal.SIGTERM)
+
+        for sig in signals:
+            try:
+                asyncio.get_running_loop().add_signal_handler(
+                    sig,
+                    lambda s=sig: asyncio.create_task(self._signal_handler(s))
+                )
+            except NotImplementedError:
+                # Some systems might not support add_signal_handler
+                signal.signal(sig, lambda s, f: asyncio.create_task(self._signal_handler(s)))
+
+    async def _signal_handler(self, sig: int) -> None:
+        """Handle shutdown signals.
+        
+        Args:
+            sig: Signal number that triggered the handler
+        """
+        sig_name = signal.Signals(sig).name
+        self.logger.info("Received shutdown signal %s", sig_name)
+        await self.stop()
+
     async def start(self, host: str = "127.0.0.1", port: int = 3000) -> None:
         """Start the MCP server using HTTP transport.
         
@@ -158,11 +204,70 @@ class DNSMCPServer:
             host: The host to bind to. Defaults to "127.0.0.1"
             port: The port to listen on. Defaults to 3000
         """
-        await self.server.run_async(transport="http", host=host, port=port)
+        self.setup_signal_handlers()
+        try:
+            self.logger.info("Starting MCP DNS Server on %s:%d", host, port)
+            await self.server.run_async(transport="http", host=host, port=port)
+        except (OSError, RuntimeError) as e:
+            self.logger.error("Error starting server: %s", e)
+            await self.stop()
+            raise
+        except KeyboardInterrupt:
+            self.logger.info("Received keyboard interrupt")
+            await self.stop()
 
     async def stop(self) -> None:
-        """Stop the MCP server."""
-        # FastMCP doesn't have a direct stop method - server runs until interrupted
+        """Stop the MCP server gracefully."""
+        self.logger.info("Shutting down MCP DNS Server...")
+
+        # Close any active DNS resolver connections
+        try:
+            if hasattr(self, 'resolver') and self.resolver is not None:
+                if hasattr(self.resolver, 'cache') and self.resolver.cache is not None:
+                    self.resolver.cache.flush()
+        except AttributeError:
+            self.logger.debug("No resolver cache to flush")
+        except Exception as e:
+            self.logger.warning("Error while flushing resolver cache: %s", e)
+
+        # Stop the FastMCP server
+        if hasattr(self, 'server'):
+            # Since FastMCP doesn't expose a stop() method, we'll clean up manually
+            try:
+                # First cancel all running tasks except the current one
+                current = asyncio.current_task()
+                pending = [t for t in asyncio.all_tasks() if t is not current]
+
+                if pending:
+                    self.logger.debug("Cancelling %d pending tasks", len(pending))
+                    for task in pending:
+                        task.cancel()
+
+                    # Wait for tasks to complete or timeout
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.gather(*pending, return_exceptions=True),
+                            timeout=5.0
+                        )
+                    except asyncio.TimeoutError:
+                        self.logger.warning("Timeout waiting for tasks to stop")
+                    except Exception as e:
+                        self.logger.error("Error during task cleanup: %s", e)
+            except Exception as e:
+                self.logger.error("Error during server shutdown: %s", e)
+
+        # Remove signal handlers
+        if sys.platform == "win32":
+            signals = (signal.SIGINT, signal.SIGBREAK)
+        else:
+            signals = (signal.SIGINT, signal.SIGTERM)
+
+        for sig in signals:
+            try:
+                asyncio.get_running_loop().remove_signal_handler(sig)
+            except (NotImplementedError, ValueError):
+                # Ignore if signal handlers weren't supported or already removed
+                pass
         self.logger.info("MCP DNS Server stopped")
 
     def register_knowledge_base_resources(self) -> None:
@@ -246,7 +351,10 @@ class DNSMCPServer:
         )
         def dns_troubleshooting_help() -> str:
             """Get help with DNS troubleshooting using the knowledge base."""
-            return "When asked about DNS troubleshooting, consult the knowledge base using the search function with relevant query terms."
+            return (
+                "When asked about DNS troubleshooting, consult the knowledge base"
+                " using the search function with relevant query terms."
+            )
 
         @self.server.prompt(
             name="dns_configuration_help",
@@ -254,7 +362,10 @@ class DNSMCPServer:
         )
         def dns_configuration_help() -> str:
             """Get help with DNS configuration using the knowledge base."""
-            return "When asked about DNS configuration, particularly for complex setups like Extranet, search the knowledge base for configuration guides."
+            return (
+                "When asked about DNS configuration, particularly for complex setups"
+                " like Extranet, search the knowledge base for configuration guides."
+            )
 
         @self.server.prompt(
             name="dns_security_help",
@@ -262,54 +373,117 @@ class DNSMCPServer:
         )
         def dns_security_help() -> str:
             """Get help with DNS security best practices using the knowledge base."""
-            return "When asked about DNS security, search the knowledge base for security best practices and implementation guidelines."
+            return (
+                "When asked about DNS security, search the knowledge base for"
+                " security best practices and implementation guidelines."
+            )
 
         @self.server.prompt
         def resolve_hostname(hostname: str) -> str:
-            """Resolve a hostname to its IP address using the simple DNS lookup tool."""
-            return f"Resolve {hostname} to its IP address using the simple dns lookup tool provided by the DNS MCP Server."
+            """Resolve a hostname to its IP address."""
+            return (
+                f"Resolve {hostname} to its IP address using the simple dns"
+                " lookup tool provided by the DNS MCP Server."
+            )
 
         @self.server.prompt
         def resolve_ip(ip: str) -> str:
-            """Resolve a IP address to hostname using the reverse DNS lookup tool."""
-            return f"Resolve {ip} to its hostname using the reverse DNS lookup tool provided by the DNS MCP Server."
+            """Resolve an IP address to hostname using reverse DNS lookup."""
+            return (
+                f"Resolve {ip} to its hostname using the reverse DNS lookup tool"
+                " provided by the DNS MCP Server."
+            )
 
         @self.server.prompt
         def advanced_lookup(hostname: str, record_type: str) -> str:
-            """Perform an advanced DNS lookup for a hostname and record type using the advanced DNS lookup tool."""
-            return f"Perform an advanced DNS lookup for {hostname} with record type {record_type} using the advanced dns lookup tool provided by the DNS MCP Server."
+            """Perform an advanced DNS lookup for a hostname and record type."""
+            return (
+                f"Perform an advanced DNS lookup for {hostname} with record type"
+                f" {record_type} using the advanced dns lookup tool provided"
+                " by the DNS MCP Server."
+            )
 
         @self.server.prompt
         def dns_domain_troubleshoot(domain: str) -> str:
-            """Perform comprehensive DNS troubleshooting for a domain using the DNS troubleshooting tool."""
-            return f"Perform DNS troubleshooting for {domain} using the dns domain troubleshooting tool provided by the DNS MCP Server."
+            """Perform DNS troubleshooting for a domain."""
+            return (
+                f"Perform DNS troubleshooting for {domain} using"
+                " the dns domain troubleshooting tool provided"
+                " by the DNS MCP Server."
+            )
 
         @self.server.prompt
         def dns_server_troubleshoot(domain: str, nameserver: str) -> str:
-            """Perform comprehensive DNS server troubleshooting for a nameserver using the DNS server troubleshooting tool."""
-            return f"Perform DNS server troubleshooting for domain {domain} and nameserver {nameserver} using the dns server troubleshooting tool provided by the DNS MCP Server."
+            """Perform comprehensive DNS server troubleshooting."""
+            return (
+                f"Perform DNS server troubleshooting for domain {domain} and"
+                f" nameserver {nameserver} using the dns server troubleshooting"
+                " tool provided by the DNS MCP Server."
+            )
 
         @self.server.prompt
         def dns_edns_test(domain: str, nameserver: str) -> str:
-            """Perform EDNS tests for a nameserver using the DNS EDNS test tool."""
-            return f"Perform EDNS tests for domain {domain} and nameserver {nameserver} using the dns server edns test tool provided by the DNS MCP Server."
+            """Perform EDNS tests for a nameserver."""
+            return (
+                f"Perform EDNS tests for domain {domain} and"
+                f" nameserver {nameserver} using the dns server edns test"
+                " tool provided by the DNS MCP Server."
+            )
 
         @self.server.prompt
         def dns_udp_tcp_test(domain: str, nameserver: str) -> str:
-            """Perform UDP and TCP behavior tests for a nameserver using the DNS UDP/TCP test tool."""
-            return f"Perform UDP and TCP behavior tests for domain {domain} and nameserver {nameserver} using the dns udp tcp test tool provided by the DNS MCP Server."
+            """Perform UDP and TCP behavior tests for a nameserver."""
+            return (
+                f"Perform UDP and TCP behavior tests for domain {domain} and"
+                f" nameserver {nameserver} using the dns udp tcp test tool"
+                " provided by the DNS MCP Server."
+            )
 
         @self.server.prompt
         def check_dnssec(domain: str) -> str:
-            """Get DNSSEC status of a domain using the DNSSEC validation check tool."""
-            return f"Get DNSSEC status of domain {domain} using the check_dnssec tool provided by the DNS MCP Server."
+            """Get DNSSEC status of a domain."""
+            return (
+                f"Get DNSSEC status of domain {domain} using the check_dnssec"
+                " tool provided by the DNS MCP Server."
+            )
 
 async def main() -> None:
     """Main entry point."""
     server = DNSMCPServer()
-    # Start the server with HTTP transport - this will block until interrupted
-    await server.start()
+    try:
+        # Start the server with HTTP transport
+        await server.start()
+    except KeyboardInterrupt:
+        # Handle Ctrl+C gracefully
+        await server.stop()
+    except (OSError, RuntimeError) as e:
+        # Log any unexpected errors
+        logging.error("Unexpected error: %s", e)
+        await server.stop()
+        sys.exit(1)
+
+
+def run_server() -> None:
+    """Run the server with proper asyncio event loop handling."""
+    loop = None
+    try:
+        if sys.platform == "win32":
+            # Use ProactorEventLoop on Windows for better signal handling
+            loop = asyncio.ProactorEventLoop()
+            asyncio.set_event_loop(loop)
+        else:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        # This is a fallback in case the signal handlers don't catch it
+        if loop is not None:
+            loop.run_until_complete(asyncio.sleep(0))  # Let other tasks complete
+    finally:
+        if loop is not None:
+            loop.close()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run_server()

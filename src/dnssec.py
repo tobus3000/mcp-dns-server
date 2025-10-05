@@ -1,51 +1,87 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """DNSSEC validator module for DNS zone security."""
 
 from __future__ import annotations
 
+import statistics
 import sys
 import time
-import statistics
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, cast, TypedDict
 
+import dns.dnssec
+import dns.edns
+import dns.exception
+import dns.flags
 import dns.message
 import dns.name
+import dns.query
+import dns.rcode
+import dns.rdataclass
+import dns.rdataset
+import dns.rdatatype
 import dns.resolver
 import dns.rrset
-import dns.rdataset
-import dns.rdataclass
-import dns.rdatatype
-import dns.dnssec
 import dns.rdtypes.ANY.SOA
+from dns.rdtypes.ANY.NSEC import NSEC
+from dns.rdtypes.ANY.NSEC3 import NSEC3
+from dns.rdtypes.ANY.RRSIG import RRSIG
 
-# Import NSEC/NSEC3 types
-import dns.rdtypes.ANY.NSEC
-import dns.rdtypes.ANY.NSEC3
-import dns.flags
-import dns.rcode
-import dns.edns
-import dns.query
-import dns.exception
+# Type definitions for result dictionaries
+class ValidationResult(TypedDict, total=False):
+    valid: bool
+    error: str  # Single error string
+    errors: List[str]  # List of errors
+    warnings: List[str]
+    parameters: Optional[Dict[str, Any]]
+    chain: List[Dict[str, Any]]
+    validation: Dict[str, Any]
+
+class TestResult(TypedDict):
+    name: str
+    description: str
+    passed: bool
+    error: Optional[str]
 
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA
 RRset = dns.rrset.RRset
 Message = dns.message.Message
 Name = dns.name.Name
-NSECRecord = dns.rdtypes.ANY.NSEC.NSEC
-NSEC3Record = dns.rdtypes.ANY.NSEC3.NSEC3
 
-# Required for exception handling
-import dns.exception
-
+# For type checking
+NSECRecord = NSEC 
+NSEC3Record = NSEC3
 
 DEFAULT_TIMEOUT = 5.0
 
 
 class ValidationError(Exception):
-    pass
+    """Base exception for DNSSEC validation errors."""
+
+def handle_dns_error(error: Exception) -> str:
+    """Convert DNS-related exceptions to descriptive error messages."""
+    if isinstance(error, dns.resolver.NXDOMAIN):
+        return "Domain name does not exist"
+    elif isinstance(error, dns.resolver.NoAnswer):
+        return "No answer received from server"
+    elif isinstance(error, dns.resolver.NoNameservers):
+        return "No DNS servers responded"
+    elif isinstance(error, dns.name.LabelTooLong):
+        return "Domain name label too long"
+    elif isinstance(error, dns.name.BadLabelType):
+        return "Invalid characters in domain name"
+    elif isinstance(error, dns.exception.Timeout):
+        return "DNS query timed out"
+    elif str(error.__class__).endswith('ValidationFailure'):
+        return f"DNSSEC validation failed: {str(error)}"
+    elif isinstance(error, dns.exception.DNSException):
+        return f"DNS error: {str(error)}"
+    else:
+        return f"Unexpected error: {str(error)}"
 
 
-def _resolve(domain: str, rdtype: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT) -> Tuple[Optional[RRset], Optional[Message]]:
+def _resolve(qname: str, rdtype: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT) -> Tuple[Optional[RRset], Optional[Message]]:
     """Resolve a single RRset using dns.resolver for convenience.
     Returns (rdataset, response) where rdataset is a dns.rrset.RRset or None and response is dns.message.Message or None.
     """
@@ -54,7 +90,7 @@ def _resolve(domain: str, rdtype: str, nameserver: Optional[str] = None, timeout
     if nameserver:
         resolver.nameservers = [nameserver]
     try:
-        answer = resolver.resolve(domain, rdtype, raise_on_no_answer=False)
+        answer = resolver.resolve(qname, rdtype, raise_on_no_answer=False)
         if answer.rrset is None:
             return None, answer.response
         return answer.rrset, answer.response
@@ -63,18 +99,18 @@ def _resolve(domain: str, rdtype: str, nameserver: Optional[str] = None, timeout
         return None, getattr(e, 'response', None)
 
 
-def fetch_dnskey(domain: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT):
-    rrset, resp = _resolve(domain, 'DNSKEY', nameserver, timeout)
+def fetch_dnskey(qname: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT):
+    rrset, resp = _resolve(qname, 'DNSKEY', nameserver, timeout)
     return rrset, resp
 
 
-def fetch_ds(domain: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT):
-    rrset, resp = _resolve(domain, 'DS', nameserver, timeout)
+def fetch_ds(qname: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT):
+    rrset, resp = _resolve(qname, 'DS', nameserver, timeout)
     return rrset, resp
 
 
-def get_parent_name(domain: str) -> str:
-    name = dns.name.from_text(domain)
+def get_parent_name(qname: str) -> str:
+    name = dns.name.from_text(qname)
     if len(name) == 1:
         return '.'
     parent = name.parent()
@@ -83,31 +119,51 @@ def get_parent_name(domain: str) -> str:
     return parent_text if parent_text == '.' else parent_text.rstrip('.')
 
 
-def compute_ds_from_dnskey(name: str, dnskey_rrset: dns.rrset.RRset, digest_alg: str = 'SHA256') -> List[str]:
-    """Compute DS digest(s) from DNSKEY RRset. Returns list of DS string representations."""
+def compute_ds_from_dnskey(name: str, dnskey_rrset: dns.rrset.RRset, digest_alg: str = 'SHA256') -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Compute DS digest(s) from DNSKEY RRset. 
+    
+    Returns:
+        Tuple containing:
+        - List of DS string representations
+        - List of dictionaries containing information about denied keys
+    """
     ds_list = []
+    denied_keys = []
     name_obj = dns.name.from_text(name)
     for rdata in dnskey_rrset:
         try:
             # Try with newer API first
             ds = dns.dnssec.make_ds(name_obj, rdata, digest_alg)
             ds_list.append(str(ds))
-        except Exception:
+        except dns.exception.DeniedByPolicy:
+            # Track denied keys with their details
+            denied_keys.append({
+                'key_tag': key_tag_from_dnskey(rdata),
+                'algorithm': rdata.algorithm,
+                'algorithm_name': dns.dnssec.algorithm_to_text(rdata.algorithm),
+                'flags': rdata.flags,
+                'digest_alg': digest_alg,
+                'reason': 'Denied by DNSSEC policy'
+            })
             continue
-    return ds_list
+        except (dns.resolver.NoNameservers, dns.resolver.NoAnswer, dns.exception.Timeout,
+                dns.exception.DNSException):
+            continue  # Skip this record and try next one
+    return ds_list, denied_keys
 
 
 def key_tag_from_dnskey(rdata) -> int:
     try:
         return dns.dnssec.key_id(rdata)
-    except Exception:
-        # If dns.dnssec.key_id unavailable, try .key_tag attribute
+    except (AttributeError, ValueError, dns.exception.DNSException):
+        # If dns.dnssec.key_id fails, try .key_tag attribute
+        # This handles both older DNS implementations and malformed keys
         return getattr(rdata, 'key_tag', 0)
 
 
-def validate_nsec3_parameters(nsec3_record) -> Dict[str, Any]:
+def validate_nsec3_parameters(nsec3_record: NSEC3) -> Dict[str, Any]:
     """Validate NSEC3 parameters according to best practices."""
-    result = {
+    result: Dict[str, Any] = {
         'valid': True,
         'warnings': [],
         'algorithm': nsec3_record.algorithm,
@@ -117,15 +173,15 @@ def validate_nsec3_parameters(nsec3_record) -> Dict[str, Any]:
     }
     
     # Check for invalid parameters according to RFC 5155 and best practices
-    if nsec3_record.algorithm != 1:
+    if result['algorithm'] != 1:
         result['valid'] = False
-        result['warnings'].append(f"Invalid NSEC3 algorithm: {nsec3_record.algorithm}")
+        result['warnings'].append(f"Invalid NSEC3 algorithm: {result['algorithm']}")
     
-    if nsec3_record.iterations > 150:  # Current recommended max
-        result['warnings'].append(f"NSEC3 iterations too high: {nsec3_record.iterations}")
+    if result['iterations'] > 150:  # Current recommended max
+        result['warnings'].append(f"NSEC3 iterations too high: {result['iterations']}")
     
-    if nsec3_record.salt and len(nsec3_record.salt) > 32:
-        result['warnings'].append(f"NSEC3 salt length too long: {len(nsec3_record.salt)}")
+    if result['salt'] and result['salt_length'] > 32:
+        result['warnings'].append(f"NSEC3 salt length too long: {result['salt_length']}")
     
     return result
 
@@ -139,17 +195,13 @@ def validate_nsec_chain(nsec_records: List[dns.rrset.RRset], zone_name: str) -> 
     sorted_records = sorted(nsec_records, key=lambda r: r.name.to_text())
     
     # Convert zone name for comparison
-    zone = dns.name.from_text(zone_name)
+    _ = dns.name.from_text(zone_name)  # Validate zone name format
     
     # Check if chain forms a complete circle
     for i in range(len(sorted_records)):
         current_rrset = sorted_records[i]
-        # Cast the record to NSECRecord for type safety
-        current_nsec = NSECRecord.from_rdata(
-            current_rrset.name,
-            current_rrset.ttl,
-            current_rrset[0]
-        )
+        # Use the first rdata record directly
+        current_nsec = cast(NSEC, current_rrset[0])
         next_owner = current_nsec.next
         expected_next = sorted_records[(i + 1) % len(sorted_records)].name
         
@@ -160,37 +212,37 @@ def validate_nsec_chain(nsec_records: List[dns.rrset.RRset], zone_name: str) -> 
         result['chain'].append({
             'owner': current_rrset.name.to_text(),
             'next': next_owner.to_text(),
-            'types': [dns.rdatatype.to_text(t) for t in current_nsec.windows]
+            'types': [str(dns.rdatatype.RdataType(t[0])) for t in current_nsec.windows]
         })
     
     return result
 
 
-def validate_nsec3_chain(nsec3_records: List[dns.rrset.RRset], zone_name: str) -> Dict[str, Any]:
+def validate_nsec3_chain(nsec3_records: List[dns.rrset.RRset]) -> ValidationResult:
     """Validate that NSEC3 records form a complete chain with valid parameters."""
     if not nsec3_records:
         return {'valid': False, 'error': 'No NSEC3 records found'}
     
-    result = {'valid': True, 'errors': [], 'warnings': [], 'parameters': None, 'chain': []}
+    result: ValidationResult = {
+        'valid': True,
+        'errors': [],
+        'warnings': [],
+        'parameters': None,
+        'chain': []
+    }
     
     # Cast to NSEC3Record for type safety
     def to_nsec3(record: dns.rrset.RRset) -> NSEC3Record:
-        return NSEC3Record(
-            rdclass=record.rdclass,
-            rdtype=record.rdtype,
-            algorithm=record[0].algorithm,
-            flags=record[0].flags,
-            iterations=record[0].iterations,
-            salt=record[0].salt,
-            next=record[0].next,
-            windows=record[0].windows,
-            bitmap=record[0].bitmap
-        )
+        rdata = record[0]
+        # Simply return the RDATA cast to NSEC3 type
+        return cast(NSEC3Record, rdata)
 
     # Validate parameters from first record
     first_nsec3 = to_nsec3(nsec3_records[0])
     result['parameters'] = validate_nsec3_parameters(first_nsec3)
-    result['warnings'].extend(result['parameters']['warnings'])
+    params = result.get('parameters', {})
+    if params and 'warnings' in params:
+        result['warnings'].extend(params['warnings'])
     
     # Sort records by hash
     sorted_records = [to_nsec3(r) for r in nsec3_records]
@@ -200,16 +252,16 @@ def validate_nsec3_chain(nsec3_records: List[dns.rrset.RRset], zone_name: str) -
     for i in range(len(sorted_records)):
         current = sorted_records[i]
         next_hash = current.next
-        expected_next = sorted_records[(i + 1) % len(sorted_records)].current
+        expected_next = sorted_records[(i + 1) % len(sorted_records)].next
         
         if next_hash != expected_next:
             result['valid'] = False
-            result['errors'].append(f"Broken NSEC3 chain between {current.current.hex()} and {next_hash.hex()}")
+            result['errors'].append(f"Broken NSEC3 chain between {current.next.hex()} and {next_hash.hex()}")
         
         result['chain'].append({
-            'current': current.current.hex(),
+            'current': current.next.hex(),
             'next': next_hash.hex(),
-            'types': [dns.rdatatype.to_text(t) for t in current.windows]
+            'types': [str(dns.rdatatype.RdataType(t[0])) for t in current.windows]
         })
     
     return result
@@ -244,11 +296,12 @@ def validate_rrset_with_dnskey(rrset: dns.rrset.RRset, rrsigset: dns.rrset.RRset
         }
         dns.dnssec.validate(rrset, rrsigset, keys)
         return True, None
-    except Exception as e:
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, 
+            dns.resolver.NoNameservers, dns.exception.DNSException) as e:
         return False, str(e)
 
 
-def validate_denial_proof(resp: Message, domain: str) -> Dict[str, Any]:
+def validate_denial_proof(resp: Message, _target: str) -> Dict[str, Any]:
     """Validate NSEC or NSEC3 denial of existence proof."""
     result = {
         'valid': False,
@@ -272,25 +325,28 @@ def validate_denial_proof(resp: Message, domain: str) -> Dict[str, Any]:
     if nsec_records:
         result['proof_type'] = 'NSEC'
         result['records'] = [r.to_text() for r in nsec_records]
-        zone = dns.name.from_text(domain).parent()
-        result['validation'] = validate_nsec_chain(nsec_records, zone.to_text())
-        result['valid'] = result['validation']['valid']
+        # Extract domain from first NSEC record's owner name
+        first_nsec = nsec_records[0]
+        zone = first_nsec.name.parent()
+        validation = validate_nsec_chain(nsec_records, zone.to_text())
+        result['validation'] = validation
+        result['valid'] = validation.get('valid', False)
     elif nsec3_records:
         result['proof_type'] = 'NSEC3'
         result['records'] = [r.to_text() for r in nsec3_records]
-        zone = dns.name.from_text(domain).parent()
-        result['validation'] = validate_nsec3_chain(nsec3_records, zone.to_text())
-        result['valid'] = result['validation']['valid']
+        validation = validate_nsec3_chain(nsec3_records)
+        result['validation'] = validation
+        result['valid'] = validation.get('valid', False)
     
     return result
 
 
-def check_rrset_signature(domain: str, rdtype: str, dnskey_rrset: Optional[dns.rrset.RRset], nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
-    rrset, resp = _resolve(domain, rdtype, nameserver, timeout)
+def check_rrset_signature(target: str, rdtype: str, dnskey_rrset: Optional[dns.rrset.RRset], nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
+    rrset, resp = _resolve(target, rdtype, nameserver, timeout)
     result: Dict[str, Any] = {'type': rdtype, 'present': rrset is not None}
     if rrset is None or dnskey_rrset is None:
         # try to see if NXDOMAIN or NODATA with proof
-        result['nx_proof'] = validate_denial_proof(resp, domain) if resp else None
+        result['nx_proof'] = validate_denial_proof(resp, target) if resp else None
         return result
 
     rrsig = extract_rrsig_for_rrset(resp, rdtype)
@@ -300,7 +356,7 @@ def check_rrset_signature(domain: str, rdtype: str, dnskey_rrset: Optional[dns.r
         result['error'] = 'no RRSIG present'
         return result
 
-    valid, message = validate_rrset_with_dnskey(rrset, rrsig, dnskey_rrset, domain)
+    valid, message = validate_rrset_with_dnskey(rrset, rrsig, dnskey_rrset, target)
     result['valid'] = valid
     if not valid:
         result['error'] = message
@@ -314,23 +370,31 @@ def check_rrset_signature(domain: str, rdtype: str, dnskey_rrset: Optional[dns.r
                 expiration = rdata.expiration
                 now = int(time.time())
                 sig_ok_times.append({'inception': inception, 'expiration': expiration, 'now': now, 'valid_now': inception <= now <= expiration})
-            except Exception:
+            except (AttributeError, ValueError, TypeError):
+                # Skip records with invalid time values
                 continue
         result['signatures'] = sig_ok_times
     return result
 
 
-def check_parent_ds(domain: str, dnskey_rrset: Optional[dns.rrset.RRset], parent_ns: Optional[str] = None) -> Dict[str, Any]:
-    parent = get_parent_name(domain)
-    ds_rrset, _ = fetch_ds(domain, parent_ns)
-    result: Dict[str, Any] = {'parent': parent, 'parent_ds_present': ds_rrset is not None}
+def check_parent_ds(zone_name: str, dnskey_rrset: Optional[dns.rrset.RRset], parent_ns: Optional[str] = None) -> Dict[str, Any]:
+    parent = get_parent_name(zone_name)
+    ds_rrset, _ = fetch_ds(zone_name, parent_ns)
+    result: Dict[str, Any] = {
+        'parent': parent,
+        'parent_ds_present': ds_rrset is not None,
+        'denied_keys': []
+    }
     # compute DS from the child DNSKEY
     if dnskey_rrset is None:
         result['child_dnskey_present'] = False
         return result
     result['child_dnskey_present'] = True
-    computed_sha256 = compute_ds_from_dnskey(domain, dnskey_rrset, 'SHA256')
-    computed_sha1 = compute_ds_from_dnskey(domain, dnskey_rrset, 'SHA1')
+    computed_sha256, denied_sha256 = compute_ds_from_dnskey(zone_name, dnskey_rrset, 'SHA256')
+    computed_sha1, denied_sha1 = compute_ds_from_dnskey(zone_name, dnskey_rrset, 'SHA1')
+    # Track all denied keys
+    result['denied_keys'].extend(denied_sha256)
+    result['denied_keys'].extend(denied_sha1)
     result['computed_ds'] = {'SHA256': computed_sha256, 'SHA1': computed_sha1}
     if ds_rrset is None:
         return result
@@ -338,6 +402,13 @@ def check_parent_ds(domain: str, dnskey_rrset: Optional[dns.rrset.RRset], parent
     parent_ds_texts = [str(r) for r in ds_rrset]
     result['parent_ds_texts'] = parent_ds_texts
     matches = []
+    # Add summary of denied keys if any were denied
+    if result['denied_keys']:
+        result['denied_summary'] = {
+            'count': len(result['denied_keys']),
+            'algorithms': list(set(k['algorithm_name'] for k in result['denied_keys'])),
+            'flags': list(set(k['flags'] for k in result['denied_keys']))
+        }
     for ds in parent_ds_texts:
         for cds in computed_sha256 + computed_sha1:
             if ds.split()[-1] == cds.split()[-1] or ds == cds:
@@ -346,7 +417,7 @@ def check_parent_ds(domain: str, dnskey_rrset: Optional[dns.rrset.RRset], parent
     return result
 
 
-def get_soa_serial(domain: str, nameserver: str, timeout: int = 5) -> Optional[int]:
+def get_soa_serial(zone_name: str, nameserver: str, timeout: int = 5) -> Optional[int]:
     """Gets the SOA serial number from the specified nameserver."""
     try:
         # Create a resolver for this nameserver
@@ -355,7 +426,7 @@ def get_soa_serial(domain: str, nameserver: str, timeout: int = 5) -> Optional[i
         resolver.timeout = timeout
         
         # Query the SOA record
-        answer = resolver.resolve(domain, 'SOA')
+        answer = resolver.resolve(zone_name, 'SOA')
         if answer and answer.rrset and len(answer.rrset) > 0:
             # SOA record format: mname rname serial refresh retry expire minimum
             soa_text = str(answer.rrset[0])
@@ -363,11 +434,12 @@ def get_soa_serial(domain: str, nameserver: str, timeout: int = 5) -> Optional[i
             fields = soa_text.split()
             if len(fields) >= 3:
                 return int(fields[2])
-    except Exception:
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, 
+            dns.resolver.NoNameservers, dns.exception.DNSException):
         pass
     return None
 
-def check_soa_consistency(domain: str, nameservers: List[str]) -> Dict[str, Any]:
+def check_soa_consistency(zone_name: str, nameservers: List[str]) -> Dict[str, Any]:
     """Check SOA serial consistency across authoritative nameservers."""
     results = {}
     serials = {}
@@ -380,7 +452,9 @@ def check_soa_consistency(domain: str, nameservers: List[str]) -> Dict[str, Any]
                 a_rr, _ = _resolve(ns, 'A')
                 if a_rr:
                     ns_ip = str(a_rr[0])
-            except Exception as e:
+            except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
+                    dns.resolver.NoNameservers, dns.exception.DNSException,
+                    dns.exception.Timeout) as e:
                 results[ns] = {'error': f"Failed to resolve nameserver IP: {str(e)}"}
                 continue
 
@@ -389,13 +463,15 @@ def check_soa_consistency(domain: str, nameservers: List[str]) -> Dict[str, Any]
                 continue
 
             # Get SOA serial from this nameserver
-            serial = get_soa_serial(domain, ns_ip)
+            serial = get_soa_serial(zone_name, ns_ip)
             if serial is not None:
                 serials[ns] = serial
                 results[ns] = {'serial': serial, 'ip': ns_ip}
             else:
                 results[ns] = {'error': "Could not retrieve SOA serial"}
-        except Exception as e:
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
+              dns.resolver.NoNameservers, dns.exception.DNSException,
+              dns.exception.Timeout) as e:
             results[ns] = {'error': str(e)}
 
     # Analyze serial consistency
@@ -409,15 +485,15 @@ def check_soa_consistency(domain: str, nameservers: List[str]) -> Dict[str, Any]
     
     return results
 
-def list_authoritative_nameservers(domain: str) -> List[str]:
-    ns_rrset, _ = _resolve(domain, 'NS')
+def list_authoritative_nameservers(zone_name: str) -> List[str]:
+    ns_rrset, _ = _resolve(zone_name, 'NS')
     if ns_rrset is None:
         return []
     return [r.target.to_text() for r in ns_rrset]
 
 
-def check_authoritative_consistency(domain: str) -> Dict[str, Any]:
-    ns_list = list_authoritative_nameservers(domain)
+def check_authoritative_consistency(zone_name: str) -> Dict[str, Any]:
+    ns_list = list_authoritative_nameservers(zone_name)
     results: Dict[str, Any] = {}
     for ns in ns_list:
         try:
@@ -427,7 +503,9 @@ def check_authoritative_consistency(domain: str) -> Dict[str, Any]:
                 a_rr, _ = _resolve(ns, 'A')
                 if a_rr:
                     ns_ip = str(a_rr[0])
-            except Exception as e:
+            except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
+                   dns.resolver.NoNameservers, dns.exception.DNSException,
+                   dns.exception.Timeout) as e:
                 results[ns] = {'error': f"Failed to resolve nameserver IP: {str(e)}"}
                 continue
                 
@@ -436,20 +514,22 @@ def check_authoritative_consistency(domain: str) -> Dict[str, Any]:
                 continue
                 
             # Query DNSKEY directly at that nameserver
-            rrset, _ = fetch_dnskey(domain, nameserver=ns_ip)
+            rrset, _ = fetch_dnskey(zone_name, nameserver=ns_ip)
             results[ns] = {
                 'dnskey_present': rrset is not None,
                 'dnskey_count': len(rrset) if rrset else 0,
                 'dnskey_text': [r.to_text() for r in rrset] if rrset else [],
                 'ip': ns_ip
             }
-        except Exception as e:
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
+                dns.resolver.NoNameservers, dns.exception.DNSException,
+                dns.exception.Timeout) as e:
             results[ns] = {'error': str(e)}
     # quick consistency check: compare unique signatures and key counts
     counts = [v.get('dnskey_count', 0) for v in results.values() if isinstance(v, dict)]
     try:
         results['counts_summary'] = {'min': min(counts), 'max': max(counts), 'median': statistics.median(counts) if counts else None}
-    except Exception:
+    except (ValueError, TypeError):
         results['counts_summary'] = None
     return results
 
@@ -555,18 +635,25 @@ def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[s
     return key_results
 
 
-def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
-    """Test DNS server robustness against malformed and malicious queries.
+def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
+    """Test DNS server's robustness to various edge cases.
     
     Tests various edge cases and potential attack vectors:
     1. Overly long domain names
     2. Invalid characters in queries
     3. Unexpected record types
     4. Malformed DNSSEC queries
-    5. Response to potential replay attacks
+    5. Replay attack detection
+    
+    Args:
+        zone_name: Zone name used for test scenarios
+        timeout: Timeout for DNS queries in seconds
+    
+    Returns:
+        Dict containing test results with details about each test case
     """
     result = {
-        'domain': domain,
+        'domain': zone_name,
         'tests': [],
         'issues_found': [],
         'security_rating': 'good'
@@ -574,7 +661,7 @@ def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
     
     # Test 1: Overly long labels and names
     long_label = "a" * 64  # RFC 1035 limit is 63
-    long_name = f"{long_label}.{domain}"
+    long_name = f"{long_label}.{zone_name}"
     try:
         # Create query with overly long label
         qname = dns.name.from_text(long_name)
@@ -583,54 +670,50 @@ def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
         resolver.lifetime = timeout
         
         try:
-            answer = resolver.resolve(qname, 'A')
+            _ = resolver.resolve(qname, 'A')  # Just testing if resolution works
             passed = False  # Should not succeed with invalid name
         except dns.name.LabelTooLong:
-            passed = True  # Expected behavior
-        except Exception:
-            passed = True  # Any rejection is acceptable
+            passed = True  # Expected behavior - proper handling of long labels
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, 
+                dns.resolver.NoNameservers, dns.name.BadLabelType):
+            passed = True  # Any form of rejection for invalid names is acceptable
+        except dns.exception.DNSException:
+            # Other DNS-related rejections are also acceptable
+            passed = True
             
         result['tests'].append({
             'name': 'oversized_label',
             'description': 'Testing handling of oversized DNS labels',
-            'passed': passed
+            'passed': passed,
+            'details': 'Server properly rejected oversized label'
         })
-    except Exception as e:
+    except (ValueError, dns.exception.DNSException) as e:
+        # Even setup failures are acceptable as they prevent invalid queries
         result['tests'].append({
             'name': 'oversized_label',
             'description': 'Testing handling of oversized DNS labels',
             'passed': True,
-            'error': str(e)
+            'error': handle_dns_error(e)
         })
 
     # Test 2: Invalid characters
     invalid_chars = "test!@#$"  # Invalid characters in label
     try:
-        try:
-            # This should raise an exception for invalid characters
-            qname = dns.name.from_text(f"{invalid_chars}.{domain}")
-            passed = False
-        except dns.name.BadLabelType:
-            passed = True  # Expected behavior
-        except Exception:
-            passed = True  # Any rejection is acceptable
+        # This should raise an exception for invalid characters
+        qname = dns.name.from_text(f"{invalid_chars}.{zone_name}")
+        passed = False
+    except dns.name.BadLabelType:
+        passed = True  # Expected behavior
+    except (dns.name.LabelTooLong, dns.exception.DNSException, ValueError):
+        passed = True  # Any rejection is acceptable
             
-        result['tests'].append({
-            'name': 'invalid_chars',
-            'description': 'Testing handling of invalid characters in domain names',
-            'passed': passed
-        })
-    except Exception:
-        # Expected behavior - should reject invalid names
-        result['tests'].append({
-            'name': 'invalid_chars',
-            'description': 'Testing handling of invalid characters in domain names',
-            'passed': True
-        })
-
-    # Test 3: Unusual record types
+    result['tests'].append({
+        'name': 'invalid_chars',
+        'description': 'Testing handling of invalid characters in domain names',
+        'passed': passed
+    })    # Test 3: Unusual record types
     try:
-        rrset, resp = _resolve(domain, 'NULL', timeout=timeout)
+        _, resp = _resolve(zone_name, 'NULL', timeout=timeout)
         # NULL records should be rejected or handled safely
         passed = (resp is None or 
                  resp.rcode() in [dns.rcode.REFUSED, dns.rcode.NOTIMP, dns.rcode.FORMERR])
@@ -646,7 +729,8 @@ def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
             'description': 'Testing handling of unusual record types',
             'passed': True
         })
-    except Exception:
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoNameservers,
+            dns.exception.DNSException, dns.exception.Timeout):
         # Any rejection is acceptable for NULL records
         result['tests'].append({
             'name': 'unusual_rr_type',
@@ -660,7 +744,7 @@ def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
         resolver.lifetime = timeout
         
         # Create a query with DNSSEC enabled
-        qname = dns.name.from_text(domain)
+        qname = dns.name.from_text(zone_name)
         query = dns.message.make_query(qname, dns.rdatatype.DNSKEY)
         query.use_edns(edns=0, ednsflags=dns.flags.DO)  # Set DNSSEC OK
         
@@ -670,13 +754,15 @@ def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
         # Try to send directly to each nameserver
         ns_addrs = []
         try:
-            ns_rrset, _ = _resolve(domain, 'NS')
+            ns_rrset, _ = _resolve(zone_name, 'NS')
             if ns_rrset:
                 for rr in ns_rrset:
                     a_rrset, _ = _resolve(rr.target.to_text(), 'A')
                     if a_rrset:
                         ns_addrs.append(str(a_rrset[0]))
-        except Exception:
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
+                dns.resolver.NoNameservers, dns.exception.DNSException,
+                dns.exception.Timeout):
             pass
             
         if not ns_addrs:
@@ -686,11 +772,12 @@ def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
         dnssec_works = False
         for ns in ns_addrs:
             try:
-                response = dns.query.udp(query, ns, timeout=timeout)
+                response = dns.query.udp(query, str(ns), timeout=timeout)
                 if response and response.rcode() == dns.rcode.NOERROR:
                     dnssec_works = True
                     break
-            except Exception:
+            except (dns.exception.Timeout, dns.query.BadResponse,
+                   dns.exception.DNSException):
                 continue
                 
         result['tests'].append({
@@ -698,28 +785,34 @@ def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
             'description': 'Testing handling of malformed DNSSEC queries',
             'passed': dnssec_works
         })
-    except Exception:
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
+            dns.resolver.NoNameservers, dns.exception.DNSException,
+            dns.exception.Timeout, dns.name.BadLabelType) as e:
         # Should handle malformed queries gracefully
         result['tests'].append({
             'name': 'malformed_dnssec',
             'description': 'Testing handling of malformed DNSSEC queries',
-            'passed': True
+            'passed': True,
+            'details': f'Expected error occurred: {str(e)}'
         })
 
     # Test 5: Check for replay attack vulnerability
     # Query twice and compare inception/expiration times
     try:
-        _, resp1 = _resolve(domain, 'DNSKEY', timeout=timeout)
+        _, resp1 = _resolve(zone_name, 'DNSKEY', timeout=timeout)
         time.sleep(1)  # Wait a bit
-        _, resp2 = _resolve(domain, 'DNSKEY', timeout=timeout)
+        _, resp2 = _resolve(zone_name, 'DNSKEY', timeout=timeout)
         
-        sig1 = extract_rrsig_for_rrset(resp1, 'DNSKEY')
-        sig2 = extract_rrsig_for_rrset(resp2, 'DNSKEY')
+        sig1_rrset = extract_rrsig_for_rrset(resp1, 'DNSKEY')
+        sig2_rrset = extract_rrsig_for_rrset(resp2, 'DNSKEY')
         
-        if sig1 and sig2 and len(sig1) > 0 and len(sig2) > 0:
+        if sig1_rrset and sig2_rrset and len(sig1_rrset) > 0 and len(sig2_rrset) > 0:
+            # Cast to RRSIG type for proper access
+            sig1: RRSIG = cast(RRSIG, sig1_rrset[0])
+            sig2: RRSIG = cast(RRSIG, sig2_rrset[0])
             # Compare inception times - shouldn't be identical for fresh signatures
-            passed = (sig1[0].inception != sig2[0].inception or 
-                     sig1[0].expiration != sig2[0].expiration)
+            passed = (sig1.inception != sig2.inception or 
+                     sig1.expiration != sig2.expiration)
         else:
             passed = True  # No RRSIG means no replay vulnerability
             
@@ -728,15 +821,15 @@ def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
             'description': 'Testing resistance to replay attacks',
             'passed': passed
         })
-    except Exception:
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
+            dns.resolver.NoNameservers, dns.exception.DNSException,
+            dns.exception.Timeout) as e:
         result['tests'].append({
             'name': 'replay_resistance',
             'description': 'Testing resistance to replay attacks',
             'passed': False,
-            'error': 'Could not complete replay resistance test'
+            'error': f'Could not complete replay resistance test: {str(e)}'
         })
-
-    # Analyze results
     failed_tests = [t for t in result['tests'] if not t['passed']]
     if failed_tests:
         result['issues_found'].extend([
@@ -763,13 +856,13 @@ def test_robustness(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
 
     return result
 
-def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
+def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
     """Perform the batch of DNSSEC checks described in the earlier checklist.
 
     Returns a structured report as a dictionary.
     """
     report: Dict[str, Any] = {
-        'domain': domain,
+        'domain': zone_name,
         'dnskey': {'present': False},
         'dnskey_signature': {'present': False, 'valid': False},
         'parent_ds': {},
@@ -783,7 +876,7 @@ def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
     }
     
     # Split domain into labels for zone traversal
-    labels = dns.name.from_text(domain).labels
+    labels = dns.name.from_text(zone_name).labels
     zones = []
     for i in range(len(labels)):
         zone = b'.'.join(labels[-(i+1):]).decode()
@@ -797,7 +890,7 @@ def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
             report['soa_consistency'][zone] = check_soa_consistency(zone, nameservers)
 
     # 1) Fetch DNSKEY from an arbitrary resolver (system resolver)
-    dnskey_rrset, _ = fetch_dnskey(domain, None, timeout)
+    dnskey_rrset, _ = fetch_dnskey(zone_name, None, timeout)
     report['dnskey'].update({
         'present': dnskey_rrset is not None,
         'count': len(dnskey_rrset) if dnskey_rrset else 0,
@@ -805,12 +898,12 @@ def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
     })
 
     # 2) Parent DS check
-    report['parent_ds'] = check_parent_ds(domain, dnskey_rrset)
+    report['parent_ds'] = check_parent_ds(zone_name, dnskey_rrset)
 
     # 3) Verify DNSKEY RRset signatures (RRSIG over DNSKEY)
     if dnskey_rrset is not None:
         # We need the response message to extract RRSIG; fetch again to get response
-        _, resp = fetch_dnskey(domain, None, timeout)
+        _, resp = fetch_dnskey(zone_name, None, timeout)
         rrsig = extract_rrsig_for_rrset(resp, 'DNSKEY') if resp else None
         report['dnskey_signature'].update({
             'present': rrsig is not None,
@@ -818,7 +911,7 @@ def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
             'error': None
         })
         if rrsig is not None:
-            valid, message = validate_rrset_with_dnskey(dnskey_rrset, rrsig, dnskey_rrset, domain)
+            valid, message = validate_rrset_with_dnskey(dnskey_rrset, rrsig, dnskey_rrset, zone_name)
             report['dnskey_signature'].update({
                 'valid': valid,
                 'error': message if not valid else None
@@ -828,29 +921,29 @@ def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
     rrtypes = ['SOA', 'NS', 'A', 'AAAA', 'MX', 'TXT']
     rrchecks = {}
     for t in rrtypes:
-        rrchecks[t] = check_rrset_signature(domain, t, dnskey_rrset, None, timeout)
+        rrchecks[t] = check_rrset_signature(zone_name, t, dnskey_rrset, None, timeout)
     report['rrsets'] = rrchecks
 
     # 5) NXDOMAIN / denial proofs check (test non-existent names)
     # 5) NXDOMAIN / denial proofs check (test non-existent names)
     
     # Test NXDOMAIN with random label
-    test_name = f"this-name-should-not-exist-{int(time.time())}.{domain}"
+    test_name = f"this-name-should-not-exist-{int(time.time())}.{zone_name}"
     report['nxdomain_test'] = check_rrset_signature(test_name, 'A', dnskey_rrset, None, timeout)
     
     # Additional denial of existence tests
     report['denial_tests'] = {}
     
     # Test wildcard denial (if NSEC3 is in use) with specific name pattern
-    wildcard_test = f"*.{domain}"
+    wildcard_test = f"*.{zone_name}"
     report['denial_tests']['wildcard'] = check_rrset_signature(wildcard_test, 'A', dnskey_rrset, None, timeout)
     
     # Test empty non-terminal handling
-    ent_test = f"nonexistent.subdomain.{domain}"
+    ent_test = f"nonexistent.subdomain.{zone_name}"
     report['denial_tests']['empty_non_terminal'] = check_rrset_signature(ent_test, 'A', dnskey_rrset, None, timeout)
 
     # 6) Authoritative consistency
-    report['authoritative'] = check_authoritative_consistency(domain)
+    report['authoritative'] = check_authoritative_consistency(zone_name)
 
     # 7) Key inspection and rollover hints
     report['keys'] = inspect_keys_and_rollover(dnskey_rrset)
@@ -863,7 +956,7 @@ def validate_domain(domain: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, 
     report['algorithms'] = {'algorithm_numbers': sorted(list(algs))}
 
     # 9) Robustness Testing
-    report['robustness'] = test_robustness(domain, timeout)
+    report['robustness'] = test_robustness(zone_name, timeout)
 
     return report
 
@@ -982,7 +1075,7 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
     return interpretation
 
 def pretty_report(report: Dict[str, Any]) -> str:
-    """Generate a human and LLM-friendly report with both raw data and interpretations."""
+    """Format validation report as a JSON string with metadata."""
     import json
     
     # Create the final report structure
@@ -1004,10 +1097,16 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('Usage: python dnssec_validator.py <domain>')
         sys.exit(1)
-    domain = sys.argv[1].rstrip('.')
+    target_domain = sys.argv[1].rstrip('.')
     try:
-        out = validate_domain(domain)
+        out = validate_domain(target_domain)
         print(pretty_report(out))
-    except Exception as e:
-        print('Validation failed:', e)
-        raise
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoNameservers) as e:
+        print('Domain validation failed:', handle_dns_error(e))
+        sys.exit(1)
+    except dns.exception.DNSException as e:
+        print('DNS error:', handle_dns_error(e))
+        sys.exit(1)
+    except (ValueError, KeyError) as e:
+        print('Invalid input or configuration:', str(e))
+        sys.exit(1)

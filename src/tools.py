@@ -44,6 +44,14 @@ async def simple_dns_lookup_impl(resolver, hostname: str) -> Dict[str, Any]:
 
 async def advanced_dns_lookup_impl(resolver, hostname: str, record_type: str) -> Dict[str, Any]:
     try:
+        # Get authoritative nameservers first
+        auth_nameservers = []
+        try:
+            ns_result = resolver.resolve(hostname, 'NS')
+            auth_nameservers = [str(rdata) for rdata in ns_result]
+        except Exception:
+            pass  # If NS lookup fails, continue with main record lookup
+            
         result = resolver.resolve(hostname, record_type)
         records = []
         for rdata in result:
@@ -71,12 +79,15 @@ async def advanced_dns_lookup_impl(resolver, hostname: str, record_type: str) ->
                 })
             else:
                 records.append(str(rdata))
-        return {
+        response = {
             "hostname": hostname,
             "record_type": record_type,
             "records": records,
             "status": "success"
         }
+        if auth_nameservers:
+            response["authoritative_nameservers"] = auth_nameservers
+        return response
     except dns.resolver.NXDOMAIN:
         return {
             "hostname": hostname,
