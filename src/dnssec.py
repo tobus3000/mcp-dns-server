@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """DNSSEC validator module for DNS zone security."""
 
 from __future__ import annotations
@@ -7,18 +5,15 @@ from __future__ import annotations
 import statistics
 import sys
 import time
-from typing import Dict, Any, List, Tuple, Optional, cast, TypedDict
-
+from typing import Dict, Any, List, Tuple, Optional, cast
+import json
 import dns.dnssec
-import dns.edns
 import dns.exception
 import dns.flags
 import dns.message
 import dns.name
 import dns.query
 import dns.rcode
-import dns.rdataclass
-import dns.rdataset
 import dns.rdatatype
 import dns.resolver
 import dns.rrset
@@ -26,22 +21,9 @@ import dns.rdtypes.ANY.SOA
 from dns.rdtypes.ANY.NSEC import NSEC
 from dns.rdtypes.ANY.NSEC3 import NSEC3
 from dns.rdtypes.ANY.RRSIG import RRSIG
-
-# Type definitions for result dictionaries
-class ValidationResult(TypedDict, total=False):
-    valid: bool
-    error: str  # Single error string
-    errors: List[str]  # List of errors
-    warnings: List[str]
-    parameters: Optional[Dict[str, Any]]
-    chain: List[Dict[str, Any]]
-    validation: Dict[str, Any]
-
-class TestResult(TypedDict):
-    name: str
-    description: str
-    passed: bool
-    error: Optional[str]
+from typedefs import ValidationResult, TestResult
+from exceptions import ValidationError, handle_dns_error
+from resolver import Resolver
 
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA
@@ -50,74 +32,13 @@ Message = dns.message.Message
 Name = dns.name.Name
 
 # For type checking
-NSECRecord = NSEC 
+NSECRecord = NSEC
 NSEC3Record = NSEC3
 
 DEFAULT_TIMEOUT = 5.0
 
-
-class ValidationError(Exception):
-    """Base exception for DNSSEC validation errors."""
-
-def handle_dns_error(error: Exception) -> str:
-    """Convert DNS-related exceptions to descriptive error messages."""
-    if isinstance(error, dns.resolver.NXDOMAIN):
-        return "Domain name does not exist"
-    elif isinstance(error, dns.resolver.NoAnswer):
-        return "No answer received from server"
-    elif isinstance(error, dns.resolver.NoNameservers):
-        return "No DNS servers responded"
-    elif isinstance(error, dns.name.LabelTooLong):
-        return "Domain name label too long"
-    elif isinstance(error, dns.name.BadLabelType):
-        return "Invalid characters in domain name"
-    elif isinstance(error, dns.exception.Timeout):
-        return "DNS query timed out"
-    elif str(error.__class__).endswith('ValidationFailure'):
-        return f"DNSSEC validation failed: {str(error)}"
-    elif isinstance(error, dns.exception.DNSException):
-        return f"DNS error: {str(error)}"
-    else:
-        return f"Unexpected error: {str(error)}"
-
-
-def _resolve(qname: str, rdtype: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT) -> Tuple[Optional[RRset], Optional[Message]]:
-    """Resolve a single RRset using dns.resolver for convenience.
-    Returns (rdataset, response) where rdataset is a dns.rrset.RRset or None and response is dns.message.Message or None.
-    """
-    resolver = dns.resolver.Resolver(configure=True)
-    resolver.lifetime = timeout
-    if nameserver:
-        resolver.nameservers = [nameserver]
-    try:
-        answer = resolver.resolve(qname, rdtype, raise_on_no_answer=False)
-        if answer.rrset is None:
-            return None, answer.response
-        return answer.rrset, answer.response
-    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.NoNameservers, dns.exception.Timeout) as e:
-        # return None but also the last response if available
-        return None, getattr(e, 'response', None)
-
-
-def fetch_dnskey(qname: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT):
-    rrset, resp = _resolve(qname, 'DNSKEY', nameserver, timeout)
-    return rrset, resp
-
-
-def fetch_ds(qname: str, nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT):
-    rrset, resp = _resolve(qname, 'DS', nameserver, timeout)
-    return rrset, resp
-
-
-def get_parent_name(qname: str) -> str:
-    name = dns.name.from_text(qname)
-    if len(name) == 1:
-        return '.'
-    parent = name.parent()
-    # Strip trailing dot except for root zone
-    parent_text = parent.to_text()
-    return parent_text if parent_text == '.' else parent_text.rstrip('.')
-
+# Global resolver instance
+_resolver = Resolver(timeout=DEFAULT_TIMEOUT)
 
 def compute_ds_from_dnskey(name: str, dnskey_rrset: dns.rrset.RRset, digest_alg: str = 'SHA256') -> Tuple[List[str], List[Dict[str, Any]]]:
     """Compute DS digest(s) from DNSKEY RRset. 
@@ -171,18 +92,18 @@ def validate_nsec3_parameters(nsec3_record: NSEC3) -> Dict[str, Any]:
         'salt': nsec3_record.salt.hex() if nsec3_record.salt else None,
         'salt_length': len(nsec3_record.salt) if nsec3_record.salt else 0
     }
-    
+
     # Check for invalid parameters according to RFC 5155 and best practices
     if result['algorithm'] != 1:
         result['valid'] = False
         result['warnings'].append(f"Invalid NSEC3 algorithm: {result['algorithm']}")
-    
+
     if result['iterations'] > 150:  # Current recommended max
         result['warnings'].append(f"NSEC3 iterations too high: {result['iterations']}")
-    
+
     if result['salt'] and result['salt_length'] > 32:
         result['warnings'].append(f"NSEC3 salt length too long: {result['salt_length']}")
-    
+
     return result
 
 
@@ -190,31 +111,31 @@ def validate_nsec_chain(nsec_records: List[dns.rrset.RRset], zone_name: str) -> 
     """Validate that NSEC records form a complete chain."""
     if not nsec_records:
         return {'valid': False, 'error': 'No NSEC records found'}
-    
+
     result = {'valid': True, 'errors': [], 'chain': []}
     sorted_records = sorted(nsec_records, key=lambda r: r.name.to_text())
-    
+
     # Convert zone name for comparison
     _ = dns.name.from_text(zone_name)  # Validate zone name format
-    
+
     # Check if chain forms a complete circle
-    for i in range(len(sorted_records)):
-        current_rrset = sorted_records[i]
+    for i, current_rrset in enumerate(sorted_records):
         # Use the first rdata record directly
         current_nsec = cast(NSEC, current_rrset[0])
         next_owner = current_nsec.next
         expected_next = sorted_records[(i + 1) % len(sorted_records)].name
-        
+
         if next_owner != expected_next:
             result['valid'] = False
-            result['errors'].append(f"Broken NSEC chain between {current_rrset.name} and {next_owner}")
-        
+            result['errors'].append(
+                f"Broken NSEC chain between {current_rrset.name} and {next_owner}"
+            )
+
         result['chain'].append({
             'owner': current_rrset.name.to_text(),
             'next': next_owner.to_text(),
             'types': [str(dns.rdatatype.RdataType(t[0])) for t in current_nsec.windows]
         })
-    
     return result
 
 
@@ -222,7 +143,7 @@ def validate_nsec3_chain(nsec3_records: List[dns.rrset.RRset]) -> ValidationResu
     """Validate that NSEC3 records form a complete chain with valid parameters."""
     if not nsec3_records:
         return {'valid': False, 'error': 'No NSEC3 records found'}
-    
+
     result: ValidationResult = {
         'valid': True,
         'errors': [],
@@ -230,7 +151,7 @@ def validate_nsec3_chain(nsec3_records: List[dns.rrset.RRset]) -> ValidationResu
         'parameters': None,
         'chain': []
     }
-    
+
     # Cast to NSEC3Record for type safety
     def to_nsec3(record: dns.rrset.RRset) -> NSEC3Record:
         rdata = record[0]
@@ -243,27 +164,27 @@ def validate_nsec3_chain(nsec3_records: List[dns.rrset.RRset]) -> ValidationResu
     params = result.get('parameters', {})
     if params and 'warnings' in params:
         result['warnings'].extend(params['warnings'])
-    
+
     # Sort records by hash
     sorted_records = [to_nsec3(r) for r in nsec3_records]
     sorted_records.sort(key=lambda r: r.next)
-    
+
     # Check if chain forms a complete circle
-    for i in range(len(sorted_records)):
-        current = sorted_records[i]
+    for i, current in enumerate(sorted_records):
         next_hash = current.next
         expected_next = sorted_records[(i + 1) % len(sorted_records)].next
-        
+
         if next_hash != expected_next:
             result['valid'] = False
-            result['errors'].append(f"Broken NSEC3 chain between {current.next.hex()} and {next_hash.hex()}")
-        
+            result['errors'].append(
+                f"Broken NSEC3 chain between {current.next.hex()} and {next_hash.hex()}"
+            )
+
         result['chain'].append({
             'current': current.next.hex(),
             'next': next_hash.hex(),
             'types': [str(dns.rdatatype.RdataType(t[0])) for t in current.windows]
         })
-    
     return result
 
 
@@ -279,7 +200,9 @@ def extract_rrsig_for_rrset(resp: Optional[dns.message.Message], rdtype: str) ->
             if rrset.rdtype == dns.rdatatype.RRSIG:
                 # filter by type covered
                 for rdata in rrset:
-                    if hasattr(rdata, 'type_covered') and dns.rdatatype.to_text(rdata.type_covered) == rdtype:
+                    if hasattr(rdata, 'type_covered') and dns.rdatatype.to_text(
+                        rdata.type_covered
+                    ) == rdtype:
                         return rrset
     return None
 
@@ -309,19 +232,19 @@ def validate_denial_proof(resp: Message, _target: str) -> Dict[str, Any]:
         'records': [],
         'validation': None
     }
-    
+
     if not resp or not isinstance(resp, dns.message.Message) or not resp.authority:
         return result
-    
+
     nsec_records = []
     nsec3_records = []
-    
+
     for rrset in resp.authority:
         if rrset.rdtype == dns.rdatatype.NSEC:
             nsec_records.append(rrset)
         elif rrset.rdtype == dns.rdatatype.NSEC3:
             nsec3_records.append(rrset)
-    
+
     if nsec_records:
         result['proof_type'] = 'NSEC'
         result['records'] = [r.to_text() for r in nsec_records]
@@ -337,12 +260,16 @@ def validate_denial_proof(resp: Message, _target: str) -> Dict[str, Any]:
         validation = validate_nsec3_chain(nsec3_records)
         result['validation'] = validation
         result['valid'] = validation.get('valid', False)
-    
+
     return result
 
 
 def check_rrset_signature(target: str, rdtype: str, dnskey_rrset: Optional[dns.rrset.RRset], nameserver: Optional[str] = None, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
-    rrset, resp = _resolve(target, rdtype, nameserver, timeout)
+    if timeout != DEFAULT_TIMEOUT:
+        _resolver.resolver.lifetime = timeout
+    rrset, resp = _resolver.resolve(target, rdtype, nameserver)
+    if timeout != DEFAULT_TIMEOUT:
+        _resolver.resolver.lifetime = _resolver.default_timeout
     result: Dict[str, Any] = {'type': rdtype, 'present': rrset is not None}
     if rrset is None or dnskey_rrset is None:
         # try to see if NXDOMAIN or NODATA with proof
@@ -369,7 +296,14 @@ def check_rrset_signature(target: str, rdtype: str, dnskey_rrset: Optional[dns.r
                 inception = rdata.inception
                 expiration = rdata.expiration
                 now = int(time.time())
-                sig_ok_times.append({'inception': inception, 'expiration': expiration, 'now': now, 'valid_now': inception <= now <= expiration})
+                sig_ok_times.append(
+                    {
+                        'inception': inception,
+                        'expiration': expiration,
+                        'now': now,
+                        'valid_now': inception <= now <= expiration
+                    }
+                )
             except (AttributeError, ValueError, TypeError):
                 # Skip records with invalid time values
                 continue
@@ -378,8 +312,8 @@ def check_rrset_signature(target: str, rdtype: str, dnskey_rrset: Optional[dns.r
 
 
 def check_parent_ds(zone_name: str, dnskey_rrset: Optional[dns.rrset.RRset], parent_ns: Optional[str] = None) -> Dict[str, Any]:
-    parent = get_parent_name(zone_name)
-    ds_rrset, _ = fetch_ds(zone_name, parent_ns)
+    parent = _resolver.get_parent_name(zone_name)
+    ds_rrset, _ = _resolver.fetch_ds(zone_name, parent_ns)
     result: Dict[str, Any] = {
         'parent': parent,
         'parent_ds_present': ds_rrset is not None,
@@ -416,77 +350,128 @@ def check_parent_ds(zone_name: str, dnskey_rrset: Optional[dns.rrset.RRset], par
     result['matches'] = matches
     return result
 
-
-def get_soa_serial(zone_name: str, nameserver: str, timeout: int = 5) -> Optional[int]:
-    """Gets the SOA serial number from the specified nameserver."""
-    try:
-        # Create a resolver for this nameserver
-        resolver = dns.resolver.Resolver()
-        resolver.nameservers = [nameserver]
-        resolver.timeout = timeout
-        
-        # Query the SOA record
-        answer = resolver.resolve(zone_name, 'SOA')
-        if answer and answer.rrset and len(answer.rrset) > 0:
-            # SOA record format: mname rname serial refresh retry expire minimum
-            soa_text = str(answer.rrset[0])
-            # The third field is the serial number
-            fields = soa_text.split()
-            if len(fields) >= 3:
-                return int(fields[2])
-    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, 
-            dns.resolver.NoNameservers, dns.exception.DNSException):
-        pass
-    return None
-
 def check_soa_consistency(zone_name: str, nameservers: List[str]) -> Dict[str, Any]:
-    """Check SOA serial consistency across authoritative nameservers."""
-    results = {}
-    serials = {}
-    
+    """Check SOA serial consistency and refresh times across authoritative nameservers."""
+    results = {
+        'serials': {},
+        'refresh_times': {},
+        'analysis': {
+            'serial_consistency': False,
+            'refresh_analysis': None,
+            'recommendations': []
+        }
+    }
+
     for ns in nameservers:
         try:
             # Resolve nameserver IP first
             ns_ip = None
             try:
-                a_rr, _ = _resolve(ns, 'A')
-                if a_rr:
-                    ns_ip = str(a_rr[0])
+                answers = dns.resolver.resolve(ns, 'A')
+                if answers:
+                    ns_ip = str(answers[0])
             except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
-                    dns.resolver.NoNameservers, dns.exception.DNSException,
-                    dns.exception.Timeout) as e:
-                results[ns] = {'error': f"Failed to resolve nameserver IP: {str(e)}"}
+                   dns.resolver.NoNameservers, dns.exception.DNSException):
                 continue
 
-            if not ns_ip:
-                results[ns] = {'error': "Could not resolve nameserver IP address"}
-                continue
+            if ns_ip:
+                # Create resolver for this nameserver
+                resolver = dns.resolver.Resolver()
+                resolver.nameservers = [ns_ip]
+                resolver.timeout = 5
 
-            # Get SOA serial from this nameserver
-            serial = get_soa_serial(zone_name, ns_ip)
-            if serial is not None:
-                serials[ns] = serial
-                results[ns] = {'serial': serial, 'ip': ns_ip}
-            else:
-                results[ns] = {'error': "Could not retrieve SOA serial"}
+                # Query the SOA record
+                answer = resolver.resolve(zone_name, 'SOA')
+                if answer and answer.rrset and len(answer.rrset) > 0:
+                    # Cast the SOA record to the correct type
+                    soa_record = cast(SOARecord, answer.rrset[0])
+                    results['serials'][ns] = soa_record.serial
+                    results['refresh_times'][ns] = soa_record.refresh
+
         except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
               dns.resolver.NoNameservers, dns.exception.DNSException,
-              dns.exception.Timeout) as e:
-            results[ns] = {'error': str(e)}
+              dns.exception.Timeout):
+            results['serials'][ns] = None
+            results['refresh_times'][ns] = None
 
     # Analyze serial consistency
-    unique_serials = set(serials.values())
-    results['consistency'] = {
-        'consistent': len(unique_serials) <= 1,
-        'unique_serials': len(unique_serials),
-        'serial_details': {str(serial): [ns for ns, ns_serial in serials.items() if ns_serial == serial] 
-                          for serial in unique_serials}
+    valid_serials = {ns: serial for ns, serial in results['serials'].items() if serial is not None}
+    unique_serials = set(valid_serials.values())
+
+    # Get refresh times for analysis
+    valid_refresh_times = [rt for rt in results['refresh_times'].values() if rt is not None]
+    avg_refresh_time = sum(valid_refresh_times) / len(valid_refresh_times) if valid_refresh_times else 0
+
+    # Analyze consistency and refresh times
+    results['analysis']['serial_consistency'] = len(unique_serials) <= 1
+
+    # Define refresh time thresholds (in seconds)
+    REFRESH_TOO_SHORT = 300  # 5 minutes
+    REFRESH_TOO_LONG = 14400  # 4 hours
+    REFRESH_IDEAL_MIN = 1800  # 30 minutes
+    REFRESH_IDEAL_MAX = 7200  # 2 hours
+
+    # Serial consistency analysis with refresh time context
+    if len(unique_serials) > 1:
+        if avg_refresh_time < REFRESH_TOO_SHORT:
+            results['analysis']['recommendations'].append(
+                "Zone serial numbers are inconsistent, but the refresh time is very short "
+                f"({avg_refresh_time} seconds). The zones might have already synchronized. "
+                f"Consider retesting after {avg_refresh_time} seconds to verify."
+            )
+        else:
+            results['analysis']['recommendations'].append(
+                f"CRITICAL: Zone serial numbers are inconsistent and refresh time is "
+                f"{avg_refresh_time} seconds. This should be investigated as "
+                "it may indicate zone transfer issues."
+            )
+
+    # Refresh time analysis
+    if valid_refresh_times:
+        if avg_refresh_time < REFRESH_TOO_SHORT:
+            results['analysis']['refresh_analysis'] = "too_short"
+            results['analysis']['recommendations'].append(
+                f"WARNING: Average refresh time ({avg_refresh_time} seconds) is too short. "
+                f"Recommended minimum is {REFRESH_TOO_SHORT} seconds to avoid excessive zone transfers."
+            )
+        elif avg_refresh_time > REFRESH_TOO_LONG:
+            results['analysis']['refresh_analysis'] = "too_long"
+            results['analysis']['recommendations'].append(
+                f"WARNING: Average refresh time ({avg_refresh_time} seconds) is too long. "
+                f"Recommended maximum is {REFRESH_TOO_LONG} seconds to ensure timely zone updates."
+            )
+        elif REFRESH_IDEAL_MIN <= avg_refresh_time <= REFRESH_IDEAL_MAX:
+            results['analysis']['refresh_analysis'] = "ideal"
+            results['analysis']['recommendations'].append(
+                f"GOOD: Refresh time ({avg_refresh_time} seconds) is within the ideal range "
+                f"of {REFRESH_IDEAL_MIN}-{REFRESH_IDEAL_MAX} seconds."
+            )
+
+    # Add detailed consistency information
+    results['analysis']['details'] = {
+        'serial_consistency': {
+            'consistent': len(unique_serials) <= 1,
+            'unique_serials': len(unique_serials),
+            'serial_details': {
+                str(serial): [
+                    ns for ns, ns_serial in valid_serials.items() if ns_serial == serial
+                ] for serial in unique_serials
+            }
+        },
+        'refresh_details': {
+            'average': avg_refresh_time,
+            'by_nameserver': results['refresh_times'],
+            'threshold_values': {
+                'too_short': REFRESH_TOO_SHORT,
+                'too_long': REFRESH_TOO_LONG,
+                'ideal_range': [REFRESH_IDEAL_MIN, REFRESH_IDEAL_MAX]
+            }
+        }
     }
-    
     return results
 
 def list_authoritative_nameservers(zone_name: str) -> List[str]:
-    ns_rrset, _ = _resolve(zone_name, 'NS')
+    ns_rrset, _ = _resolver.resolve(zone_name, 'NS')
     if ns_rrset is None:
         return []
     return [r.target.to_text() for r in ns_rrset]
@@ -500,7 +485,7 @@ def check_authoritative_consistency(zone_name: str) -> Dict[str, Any]:
             # Try to resolve A/AAAA of the nameserver first
             ns_ip = None
             try:
-                a_rr, _ = _resolve(ns, 'A')
+                a_rr, _ = _resolver.resolve(ns, 'A')
                 if a_rr:
                     ns_ip = str(a_rr[0])
             except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
@@ -508,13 +493,13 @@ def check_authoritative_consistency(zone_name: str) -> Dict[str, Any]:
                    dns.exception.Timeout) as e:
                 results[ns] = {'error': f"Failed to resolve nameserver IP: {str(e)}"}
                 continue
-                
+
             if not ns_ip:
                 results[ns] = {'error': "Could not resolve nameserver IP address"}
                 continue
-                
+
             # Query DNSKEY directly at that nameserver
-            rrset, _ = fetch_dnskey(zone_name, nameserver=ns_ip)
+            rrset, _ = _resolver.fetch_dnskey(zone_name, nameserver=ns_ip)
             results[ns] = {
                 'dnskey_present': rrset is not None,
                 'dnskey_count': len(rrset) if rrset else 0,
@@ -528,7 +513,11 @@ def check_authoritative_consistency(zone_name: str) -> Dict[str, Any]:
     # quick consistency check: compare unique signatures and key counts
     counts = [v.get('dnskey_count', 0) for v in results.values() if isinstance(v, dict)]
     try:
-        results['counts_summary'] = {'min': min(counts), 'max': max(counts), 'median': statistics.median(counts) if counts else None}
+        results['counts_summary'] = {
+            'min': min(counts),
+            'max': max(counts),
+            'median': statistics.median(counts) if counts else None
+        }
     except (ValueError, TypeError):
         results['counts_summary'] = None
     return results
@@ -544,7 +533,7 @@ def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[s
         'algorithms': set(),
         'key_lengths': {}
     }
-    
+
     if dnskey_rrset is None:
         key_results['critical'].append("No DNSKEY records found")
         return key_results
@@ -555,7 +544,7 @@ def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[s
         flags = r.flags
         is_sep = bool(flags & 0x0100)
         protocol = r.protocol
-        
+
         # Get key details
         key_info = {
             'tag': tag,
@@ -569,17 +558,21 @@ def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[s
             'valid': True,
             'issues': []
         }
-        
+
         # Check protocol field (must be 3 as per RFC 4034)
         if protocol != 3:
             key_info['valid'] = False
-            key_info['issues'].append(f"Invalid protocol value: {protocol} (must be 3)")
-            
+            key_info['issues'].append(
+                f"Invalid protocol value: {protocol} (must be 3)"
+            )
+
         # Check algorithm validity
         key_results['algorithms'].add(alg)
         if alg in [1, 3, 6, 7, 8]:  # Deprecated/insecure algorithms
-            key_info['issues'].append(f"Insecure or deprecated algorithm: {key_info['algorithm_name']}")
-            
+            key_info['issues'].append(
+                f"Insecure or deprecated algorithm: {key_info['algorithm_name']}"
+            )
+
         # Check key length based on algorithm
         min_key_lengths = {
             1: 512,   # RSA/MD5 (not recommended)
@@ -593,27 +586,27 @@ def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[s
             15: 256,  # Ed25519
             16: 456   # Ed448
         }
-        
+
         if alg in min_key_lengths:
             if key_info['key_size'] < min_key_lengths[alg]:
                 key_info['issues'].append(
                     f"Key size {key_info['key_size']} bits is below minimum {min_key_lengths[alg]} "
                     f"bits for algorithm {key_info['algorithm_name']}"
                 )
-        
+
         # Track key lengths by algorithm
         if alg not in key_results['key_lengths']:
             key_results['key_lengths'][alg] = []
         key_results['key_lengths'][alg].append(key_info['key_size'])
-        
+
         key_results['keys'].append(key_info)
-    
+
     # Analyze overall key configuration
     sep_count = sum(1 for k in key_results['keys'] if k['is_sep'])
     zsk_count = len(key_results['keys']) - sep_count
     key_results['sep_count'] = sep_count
     key_results['zsk_count'] = zsk_count
-    
+
     # Check for critical issues
     if sep_count == 0:
         key_results['critical'].append("No KSK (SEP) keys found")
@@ -621,17 +614,16 @@ def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[s
         key_results['critical'].append("No ZSK keys found")
     if sep_count > 2:
         key_results['warnings'].append(f"Unusually high number of KSK keys: {sep_count}")
-    
+
     # Check algorithm consistency
     if len(key_results['algorithms']) > 1:
         key_results['warnings'].append(
             f"Multiple signing algorithms in use: "
             f"{', '.join(dns.dnssec.algorithm_to_text(a) for a in sorted(key_results['algorithms']))}"
         )
-    
+
     # Convert algorithms set to list for JSON serialization
     key_results['algorithms'] = sorted(list(key_results['algorithms']))
-    
     return key_results
 
 
@@ -658,7 +650,7 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
         'issues_found': [],
         'security_rating': 'good'
     }
-    
+
     # Test 1: Overly long labels and names
     long_label = "a" * 64  # RFC 1035 limit is 63
     long_name = f"{long_label}.{zone_name}"
@@ -668,7 +660,7 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
         query = dns.message.make_query(qname, dns.rdatatype.A)
         resolver = dns.resolver.Resolver()
         resolver.lifetime = timeout
-        
+
         try:
             _ = resolver.resolve(qname, 'A')  # Just testing if resolution works
             passed = False  # Should not succeed with invalid name
@@ -680,7 +672,7 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
         except dns.exception.DNSException:
             # Other DNS-related rejections are also acceptable
             passed = True
-            
+
         result['tests'].append({
             'name': 'oversized_label',
             'description': 'Testing handling of oversized DNS labels',
@@ -706,14 +698,14 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
         passed = True  # Expected behavior
     except (dns.name.LabelTooLong, dns.exception.DNSException, ValueError):
         passed = True  # Any rejection is acceptable
-            
+
     result['tests'].append({
         'name': 'invalid_chars',
         'description': 'Testing handling of invalid characters in domain names',
         'passed': passed
     })    # Test 3: Unusual record types
     try:
-        _, resp = _resolve(zone_name, 'NULL', timeout=timeout)
+        _, resp = _resolver.resolve(zone_name, 'NULL')
         # NULL records should be rejected or handled safely
         passed = (resp is None or 
                  resp.rcode() in [dns.rcode.REFUSED, dns.rcode.NOTIMP, dns.rcode.FORMERR])
@@ -742,32 +734,32 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
     try:
         resolver = dns.resolver.Resolver()
         resolver.lifetime = timeout
-        
+
         # Create a query with DNSSEC enabled
         qname = dns.name.from_text(zone_name)
         query = dns.message.make_query(qname, dns.rdatatype.DNSKEY)
         query.use_edns(edns=0, ednsflags=dns.flags.DO)  # Set DNSSEC OK
-        
+
         # Test with both CD (Checking Disabled) flag set and unset
         query.flags |= dns.flags.CD
-        
+
         # Try to send directly to each nameserver
         ns_addrs = []
         try:
-            ns_rrset, _ = _resolve(zone_name, 'NS')
+            ns_rrset, _ = _resolver.resolve(zone_name, 'NS')
             if ns_rrset:
                 for rr in ns_rrset:
-                    a_rrset, _ = _resolve(rr.target.to_text(), 'A')
+                    a_rrset, _ = _resolver.resolve(rr.target.to_text(), 'A')
                     if a_rrset:
                         ns_addrs.append(str(a_rrset[0]))
         except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
                 dns.resolver.NoNameservers, dns.exception.DNSException,
                 dns.exception.Timeout):
             pass
-            
+
         if not ns_addrs:
             ns_addrs = [resolver.nameservers[0]]
-            
+
         # Test each nameserver
         dnssec_works = False
         for ns in ns_addrs:
@@ -779,7 +771,7 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
             except (dns.exception.Timeout, dns.query.BadResponse,
                    dns.exception.DNSException):
                 continue
-                
+
         result['tests'].append({
             'name': 'malformed_dnssec',
             'description': 'Testing handling of malformed DNSSEC queries',
@@ -799,13 +791,13 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
     # Test 5: Check for replay attack vulnerability
     # Query twice and compare inception/expiration times
     try:
-        _, resp1 = _resolve(zone_name, 'DNSKEY', timeout=timeout)
+        _, resp1 = _resolver.resolve(zone_name, 'DNSKEY')
         time.sleep(1)  # Wait a bit
-        _, resp2 = _resolve(zone_name, 'DNSKEY', timeout=timeout)
-        
+        _, resp2 = _resolver.resolve(zone_name, 'DNSKEY')
+
         sig1_rrset = extract_rrsig_for_rrset(resp1, 'DNSKEY')
         sig2_rrset = extract_rrsig_for_rrset(resp2, 'DNSKEY')
-        
+
         if sig1_rrset and sig2_rrset and len(sig1_rrset) > 0 and len(sig2_rrset) > 0:
             # Cast to RRSIG type for proper access
             sig1: RRSIG = cast(RRSIG, sig1_rrset[0])
@@ -815,7 +807,7 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
                      sig1.expiration != sig2.expiration)
         else:
             passed = True  # No RRSIG means no replay vulnerability
-            
+
         result['tests'].append({
             'name': 'replay_resistance',
             'description': 'Testing resistance to replay attacks',
@@ -836,14 +828,14 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
             f"Failed {t['name']}: {t['description']}" for t in failed_tests
         ])
         result['security_rating'] = 'poor' if len(failed_tests) > 2 else 'fair'
-    
+
     # Add test results to the interpretation
     result['interpretation'] = {
         'description': 'Analysis of DNS server robustness against malformed and malicious queries',
         'findings': [],
         'recommendations': []
     }
-    
+
     for test in result['tests']:
         status = 'passed' if test['passed'] else 'failed'
         result['interpretation']['findings'].append(
@@ -861,6 +853,10 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
 
     Returns a structured report as a dictionary.
     """
+    # Set timeout for this validation run
+    if timeout != DEFAULT_TIMEOUT:
+        _resolver.resolver.lifetime = timeout
+
     report: Dict[str, Any] = {
         'domain': zone_name,
         'dnskey': {'present': False},
@@ -874,7 +870,7 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
         'soa_consistency': {},
         'robustness': {}
     }
-    
+
     # Split domain into labels for zone traversal
     labels = dns.name.from_text(zone_name).labels
     zones = []
@@ -890,7 +886,7 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
             report['soa_consistency'][zone] = check_soa_consistency(zone, nameservers)
 
     # 1) Fetch DNSKEY from an arbitrary resolver (system resolver)
-    dnskey_rrset, _ = fetch_dnskey(zone_name, None, timeout)
+    dnskey_rrset, _ = _resolver.fetch_dnskey(zone_name)
     report['dnskey'].update({
         'present': dnskey_rrset is not None,
         'count': len(dnskey_rrset) if dnskey_rrset else 0,
@@ -903,7 +899,7 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
     # 3) Verify DNSKEY RRset signatures (RRSIG over DNSKEY)
     if dnskey_rrset is not None:
         # We need the response message to extract RRSIG; fetch again to get response
-        _, resp = fetch_dnskey(zone_name, None, timeout)
+        _, resp = _resolver.fetch_dnskey(zone_name)
         rrsig = extract_rrsig_for_rrset(resp, 'DNSKEY') if resp else None
         report['dnskey_signature'].update({
             'present': rrsig is not None,
@@ -911,7 +907,12 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
             'error': None
         })
         if rrsig is not None:
-            valid, message = validate_rrset_with_dnskey(dnskey_rrset, rrsig, dnskey_rrset, zone_name)
+            valid, message = validate_rrset_with_dnskey(
+                dnskey_rrset,
+                rrsig,
+                dnskey_rrset,
+                zone_name
+            )
             report['dnskey_signature'].update({
                 'valid': valid,
                 'error': message if not valid else None
@@ -926,21 +927,33 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
 
     # 5) NXDOMAIN / denial proofs check (test non-existent names)
     # 5) NXDOMAIN / denial proofs check (test non-existent names)
-    
+
     # Test NXDOMAIN with random label
     test_name = f"this-name-should-not-exist-{int(time.time())}.{zone_name}"
     report['nxdomain_test'] = check_rrset_signature(test_name, 'A', dnskey_rrset, None, timeout)
-    
+
     # Additional denial of existence tests
     report['denial_tests'] = {}
-    
+
     # Test wildcard denial (if NSEC3 is in use) with specific name pattern
     wildcard_test = f"*.{zone_name}"
-    report['denial_tests']['wildcard'] = check_rrset_signature(wildcard_test, 'A', dnskey_rrset, None, timeout)
-    
+    report['denial_tests']['wildcard'] = check_rrset_signature(
+        wildcard_test,
+        'A',
+        dnskey_rrset,
+        None,
+        timeout
+    )
+
     # Test empty non-terminal handling
     ent_test = f"nonexistent.subdomain.{zone_name}"
-    report['denial_tests']['empty_non_terminal'] = check_rrset_signature(ent_test, 'A', dnskey_rrset, None, timeout)
+    report['denial_tests']['empty_non_terminal'] = check_rrset_signature(
+        ent_test,
+        'A',
+        dnskey_rrset,
+        None,
+        timeout
+    )
 
     # 6) Authoritative consistency
     report['authoritative'] = check_authoritative_consistency(zone_name)
@@ -1053,12 +1066,51 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
             "description": "Analysis of zone consistency across authoritative nameservers",
             "status": []
         }
+
         for zone, consistency in report["soa_consistency"].items():
-            if "consistency" in consistency:
-                status = "consistent" if consistency["consistency"]["consistent"] else "inconsistent"
-                interpretation["zone_consistency"]["status"].append(
-                    f"Zone {zone} is {status} across nameservers"
-                )
+            if "analysis" in consistency:
+                # Add serial consistency status
+                if not consistency["analysis"].get("serial_consistency", True):
+                    interpretation["zone_consistency"]["status"].append(
+                        f"Zone {zone}: Serial numbers are inconsistent across nameservers"
+                    )
+
+                # Add refresh time analysis
+                refresh_analysis = consistency["analysis"].get("refresh_analysis")
+                if refresh_analysis:
+                    if refresh_analysis == "too_short":
+                        interpretation["zone_consistency"]["status"].append(
+                            f"Zone {zone}: Refresh time is too short, may cause excessive zone transfers"
+                        )
+                    elif refresh_analysis == "too_long":
+                        interpretation["zone_consistency"]["status"].append(
+                            f"Zone {zone}: Refresh time is too long, may delay zone updates"
+                        )
+                    elif refresh_analysis == "ideal":
+                        interpretation["zone_consistency"]["status"].append(
+                            f"Zone {zone}: Refresh time is within ideal range"
+                        )
+
+                # Add recommendations from the analysis
+                if "recommendations" in consistency["analysis"]:
+                    interpretation["zone_consistency"]["status"].extend(
+                        [f"Zone {zone}: {rec}" for rec in consistency["analysis"]["recommendations"]]
+                    )
+                # Add legacy consistency information if present
+                if "analysis" in consistency and "details" in consistency["analysis"]:
+                    details = consistency["analysis"]["details"]
+                    if "serial_consistency" in details:
+                        status = "consistent" if details["serial_consistency"]["consistent"] else "inconsistent"
+                        interpretation["zone_consistency"]["status"].append(
+                            f"Zone {zone} serial numbers are {status}"
+                        )
+
+                        # Add refresh time information if available
+                        if "refresh_details" in details:
+                            refresh_avg = details["refresh_details"]["average"]
+                            interpretation["zone_consistency"]["status"].append(
+                                f"Zone {zone} refresh time is {refresh_avg} seconds"
+                            )
 
     # Add robustness test interpretation
     if "robustness" in report and "interpretation" in report["robustness"]:
@@ -1076,8 +1128,6 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
 
 def pretty_report(report: Dict[str, Any]) -> str:
     """Format validation report as a JSON string with metadata."""
-    import json
-    
     # Create the final report structure
     formatted_report = {
         "raw_data": report,
@@ -1089,7 +1139,6 @@ def pretty_report(report: Dict[str, Any]) -> str:
             "format": "Contains both raw validation data and natural language interpretation"
         }
     }
-    
     return json.dumps(formatted_report, indent=2)
 
 

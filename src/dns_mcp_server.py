@@ -20,7 +20,8 @@ try:
         advanced_dns_lookup_impl,
         reverse_dns_lookup_impl,
         check_dnssec_impl,
-        dns_troubleshooting_impl
+        dns_troubleshooting_impl,
+        lookalike_risk_impl
     )
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
@@ -30,7 +31,8 @@ except ImportError:
         advanced_dns_lookup_impl,
         reverse_dns_lookup_impl,
         check_dnssec_impl,
-        dns_troubleshooting_impl
+        dns_troubleshooting_impl,
+        lookalike_risk_impl
     )
 class DNSMCPServer:
     """MCP Server implementation for DNS operations."""
@@ -67,6 +69,7 @@ class DNSMCPServer:
 
     def configure_resolver(self) -> None:
         """Configure DNS resolver with custom settings."""
+        #TODO: Make function obsolete by changing all code to use our Resolver class.
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
@@ -110,7 +113,7 @@ class DNSMCPServer:
             description="Perform a simple DNS lookup for a hostname to get its IP address"
         )
         async def simple_dns_lookup(hostname: str) -> Dict[str, Any]:
-            return await simple_dns_lookup_impl(self.resolver, hostname)
+            return await simple_dns_lookup_impl(hostname)
 
         @self.server.tool(
             name="advanced_dns_lookup",
@@ -131,7 +134,7 @@ class DNSMCPServer:
             description="Perform comprehensive DNS troubleshooting for a given domain"
         )
         async def dns_domain_troubleshooting(domain: str) -> Dict[str, Any]:
-            return await dns_troubleshooting_impl(self.resolver, domain)
+            return await dns_troubleshooting_impl(domain)
 
         @self.server.tool(
             name="dns_server_troubleshooting",
@@ -165,9 +168,14 @@ class DNSMCPServer:
             description="Check DNSSEC validation for a given domain"
         )
         async def check_dnssec(domain: str) -> Dict[str, Any]:
-            return await check_dnssec_impl(self.resolver, domain)
+            return await check_dnssec_impl(domain)
 
-    # ...existing code...
+        @self.server.tool(
+            name="lookalike_risk",
+            description="Assess lookalike domain risk for a given domain"
+        )
+        async def lookalike_risk(domain: str, check_dns: bool = False) -> Dict[str, Any]:
+            return await lookalike_risk_impl(domain, check_dns)
 
     def setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
@@ -413,6 +421,15 @@ class DNSMCPServer:
             )
 
         @self.server.prompt
+        def dns_domain_on_server_troubleshoot(domain: str, nameserver: str) -> str:
+            """Perform DNS troubleshooting for a domain against a specific DNS server."""
+            return (
+                f"Perform DNS troubleshooting for {domain} against {nameserver} using"
+                " the dns domain troubleshooting tool provided"
+                " by the DNS MCP Server."
+            )
+
+        @self.server.prompt
         def dns_server_troubleshoot(domain: str, nameserver: str) -> str:
             """Perform comprehensive DNS server troubleshooting."""
             return (
@@ -445,6 +462,22 @@ class DNSMCPServer:
             return (
                 f"Get DNSSEC status of domain {domain} using the check_dnssec"
                 " tool provided by the DNS MCP Server."
+            )
+
+        @self.server.prompt
+        def lookalike_risk(domain: str, check_dns: bool = False) -> str:
+            """Assess lookalike domain risk."""
+            return (
+                f"Assess lookalike domain risk for {domain} using the"
+                " lookalike_risk tool provided by the DNS MCP Server."
+            )
+
+        @self.server.prompt
+        def lookalike_risk_check_dns(domain: str, check_dns: bool = True) -> str:
+            """Assess lookalike domain risk and resolve all variants."""
+            return (
+                f"Assess lookalike domain risk for {domain} and resolve all variants using the"
+                " lookalike_risk tool provided by the DNS MCP Server."
             )
 
 async def main() -> None:
