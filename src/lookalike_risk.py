@@ -443,10 +443,10 @@ def assess_domain_risk(domain: str,
 
     num_variants = len(candidates)
     num_resolving = len(resolving) if check_dns else None
+    prop_resolving = None
     if num_resolving:
-        prop_resolving = (num_resolving / num_variants) if (check_dns and num_variants > 0) else None
-    else:
-        prop_resolving = None
+        if (check_dns and num_variants > 0):
+            prop_resolving = num_resolving / num_variants
 
     risk_score = _score_components(num_variants=num_variants,
                                    prop_resolving=prop_resolving,
