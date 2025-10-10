@@ -193,9 +193,12 @@ async def lookalike_risk_impl(
     report = assess_domain_risk(domain, check_dns=check_dns)
     return {
         "domain": domain,
-        "summary": f"{domain} → score={report['risk_score']:.3f}",
-        "lookalike_risk_report": report['summary'],
-        "variants": report['sample_variants'],
+        "risk_score": report.get('risk_score', None),
+        "summary": f"{domain} → score={report.get('risk_score', 0):.3f}",
+        "lookalike_risk_report": report.get('summary', ""),
+        "variants": report.get('all_variants', []),
+        "resolving_variants": report.get('resolving_variants', []),
+        "details": report.get('details', {}),
         "status": "success"
     }
 

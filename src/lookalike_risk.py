@@ -8,7 +8,7 @@ Features:
  - Typo-squatting variants (deletion, insertion, substitution, transposition)
  - Keyboard-adjacent substitutions
  - Common homoglyph substitutions for visual confusion
- - Options to check DNS (using dnspython) for whether variant resolves
+ - Options to check DNS for whether variant resolves
  - Scoring: combines number of variants, availability (if checked) and visual similarity
 
 Usage:
@@ -21,17 +21,13 @@ from __future__ import annotations
 import random
 import string
 import unicodedata
-import itertools
 from typing import List, Set, Dict, Tuple, Optional
 import difflib
 import math
-
-# Optional: dns checking using dnspython
 try:
-    import dns.resolver
-    DNSPYTHON_AVAILABLE = True
-except Exception:
-    DNSPYTHON_AVAILABLE = False
+    from .resolver import Resolver
+except:
+    from resolver import Resolver
 
 # ----- Configurable small datasets (keyboard adjacency + homoglyphs) -----
 # Keyboard adjacency (QWERTY) for simple substitution/insertion choices
@@ -98,40 +94,62 @@ _SAFE_CHARS = set(string.ascii_letters + string.digits + '-')
 
 # ----- Utility functions -----
 
-
 def _split_domain(domain: str) -> Tuple[str, str]:
-    """
-    Split "example.co.uk" into ("example", "co.uk") by taking the leftmost label
+    """Split "example.co.uk" into ("example", "co.uk") by taking the leftmost label
     as the 'sld' we mutate, and the remainder as TLD/psl part.
     This is simple: it doesn't consult a public suffix list. If you want PSL-aware
     splitting, integrate e.g. the 'publicsuffix2' package.
+    
+    Args:
+        domain: full domain name
+        
+    Returns:
+        Tuple of (sld, tld_part)
     """
-    parts = domain.split('.')
+    parts = domain.strip().lower().split('.')
     if len(parts) < 2:
         return domain, ''
     sld = parts[0]
     tld = '.'.join(parts[1:])
     return sld, tld
 
-
 def _mutations_deletion(s: str) -> Set[str]:
-    """Delete one character"""
+    """Delete one character
+    
+    Args:
+        s: input string
+    
+    Returns:
+        Set of strings with one character deleted
+    """
     out = set()
     for i in range(len(s)):
         out.add(s[:i] + s[i+1:])
     return out
 
-
 def _mutations_transpose(s: str) -> Set[str]:
-    """Swap adjacent characters"""
+    """Swap adjacent characters
+    
+    Args:
+        s: input string
+    
+    Returns:
+        Set of strings with adjacent characters swapped
+    """
     out = set()
     for i in range(len(s) - 1):
         out.add(s[:i] + s[i+1] + s[i] + s[i+2:])
     return out
 
-
 def _mutations_replace_adjacent(s: str) -> Set[str]:
-    """Replace characters with keyboard-adjacent characters"""
+    """Replace characters with keyboard-adjacent characters
+    
+    Args:
+        s: input string
+
+    Returns:
+        Set of strings with one character replaced by an adjacent key
+    """
     out = set()
     for i, ch in enumerate(s):
         low = ch.lower()
@@ -141,9 +159,15 @@ def _mutations_replace_adjacent(s: str) -> Set[str]:
                 out.add(new)
     return out
 
-
 def _mutations_insert_adjacent(s: str) -> Set[str]:
-    """Insert keyboard-adjacent characters"""
+    """Insert keyboard-adjacent characters
+    
+    Args:
+        s: input string
+
+    Returns:
+        Set of strings with one character inserted (adjacent key)
+    """
     out = set()
     for i, ch in enumerate(s):
         low = ch.lower()
@@ -157,17 +181,29 @@ def _mutations_insert_adjacent(s: str) -> Set[str]:
         out.add(s[:i] + '.' + s[i:])  # might create subdomain-like forms
     return out
 
-
 def _mutations_repeat_char(s: str) -> Set[str]:
-    """Repeat a character (double letters omitted or added)"""
+    """Repeat a character (double letters omitted or added)
+    
+    Args:
+        s: input string
+
+    Returns:
+        Set of strings with one character duplicated
+    """
     out = set()
     for i in range(len(s)):
         out.add(s[:i] + s[i] + s[i:] )  # duplicate
     return out
 
-
 def _mutations_homoglyph(s: str) -> Set[str]:
-    """Substitute characters with homoglyphs (one-per-string substitutions)"""
+    """Substitute characters with homoglyphs (one-per-string substitutions)
+    
+    Args:
+        s: input string
+
+    Returns:
+        Set of strings with one character replaced by a homoglyph
+    """
     out = set()
     for i, ch in enumerate(s):
         low = ch.lower()
@@ -181,9 +217,15 @@ def _mutations_homoglyph(s: str) -> Set[str]:
                 out.add(s[:i] + glyph_candidate + s[i+1:])
     return out
 
-
 def _normalize_variant(label: str) -> str:
-    """Normalize a label (NFKC) and remove impossible characters for DNS labels if needed."""
+    """Normalize a label (NFKC) and remove impossible characters for DNS labels if needed.
+    
+    Args:
+        label: input label string
+
+    Returns:
+        Normalized label string, or empty string if invalid
+    """
     norm = unicodedata.normalize('NFKC', label)
     # strip spaces
     norm = norm.replace(' ', '')
@@ -201,7 +243,14 @@ def _normalize_variant(label: str) -> str:
 
 
 def _generate_variants_for_label(label: str, max_variants: int = 500) -> Set[str]:
-    """Combine many mutation strategies to produce variants for the leftmost label."""
+    """Combine many mutation strategies to produce variants for the leftmost label.
+    
+    Args:
+        label: input label (e.g. "example" from "example.com")
+
+    Returns:
+        Set of plausible look-alike variants (up to max_variants)
+    """
     gen: Set[str] = set()
     # simple typos
     gen |= _mutations_deletion(label)
@@ -243,9 +292,16 @@ def _generate_variants_for_label(label: str, max_variants: int = 500) -> Set[str
             break
     return cleaned
 
-
 def _build_full_domains(label_variants: Set[str], tld_part: str) -> List[str]:
-    """Append TLD part back. If tld_part is empty, return labels only."""
+    """Append TLD part back. If tld_part is empty, return labels only.
+    
+    Args:
+        label_variants: set of label variants (e.g. "examp1e", "exampl3")
+        tld_part: TLD/psl part (e.g. "com" or "co.uk")
+
+    Returns:
+        List of full domain variants
+    """
     out = []
     for lab in label_variants:
         if tld_part:
@@ -254,19 +310,26 @@ def _build_full_domains(label_variants: Set[str], tld_part: str) -> List[str]:
             out.append(lab)
     return out
 
-
 # ----- Similarity and scoring helpers -----
 
-
 def _similarity(a: str, b: str) -> float:
-    """Return a similarity ratio between 0 and 1 using SequenceMatcher."""
+    """Return a similarity ratio between 0 and 1 using SequenceMatcher.
+    
+    Args:
+        a: first string
+        b: second string
+
+    Returns:
+        Similarity ratio (0..1)
+    """
     return difflib.SequenceMatcher(None, a, b).ratio()
 
-
-def _score_components(num_variants: int, prop_resolving: Optional[float], avg_similarity: float,
-                      params: Optional[Dict] = None) -> float:
-    """
-    Combine components into a single risk score in [0,1].
+def _score_components(
+    num_variants: int,
+    prop_resolving: Optional[float],
+    avg_similarity: float,
+    params: Optional[Dict] = None) -> float:
+    """Combine components into a single risk score in [0,1].
     - num_variants: total plausible variants generated (raw)
     - prop_resolving: proportion (0..1) of variants that resolve (None if not checked)
     - avg_similarity: average similarity (0..1) between variants and original
@@ -276,6 +339,19 @@ def _score_components(num_variants: int, prop_resolving: Optional[float], avg_si
       - availability factor: prop_resolving (if known) else 0.5
       - similarity factor: avg_similarity
       - final score = weighted sum, clamped [0,1]
+    
+    Args:
+        num_variants: number of generated variants
+        prop_resolving: proportion of variants that resolved (0..1) or None
+        avg_similarity: average similarity (0..1)
+        params: optional dict of parameters to tune scoring
+            - max_var_cap: int, cap for scaling variant count (default 1000)
+            - w_avail: weight for availability factor (default 0.5)
+            - w_count: weight for variant count factor (default 0.25)
+            - w_sim: weight for similarity factor (default 0.25)
+
+    Returns:
+        Risk score in [0,1]
     """
     if params is None:
         params = {}
@@ -300,14 +376,11 @@ def _score_components(num_variants: int, prop_resolving: Optional[float], avg_si
     score = max(0.0, min(score, 1.0))
     return score
 
-
 # ----- Main API -----
-
 
 def assess_domain_risk(domain: str,
                        check_dns: bool = False,
                        max_variants: int = 500,
-                       sample_size: int = 20,
                        timeout: float = 2.0) -> Dict:
     """
     Assess look-alike/typosquatting risk for `domain`.
@@ -316,19 +389,17 @@ def assess_domain_risk(domain: str,
       domain: domain to assess, e.g. "example.com"
       check_dns: if True, attempt to resolve each generated variant (requires dnspython).
       max_variants: cap on how many variants to keep/generate
-      sample_size: size of example variants returned in report
       timeout: DNS query timeout in seconds (if check_dns enabled)
 
     Returns:
       dict with keys:
         - domain
-        - num_variants
-        - num_resolving (or None if not checked)
-        - prop_resolving (or None)
-        - avg_similarity
         - risk_score (0..1)
-        - sample_variants (list)
-        - details: list of top variant categories counts
+        - summary (str)
+        - details: dict with
+        - all_variants
+        - all_variants_count
+        - resolving_variants (if check_dns)
     """
     domain = domain.strip().lower()
     if domain.endswith('.'):
@@ -350,33 +421,21 @@ def assess_domain_risk(domain: str,
     # 3) Optionally check DNS resolution (simple A/AAAA/NS query)
     resolving = set()
     if check_dns:
-        if not DNSPYTHON_AVAILABLE:
-            raise RuntimeError("dnspython not installed; install with `pip install dnspython` to use DNS checking.")
-        resolver = dns.resolver.Resolver(configure=True)
-        resolver.lifetime = timeout
+        resolver = Resolver(timeout=timeout)
         for cand in candidates:
-            try:
-                # Query NS first (fast indicator domain exists) then A/AAAA
-                resp = resolver.resolve(cand, 'NS', raise_on_no_answer=False)
-                if resp.rrset is not None and len(resp.rrset) > 0:
-                    resolving.add(cand)
-                    continue
-            except Exception:
-                pass
-            try:
-                resp = resolver.resolve(cand, 'A', raise_on_no_answer=False)
-                if resp.rrset is not None and len(resp.rrset) > 0:
-                    resolving.add(cand)
-                    continue
-            except Exception:
-                pass
-            try:
-                resp = resolver.resolve(cand, 'AAAA', raise_on_no_answer=False)
-                if resp.rrset is not None and len(resp.rrset) > 0:
-                    resolving.add(cand)
-                    continue
-            except Exception:
-                pass
+            # Query NS first (fast indicator domain exists) then A/AAAA
+            rrset, _ = resolver.resolve(cand, 'NS')
+            if rrset is not None and len(rrset) > 0:
+                resolving.add(cand)
+                continue
+            rrset, _ = resolver.resolve(cand, 'A')
+            if rrset is not None and len(rrset) > 0:
+                resolving.add(cand)
+                continue
+            rrset, _ = resolver.resolve(cand, 'AAAA')
+            if rrset is not None and len(rrset) > 0:
+                resolving.add(cand)
+                continue
 
     # 4) Compute similarity scores
     sim_scores = [ _similarity(domain, c) for c in candidates ]
@@ -393,9 +452,7 @@ def assess_domain_risk(domain: str,
                                    prop_resolving=prop_resolving,
                                    avg_similarity=avg_similarity)
 
-    # Build sample variants sorted by similarity descending and whether they resolve
     sorted_candidates = sorted(candidates, key=lambda c: (_similarity(domain, c), c), reverse=True)
-    sample = sorted_candidates[:sample_size]
 
     details = {
         'num_variants_generated': num_variants,
@@ -409,14 +466,12 @@ def assess_domain_risk(domain: str,
         'risk_score': risk_score,
         'summary': f"Estimated risk {risk_score:.3f} (variants={num_variants}, resolving={num_resolving})",
         'details': details,
-        'sample_variants': sample,
+        'all_variants': sorted_candidates,
         'all_variants_count': num_variants,
-        'resolving_examples': list(resolving)[:sample_size] if resolving else [],
+        'resolving_variants': list(resolving),
     }
 
-
 # ----- Example runner -----
-
 
 if __name__ == "__main__":
     test_domains = [

@@ -476,7 +476,7 @@ class DNSMCPServer:
         def lookalike_risk_check_dns(domain: str, check_dns: bool = True) -> str:
             """Assess lookalike domain risk and resolve all variants."""
             return (
-                f"Assess lookalike domain risk for {domain} and resolve all variants using the"
+                f"Assess the lookalike domain risk for {domain} and resolve all variants using the"
                 " lookalike_risk tool provided by the DNS MCP Server."
             )
 
