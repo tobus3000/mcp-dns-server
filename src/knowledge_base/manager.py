@@ -1,10 +1,9 @@
 """Knowledge Base Manager for DNS MCP Server."""
 import os
 import glob
+from typing import Dict, List, Optional
 from pathlib import Path
 import yaml
-from typing import Dict, List, Optional
-
 
 class KnowledgeBaseManager:
     """Manages DNS knowledge base articles."""

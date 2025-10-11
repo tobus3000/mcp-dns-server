@@ -9,6 +9,7 @@ from typing import Tuple, Optional, List
 import dns.exception
 import dns.name
 import dns.resolver
+import dns.reversename
 import dns.rdtypes.ANY.SOA
 import dns.rrset
 import dns.message
@@ -17,8 +18,6 @@ import dns.message
 SOARecord = dns.rdtypes.ANY.SOA.SOA
 RRset = dns.rrset.RRset
 Message = dns.message.Message
-Name = dns.name.Name
-
 
 class Resolver:
     """DNS resolver class providing high-level DNS resolution functionality.
@@ -30,6 +29,12 @@ class Resolver:
         default_timeout (float): Default timeout for DNS queries in seconds.
         resolver (dns.resolver.Resolver): Underlying dnspython resolver instance.
     """
+    allowed_record_types = [
+        "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "PTR", "SRV",
+        "DNSKEY", "DS", "RRSIG", "NSEC", "NSEC3", "NSEC3PARAM", "CAA", "SPF", "LOC",
+        "HINFO", "RP", "AFSDB", "CERT", "DNAME", "SSHFP", "TLSA", "URI", "SMIMEA",
+        "OPENPGPKEY"
+    ]
 
     def __init__(
         self,
@@ -68,6 +73,9 @@ class Resolver:
             - RRset object or None if no records found
             - DNS message response or None if query failed
         """
+        if rdtype not in self.allowed_record_types:
+            return (None, None)
+
         if timeout is not None:
             self.resolver.lifetime = timeout
 
@@ -149,6 +157,22 @@ class Resolver:
         # Strip trailing dot except for root zone
         parent_text = parent.to_text()
         return parent_text if parent_text == '.' else parent_text.rstrip('.')
+
+    @staticmethod
+    def get_reverse_name(ip_address: str) -> Optional[str] | None:
+        """Get the reverse DNS name for a given IP address.
+
+        Args:
+            ip_address: The IP address to convert to a reverse DNS name.
+        
+        Returns:
+            The reverse DNS name as a string, or None if the IP is invalid.
+        """
+        try:
+            rev_name = dns.reversename.from_address(ip_address)
+            return rev_name.to_text().rstrip('.')
+        except dns.exception.SyntaxError:
+            return None
 
     def get_soa_serial(
         self,

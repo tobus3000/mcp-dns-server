@@ -14,7 +14,7 @@ dns:
   
   # Number of retries for failed DNS queries
   retries: 2
-
+  
 features:
   # Enable advanced DNS troubleshooting
   advanced_troubleshooting: true

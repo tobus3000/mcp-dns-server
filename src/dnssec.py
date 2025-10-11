@@ -666,7 +666,7 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
             passed = False  # Should not succeed with invalid name
         except dns.name.LabelTooLong:
             passed = True  # Expected behavior - proper handling of long labels
-        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, 
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
                 dns.resolver.NoNameservers, dns.name.BadLabelType):
             passed = True  # Any form of rejection for invalid names is acceptable
         except dns.exception.DNSException:
@@ -707,7 +707,7 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
     try:
         _, resp = _resolver.resolve(zone_name, 'NULL')
         # NULL records should be rejected or handled safely
-        passed = (resp is None or 
+        passed = (resp is None or
                  resp.rcode() in [dns.rcode.REFUSED, dns.rcode.NOTIMP, dns.rcode.FORMERR])
         result['tests'].append({
             'name': 'unusual_rr_type',
@@ -803,7 +803,7 @@ def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
             sig1: RRSIG = cast(RRSIG, sig1_rrset[0])
             sig2: RRSIG = cast(RRSIG, sig2_rrset[0])
             # Compare inception times - shouldn't be identical for fresh signatures
-            passed = (sig1.inception != sig2.inception or 
+            passed = (sig1.inception != sig2.inception or
                      sig1.expiration != sig2.expiration)
         else:
             passed = True  # No RRSIG means no replay vulnerability

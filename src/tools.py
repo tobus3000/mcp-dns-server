@@ -3,11 +3,9 @@
 This module provides implementations for the tools exposed
 by the Model Context Protocol (MCP) server.
 """
-import socket
 import traceback
 from typing import Dict, Any, Optional
-import dns.resolver
-import dns.reversename
+import ipaddress
 import dns.message
 import dns.rcode
 try:
@@ -15,11 +13,13 @@ try:
     from .dnssec import validate_domain, pretty_report
     from .lookalike_risk import assess_domain_risk
     from .resolver import Resolver
+    from .dnstrace import Trace
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
     from dnssec import validate_domain, pretty_report
     from lookalike_risk import assess_domain_risk
     from resolver import Resolver
+    from dnstrace import Trace
 
 async def simple_dns_lookup_impl(hostname: str) -> Dict[str, Any]:
     """Resolve the A record of a given hostname.
@@ -52,107 +52,127 @@ async def simple_dns_lookup_impl(hostname: str) -> Dict[str, Any]:
         "status": "success"
     }
 
-async def advanced_dns_lookup_impl(resolver, hostname: str, record_type: str) -> Dict[str, Any]:
-    #TODO: Change to use our Resolver class.
-    #TODO: Change exception handling to use our Resolver class results.
-    #TODO: Smaller try/except blocks for more specific error handling.
-    try:
-        # Get authoritative nameservers first
-        auth_nameservers = []
-        try:
-            ns_result = resolver.resolve(hostname, 'NS')
-            auth_nameservers = [str(rdata) for rdata in ns_result]
-        except Exception:
-            pass  # If NS lookup fails, continue with main record lookup
-        result = resolver.resolve(hostname, record_type)
-        records = []
-        for rdata in result:
-            if record_type == "MX":
-                records.append({
-                    "preference": rdata.preference,
-                    "exchange": str(rdata.exchange)
-                })
-            elif record_type == "SRV":
-                records.append({
-                    "priority": rdata.priority,
-                    "weight": rdata.weight,
-                    "port": rdata.port,
-                    "target": str(rdata.target)
-                })
-            elif record_type == "SOA":
-                records.append({
-                    "mname": str(rdata.mname),
-                    "rname": str(rdata.rname),
-                    "serial": rdata.serial,
-                    "refresh": rdata.refresh,
-                    "retry": rdata.retry,
-                    "expire": rdata.expire,
-                    "minimum": rdata.minimum
-                })
-            else:
-                records.append(str(rdata))
-        response = {
-            "hostname": hostname,
-            "record_type": record_type,
-            "records": records,
-            "status": "success"
-        }
-        if auth_nameservers:
-            response["authoritative_nameservers"] = auth_nameservers
-        return response
-    except dns.resolver.NXDOMAIN:
-        return {
-            "hostname": hostname,
-            "record_type": record_type,
-            "error": f"Hostname {hostname} does not exist",
-            "status": "error"
-        }
-    except dns.resolver.NoAnswer:
-        return {
-            "hostname": hostname,
-            "record_type": record_type,
-            "error": f"No {record_type} record found for {hostname}",
-            "status": "error"
-        }
-    except Exception as e:
-        return {
-            "hostname": hostname,
-            "record_type": record_type,
-            "error": str(e),
-            "status": "error"
-        }
+async def advanced_dns_lookup_impl(
+    hostname: str,
+    record_type: str
+) -> Dict[str, Any]:
+    """Perform an advanced DNS lookup for the given hostname and record type.
 
-async def reverse_dns_lookup_impl(resolver, ip_address: str) -> Dict[str, Any]:
-    #TODO: Change to use our Resolver class.
-    #TODO: Change exception handling to use our Resolver class results.
-    try:
-        socket.inet_aton(ip_address)
-        rev_name = dns.reversename.from_address(ip_address)
-        result = resolver.resolve(rev_name, "PTR")
-        hostnames = [str(rdata) for rdata in result]
+    Args:
+        hostname (str): The hostname to resolve.
+        record_type (str): The DNS record type to query (e.g., A, AAAA, MX, NS, TXT).
+
+    Returns:
+        Dict[str, Any]: Dictionary containing the resolved records or error details.
+    """
+    auth_nameservers = []
+    resolver = Resolver(timeout=5.0)
+    ns_rrset, _ = resolver.resolve(hostname, 'NS')
+    if ns_rrset:
+        auth_nameservers = [str(rdata) for rdata in ns_rrset]
+    rrset, response = resolver.resolve(hostname, record_type)
+    records = []
+    if not rrset:
+        rcode_value = None
+        rcode_text = "No records found"
+        status = "error"
+        if response:
+            # Extract error type from response if available
+            if isinstance(response, dns.message.Message):
+                rcode_value = response.rcode()
+                if rcode_value == 0:
+                    status = "success"
+                rcode_text = dns.rcode.to_text(rcode_value)
+            elif hasattr(response, 'rcode'):
+                rcode_text = dns.rcode.to_text(response.rcode())
         return {
-            "ip_address": ip_address,
-            "hostnames": hostnames,
-            "status": "success"
+            "hostname": hostname,
+            "record_type": record_type,
+            "rcode": rcode_value,
+            "rcode_text": rcode_text,
+            "status": status
         }
-    except socket.error:
+    for rdata in rrset:
+        if record_type == "MX":
+            records.append({
+                "preference": rdata.preference,
+                "exchange": str(rdata.exchange)
+            })
+        elif record_type == "SRV":
+            records.append({
+                "priority": rdata.priority,
+                "weight": rdata.weight,
+                "port": rdata.port,
+                "target": str(rdata.target)
+            })
+        elif record_type == "SOA":
+            records.append({
+                "mname": str(rdata.mname),
+                "rname": str(rdata.rname),
+                "serial": rdata.serial,
+                "refresh": rdata.refresh,
+                "retry": rdata.retry,
+                "expire": rdata.expire,
+                "minimum": rdata.minimum
+            })
+        else:
+            records.append(str(rdata))
+
+    response = {
+        "hostname": hostname,
+        "record_type": record_type,
+        "records": records,
+        "status": "success"
+    }
+    if auth_nameservers:
+        response["authoritative_nameservers"] = auth_nameservers
+    return response
+
+async def reverse_dns_lookup_impl(ip_address: str) -> Dict[str, Any]:
+    """Perform a reverse DNS lookup for the given IP address.
+    Args:
+        ip_address (str): The IP address to perform reverse DNS lookup on.
+    Returns:
+        Dict[str, Any]: Dictionary containing the resolved hostnames or error details.
+    """
+    try:
+        ip = ipaddress.ip_address(ip_address)
+    except ValueError:
         return {
             "ip_address": ip_address,
             "error": f"Invalid IP address: {ip_address}",
             "status": "error"
         }
-    except dns.resolver.NXDOMAIN:
+    rev_name = Resolver.get_reverse_name(ip_address)
+    if rev_name is None:
         return {
             "ip_address": ip_address,
-            "error": f"No PTR record found for {ip_address}",
+            "error": f"Could not get reverse DNS name for IP address: {ip_address} ({ip.version})",
             "status": "error"
         }
-    except Exception as e:
+    resolver = Resolver(timeout=5.0)
+    rrset, response = resolver.resolve(rev_name, "PTR")
+    if not rrset:
+        error_message = "No PTR record found"
+        if response:
+            # Extract error type from response if available
+            if isinstance(response, dns.message.Message):
+                rcode_value = response.rcode()
+                error_message = dns.rcode.to_text(rcode_value)
+            elif hasattr(response, 'rcode'):
+                error_message = dns.rcode.to_text(response.rcode())
         return {
             "ip_address": ip_address,
-            "error": str(e),
+            "error": error_message,
             "status": "error"
         }
+    hostnames = [str(rdata) for rdata in rrset]
+    return {
+        "ip_address": ip_address,
+        "hostnames": hostnames,
+        "is_local": ip.is_private or ip.is_loopback,
+        "status": "success"
+    }
 
 async def check_dnssec_impl(domain: str) -> Dict[str, Any]:
     """DNSSEC validation tool implementation.
@@ -229,7 +249,7 @@ async def dns_troubleshooting_impl(
     record_types = ['SOA', 'A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT']
 
     for record_type in record_types:
-        # Get the answer from our new resolver
+        # Get the answer from our resolver
         # No need for try/except as resolve() handles errors...
         rrset, response = resolver.resolve(domain, record_type)
 
@@ -260,7 +280,10 @@ async def dns_troubleshooting_impl(
                         "expire": rr.expire,
                         "minimum": rr.minimum
                     })
-            troubleshooting_results[record_type] = soa_records if soa_records else {"error": "Invalid SOA record format"}
+            if soa_records:
+                troubleshooting_results[record_type] = soa_records
+            else:
+                troubleshooting_results[record_type] = {"error": "Invalid SOA record format"}
 
         elif record_type == 'MX':
             mx_records = []
@@ -270,7 +293,10 @@ async def dns_troubleshooting_impl(
                         "preference": rr.preference,
                         "exchange": str(rr.exchange)
                     })
-            troubleshooting_results[record_type] = mx_records if mx_records else {"error": "Invalid MX record format"}
+            if mx_records:
+                troubleshooting_results[record_type] = mx_records
+            else:
+                troubleshooting_results[record_type] = {"error": "Invalid MX record format"}
         else:
             # For other record types, just convert to strings
             troubleshooting_results[record_type] = [str(rr) for rr in rrset]
@@ -278,5 +304,24 @@ async def dns_troubleshooting_impl(
     return {
         "domain": domain,
         "troubleshooting_results": troubleshooting_results,
+        "status": "success"
+    }
+
+async def dns_trace_impl(
+    domain: str
+) -> Dict[str, Any]:
+    """Perform a DNS trace for the given domain.
+
+    Args:
+        domain (str): The domain to trace.
+
+    Returns:
+        Dict[str, Any]: Trace report or error details.
+    """
+    tracer = Trace(follow_cname=True)
+    tracer.perform_trace(domain.strip())
+    return {
+        "domain": domain,
+        "dns_trace": tracer.get_dig_style(),
         "status": "success"
     }
