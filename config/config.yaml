@@ -16,8 +16,17 @@ dns:
   retries: 2
   
 features:
+  # Enable Knowledge Base resources
+  knowledge_base: true
+  
   # Enable advanced DNS troubleshooting
   advanced_troubleshooting: true
   
   # Enable reverse DNS lookups
   reverse_lookup: true
+
+  # Enable DNSSEC validation
+  dnssec_validation: true
+
+  # Enable lookalike domain risk assessment
+  lookalike_risk_tool: true

@@ -22,6 +22,39 @@ from typing import (
     Optional,
     TypedDict
 )
+from dataclasses import dataclass, field
+import dns.message
+import dns.name
+import dns.rdatatype
+
+@dataclass
+class QueryResult:
+    """Stores the result of a DNS query test.
+    details:
+        'flags': response.flags,
+        'answer_count': len(response.answer),
+        'authority_count': len(response.authority),
+        'additional_count': len(response.additional),
+        'has_edns': response.edns >= 0,
+        'is_truncated': bool(response.flags & dns.flags.TC)
+    """
+    success: bool
+    qname: Optional[dns.name.Name] = None
+    rdtype: Optional[dns.rdatatype.RdataType] = None
+    response: Optional[dns.message.Message] = None
+    error: Optional[str] = None
+    rcode: Optional[int] = None
+    rcode_text: Optional[str] = None
+    duration: Optional[float] = None
+    details: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class ToolResult:
+    """Stores the result of a DNS tool operation."""
+    success: bool
+    output: Optional[str|List[str]|Dict[str, Any]|List[Dict[str, Any]]] = None
+    error: Optional[str] = None
+    details: Dict[str, Any] = field(default_factory=dict)
 
 # Type definitions for result dictionaries
 class ValidationResult(TypedDict, total=False):

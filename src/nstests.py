@@ -15,8 +15,7 @@ import random
 import struct
 import asyncio
 import socket
-from typing import Dict, Any, Optional, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, Any, Tuple
 from dns import exception as dns_exception
 import dns.message
 import dns.name
@@ -26,22 +25,17 @@ import dns.asyncquery
 import dns.flags
 import dns.edns
 import dns.rcode
+try:
+    from .typedefs import QueryResult
+    from .resolver import Resolver
+except ImportError:
+    from typedefs import QueryResult
+    from resolver import Resolver
 
 DEFAULT_TIMEOUT = 5.0
 MAX_UDP_SIZE = 4096
 DEFAULT_EDNS_SIZE = 1232  # Conservative EDNS buffer size
 COMMON_RECORD_TYPES = ['A', 'AAAA', 'MX', 'NS', 'TXT', 'SOA', 'CNAME']
-
-@dataclass
-class QueryResult:
-    """Stores the result of a DNS query test."""
-    success: bool
-    response: Optional[dns.message.Message] = None
-    error: Optional[str] = None
-    rcode: Optional[int] = None
-    duration: Optional[float] = None
-    details: Dict[str, Any] = field(default_factory=dict)
-
 
 async def make_test_query(domain: str, rdtype: str, nameserver: str,
                         use_tcp: bool = False, use_edns: bool = True,
