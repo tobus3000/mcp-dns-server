@@ -14,9 +14,9 @@ import time
 import random
 import struct
 import asyncio
-import socket
+# import socket
 from typing import Dict, Any, Tuple
-from dns import exception as dns_exception
+# from dns import exception as dns_exception
 import dns.message
 import dns.name
 import dns.rdatatype
@@ -37,81 +37,6 @@ MAX_UDP_SIZE = 4096
 DEFAULT_EDNS_SIZE = 1232  # Conservative EDNS buffer size
 COMMON_RECORD_TYPES = ['A', 'AAAA', 'MX', 'NS', 'TXT', 'SOA', 'CNAME']
 
-async def make_test_query(domain: str, rdtype: str, nameserver: str,
-                        use_tcp: bool = False, use_edns: bool = True,
-                        payload_size: int = DEFAULT_EDNS_SIZE,
-                        flags: int = 0, timeout: float = DEFAULT_TIMEOUT) -> QueryResult:
-    """Make an async DNS query with specified parameters."""
-    try:
-        qname = dns.name.from_text(domain)
-        rdtype_obj = dns.rdatatype.from_text(rdtype)
-
-        # Create the query message
-        query = dns.message.make_query(
-            qname,
-            rdtype_obj,
-            want_dnssec=bool(flags & dns.flags.DO)
-        )
-
-        # Add EDNS if requested
-        if use_edns:
-            query.use_edns(
-                0,  # EDNS version 0
-                flags,
-                payload_size,
-                options=[]
-            )
-
-        start_time = time.time()
-
-        # Send query
-        if use_tcp:
-            response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
-        else:
-            try:
-                response = await dns.asyncquery.udp(query, nameserver, timeout=timeout)
-                if response.flags & dns.flags.TC:  # Truncated, retry with TCP
-                    response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
-            except Exception as e:
-                if "Message too big" in str(e):
-                    # UDP message too large, retry with TCP
-                    response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
-                else:
-                    raise
-
-        duration = time.time() - start_time
-
-        return QueryResult(
-            success=True,
-            response=response,
-            rcode=response.rcode(),
-            duration=duration,
-            details={
-                'flags': response.flags,
-                'answer_count': len(response.answer),
-                'authority_count': len(response.authority),
-                'additional_count': len(response.additional),
-                'has_edns': response.edns >= 0,
-                'is_truncated': bool(response.flags & dns.flags.TC)
-            }
-        )
-
-    except (dns_exception.DNSException, socket.error, asyncio.TimeoutError) as e:
-        return QueryResult(
-            success=False,
-            error=str(e),
-            details={'exception_type': type(e).__name__}
-        )
-    except Exception as e:
-        # Log unexpected exceptions while keeping the function robust
-        print(f"Unexpected error in make_test_query: {type(e).__name__}: {str(e)}")
-        return QueryResult(
-            success=False,
-            error=f"Unexpected error: {str(e)}",
-            details={'exception_type': type(e).__name__}
-        )
-
-
 async def test_basic_records(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test basic DNS record types and their correctness."""
     results = {
@@ -128,8 +53,9 @@ async def test_basic_records(domain: str, nameserver: str) -> Dict[str, Any]:
 
     for rdtype in COMMON_RECORD_TYPES:
         # Test both with and without EDNS
-        standard_result = await make_test_query(domain, rdtype, nameserver, use_edns=False)
-        edns_result = await make_test_query(domain, rdtype, nameserver, use_edns=True)
+        resolver = Resolver()
+        standard_result = await resolver.async_resolve(domain, rdtype, nameserver, use_edns=False)
+        edns_result = await resolver.async_resolve(domain, rdtype, nameserver, use_edns=True)
         results['record_tests'][rdtype] = {
             'standard': {
                 'success': standard_result.success,
@@ -177,9 +103,9 @@ async def test_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
         'leading_dots': '.' + domain,
         'maximum_label': ('x' * 63 + '.').join(domain.split('.')),  # Max label length
     }
-
+    resolver = Resolver()
     for test_name, test_domain in test_cases.items():
-        result = await make_test_query(test_domain, 'A', nameserver)
+        result = await resolver.async_resolve(test_domain, 'A', nameserver)
         results['tests'][test_name] = {
             'domain': test_domain,
             'success': result.success,
@@ -202,9 +128,9 @@ async def test_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
         'invalid_chars': f"test!@#$.{domain}",
         'empty_label': f"test..{domain}",
     }
-
+    resolver = Resolver()
     for test_name, test_domain in invalid_cases.items():
-        result = await make_test_query(test_domain, 'A', nameserver)
+        result = await resolver.async_resolve(test_domain, 'A', nameserver)
         results['tests'][test_name] = {
             'domain': test_domain,
             'success': result.success,
@@ -235,9 +161,16 @@ async def test_edns_support(domain: str, nameserver: str) -> Dict[str, Any]:
     }
 
     # Test different EDNS buffer sizes
+    resolver = Resolver()
     buffer_sizes = [512, 1232, 1440, 4096]
     for size in buffer_sizes:
-        result = await make_test_query(domain, 'A', nameserver, use_edns=True, payload_size=size)
+        result = await resolver.async_resolve(
+            domain,
+            'A',
+            nameserver,
+            use_edns=True,
+            payload_size=size
+        )
         results['tests'][f'buffer_size_{size}'] = {
             'success': result.success,
             'details': result.details
@@ -293,7 +226,8 @@ async def test_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
     }
 
     # Basic TCP connectivity
-    result = await make_test_query(domain, 'A', nameserver, use_tcp=True)
+    resolver = Resolver()
+    result = await resolver.async_resolve(domain, 'A', nameserver, use_tcp=True)
     results['tests']['basic_tcp'] = {
         'success': result.success,
         'error': result.error,
@@ -308,7 +242,13 @@ async def test_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
 
     # Test large response handling
     # Request many records to force TCP
-    result = await make_test_query(domain, 'ANY', nameserver, use_edns=True, payload_size=4096)
+    result = await resolver.async_resolve(
+        domain,
+        'ANY',
+        nameserver,
+        use_edns=True,
+        payload_size=4096
+    )
     results['tests']['large_response'] = {
         'success': result.success,
         'error': result.error,
@@ -398,13 +338,13 @@ async def test_performance(domain: str, nameserver: str,
         },
         'summary': {}
     }
-
+    resolver = Resolver()
     async def worker(i: int) -> QueryResult:
         # Mix up query types for more realistic testing
         rdtype = random.choice(COMMON_RECORD_TYPES)
         # Add some randomness to prevent caching
         test_domain = f"perf-test-{i}-{random.randint(1, 1000)}.{domain}"
-        return await make_test_query(test_domain, rdtype, nameserver)
+        return await resolver.async_resolve(test_domain, rdtype, nameserver)
 
     start_time = time.time()
 
@@ -475,7 +415,8 @@ async def test_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
     }
 
     # Get NS records
-    ns_result = await make_test_query(domain, 'NS', nameserver)
+    resolver = Resolver()
+    ns_result = await resolver.async_resolve(domain, 'NS', nameserver)
     if not ns_result.success:
         results['tests']['ns_records'] = {
             'success': False,
@@ -498,7 +439,7 @@ async def test_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
         ns_name = ns.target.to_text()
 
         # Check glue records
-        glue_result = await make_test_query(ns_name, 'A', nameserver)
+        glue_result = await resolver.async_resolve(ns_name, 'A', nameserver)
         results['tests'][f'glue_{ns_name}'] = {
             'success': glue_result.success,
             'has_glue': bool(glue_result.response and glue_result.response.additional),
@@ -513,7 +454,7 @@ async def test_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
 
     # Test parent zone delegation
     parent_domain = '.'.join(domain.split('.')[1:]) or '.'
-    parent_result = await make_test_query(parent_domain, 'NS', nameserver)
+    parent_result = await resolver.async_resolve(parent_domain, 'NS', nameserver)
 
     results['tests']['parent_delegation'] = {
         'success': parent_result.success,
@@ -540,9 +481,9 @@ async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
         ('any_tcp', {'use_edns': False, 'use_tcp': True}),
         ('any_edns_tcp', {'use_edns': True, 'use_tcp': True}),
     ]
-
+    resolver = Resolver()
     for test_name, params in test_cases:
-        result = await make_test_query(domain, 'ANY', nameserver, **params)
+        result = await resolver.async_resolve(domain, 'ANY', nameserver, **params)
         results['tests'][test_name] = {
             'success': result.success,
             'rcode': result.rcode,
@@ -610,7 +551,7 @@ async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
         test_results = []
 
         for _ in range(test_count):
-            result = await make_test_query(domain, 'ANY', nameserver, use_edns=True)
+            result = await resolver.async_resolve(domain, 'ANY', nameserver, use_edns=True)
             test_results.append(result)
 
         duration = time.time() - start_time
@@ -620,7 +561,9 @@ async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
             'queries_per_second': test_count / duration,
             'refused_count': sum(1 for r in test_results if r.rcode == dns.rcode.REFUSED),
             'error_count': sum(1 for r in test_results if not r.success),
-            'average_response_time': sum(r.duration for r in test_results if r.duration) / test_count
+            'average_response_time': sum(
+                r.duration for r in test_results if r.duration
+            ) / test_count
         }
 
         # Check if rate limiting is in place
@@ -760,9 +703,9 @@ async def test_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
         ('max_name', ('x.' * 127 + domain)[:255]),  # Maximum name length
         ('overmax_name', ('x.' * 128 + domain)),  # Exceeds maximum name length
     ]
-
+    resolver = Resolver()
     for test_name, test_domain in malformed_tests:
-        result = await make_test_query(test_domain, 'A', nameserver)
+        result = await resolver.async_resolve(test_domain, 'A', nameserver)
         results['tests'][test_name] = {
             'success': result.success,
             'rcode': result.rcode,
@@ -781,7 +724,7 @@ async def test_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
     # Test unusual record types
     unusual_types = ['NULL', 'HINFO', 'RP', 'AFSDB']
     for rdtype in unusual_types:
-        result = await make_test_query(domain, rdtype, nameserver)
+        result = await resolver.async_resolve(domain, rdtype, nameserver)
         results['tests'][f'unusual_type_{rdtype}'] = {
             'success': result.success,
             'rcode': result.rcode,
@@ -815,6 +758,103 @@ async def test_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
 
     return results
 
+async def test_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
+    """Test DNS Cookie (RFC 7873) support and behavior for a given nameserver."""
+
+    results = {
+        'domain': domain,
+        'nameserver': nameserver,
+        'tests': {},
+        'summary': {'passed': 0, 'failed': 0, 'errors': []}
+    }
+
+    resolver = Resolver()  # Use your custom Resolver class
+
+    try:
+        # Generate client cookie (8 random bytes)
+        client_cookie = os.urandom(8)
+
+        # Send query through resolver’s async method
+        query_result = await resolver.async_resolve(
+            domain=domain,
+            rdtype='A',
+            nameserver=nameserver,
+            use_tcp=False,
+            use_edns=True,
+            payload_size=1232,
+            options=[dns.edns.GenericOption(dns.edns.COOKIE, client_cookie)]
+        )
+
+        # If no response or query failed
+        if not query_result.success or not query_result.response:
+            results['tests']['dns_cookie'] = {
+                'success': False,
+                'error': query_result.error or "No response received",
+                'rcode': query_result.rcode_text
+            }
+            results['summary']['failed'] += 1
+            if query_result.error:
+                results['summary']['errors'].append(query_result.error)
+            return results
+
+        response = query_result.response
+        supports_edns = query_result.details.get('has_edns', False)
+        cookie_option_reply = None
+
+        # Look for COOKIE option in the response
+        for opt in (response.options or []):
+            # Check for CookieOption type
+            if isinstance(opt, dns.edns.CookieOption):
+                cookie_option_reply = opt
+                break
+
+        # Build structured result
+        if not supports_edns:
+            results['tests']['dns_cookie'] = {
+                'success': False,
+                'supports_edns': False,
+                'supports_cookie': False,
+                'error': 'Server does not advertise EDNS0 support'
+            }
+            results['summary']['failed'] += 1
+            results['summary']['errors'].append(f"{nameserver} does not support EDNS0")
+            return results
+
+        if cookie_option_reply:
+            server_cookie_hex = cookie_option_reply.server.hex() if cookie_option_reply.server else None
+            client_cookie_hex = cookie_option_reply.client.hex() if cookie_option_reply.client else None
+            results['tests']['dns_cookie'] = {
+                'success': True,
+                'supports_edns': True,
+                'supports_cookie': True,
+                'client_cookie': client_cookie_hex,
+                'server_cookie': server_cookie_hex,
+                'edns_version': response.edns,
+                'rcode': query_result.rcode_text,
+                'details': query_result.details
+            }
+            results['summary']['passed'] += 1
+        else:
+            results['tests']['dns_cookie'] = {
+                'success': False,
+                'supports_edns': True,
+                'supports_cookie': False,
+                'error': 'No COOKIE option returned by server',
+                'rcode': query_result.rcode_text,
+                'details': query_result.details
+            }
+            results['summary']['failed'] += 1
+            results['summary']['errors'].append(f"{nameserver} did not return a DNS Cookie")
+
+    except Exception as e:
+        results['tests']['dns_cookie'] = {
+            'success': False,
+            'error': str(e)
+        }
+        results['summary']['failed'] += 1
+        results['summary']['errors'].append(f"DNS cookie test failed for {nameserver}: {e}")
+
+    return results
 
 async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any]:
     """Run all available tests and compile a comprehensive report."""
@@ -841,7 +881,8 @@ async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any
         'delegation': test_delegation,
         'robustness': test_robustness,
         'performance': test_performance,
-        'open_resolver': test_open_resolver
+        'open_resolver': test_open_resolver,
+        "dns_cookie": test_dns_cookie
     }
 
     # Run all test suites concurrently

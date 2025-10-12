@@ -75,6 +75,7 @@ class Resolver:
         use_edns: bool = True,
         payload_size: int = DEFAULT_EDNS_SIZE,
         flags: int = 0,
+        options: list | None = None,
         timeout: float = DEFAULT_TIMEOUT
     ) -> QueryResult:
         """Asynchronously resolve a single RRset using the configured resolver.
@@ -109,7 +110,7 @@ class Resolver:
                     0,  # EDNS version 0
                     flags,
                     payload_size,
-                    options=[]
+                    options=options if options else []
                 )
             if nameserver is None:
                 if not self.resolver.nameservers:

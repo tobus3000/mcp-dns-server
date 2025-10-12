@@ -162,12 +162,20 @@ class DNSMCPServer:
             return await nstests.test_edns_support(domain, nameserver)
 
         @self.server.tool(name="dns_udp_tcp_test",
-            description="Perform UDP and TCP behavior tests on a given domain and nameserver",
+            description="Perform UDP and TCP behavior tests on a given domain and nameserver.",
             tags=set(("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")),
             enabled=self.config['features'].get('advanced_troubleshooting', False)
         )
         async def dns_udp_tcp_test(domain: str, nameserver: str) -> Dict[str, Any]:
             return await nstests.test_tcp_behavior(domain, nameserver)
+
+        @self.server.tool(name="dns_cookie_test",
+            description="Perform a DNS Cookie behavior test on a given domain and nameserver.",
+            tags=set(("dns", "cookie", "edns", "diagnostics", "troubleshooting")),
+            enabled=self.config['features'].get('advanced_troubleshooting', False)
+        )
+        async def dns_cookie_test(domain: str, nameserver: str) -> Dict[str, Any]:
+            return await nstests.test_dns_cookie(domain, nameserver)
 
         @self.server.tool(name="check_dnssec",
             description="Check DNSSEC validation for a given domain",

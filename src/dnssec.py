@@ -219,7 +219,7 @@ def validate_rrset_with_dnskey(rrset: dns.rrset.RRset, rrsigset: dns.rrset.RRset
         }
         dns.dnssec.validate(rrset, rrsigset, keys)
         return True, None
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, 
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer,
             dns.resolver.NoNameservers, dns.exception.DNSException) as e:
         return False, str(e)
 

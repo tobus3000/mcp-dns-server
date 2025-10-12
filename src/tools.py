@@ -6,7 +6,6 @@ by the Model Context Protocol (MCP) server.
 import traceback
 from typing import Dict, Any, Optional
 import ipaddress
-import dns.message
 import dns.rcode
 import dns.rdatatype
 import dns.rdataclass
