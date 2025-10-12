@@ -510,6 +510,18 @@ class DNSMCPServer:
                 " provided by the DNS MCP Server."
             )
 
+        @self.server.prompt(name="check_dns_cookie",
+            description="Perform DNS Cookie behavior test on a given domain and nameserver",
+            tags=set(("dns", "troubleshooting", "diagnostics", "cookie", "edns", "dnscookie")),
+            enabled=self.config['features'].get('advanced_troubleshooting', False)
+        )
+        def dns_cookie_test(domain: str, nameserver: str) -> str:
+            """Perform DNS Cookie test against a nameserver."""
+            return (
+                f"Perform a DNS Cookie test for domain {domain} against nameserver {nameserver} using"
+                " the dns cookie test tool provided by the DNS MCP Server."
+            )
+
         @self.server.prompt(name="check_dnssec",
             description="Check DNSSEC validation for a given domain",
             tags=set(("dns", "security", "dnssec", "validation")),
