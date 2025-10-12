@@ -14,9 +14,7 @@ import time
 import random
 import struct
 import asyncio
-# import socket
 from typing import Dict, Any, Tuple
-# from dns import exception as dns_exception
 import dns.message
 import dns.name
 import dns.rdatatype
@@ -602,7 +600,8 @@ async def test_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
         'is_open_resolver': False,
         'tests': {},
         'details': {},
-        'security_risk': 'none'
+        'security_risk': 'none',
+        'summary': {'passed': 0, 'failed': 0, 'errors': []}
     }
 
     # Test 1: Basic recursive query
@@ -637,12 +636,15 @@ async def test_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
 
         results['is_open_resolver'] = is_open
         if is_open:
+            results['summary']['failed'] += 1
             results['security_risk'] = 'high'
             results['details']['risk_explanation'] = (
                 "This server appears to be an open resolver. Open resolvers can be "
                 "exploited for DNS amplification attacks and should be restricted "
                 "to only serve authorized clients."
             )
+        else:
+            results['summary']['passed'] += 1
 
     except Exception as e:
         results['tests']['recursive_query'] = {
@@ -852,7 +854,7 @@ async def test_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
             'error': str(e)
         }
         results['summary']['failed'] += 1
-        results['summary']['errors'].append(f"DNS cookie test failed for {nameserver}: {e}")
+        results['summary']['errors'].append(f"RFC 7873 DNS Cookie test failed for {nameserver}: {e}")
 
     return results
 
@@ -923,11 +925,15 @@ async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any
 
 def interpret_test_results(report: Dict[str, Any]) -> Dict[str, Any]:
     """Generate a natural language interpretation of test results."""
+    overall_status = "Some tests failed"
+    coverage = f"Ran {report['summary']['total_tests']} tests across multiple categories"
+    if report['summary']['failed_tests'] == 0:
+        overall_status = "All tests passed"
     interpretation = {
         'summary': {
             'description': f"Comprehensive DNS server test results for {report['domain']}",
-            'overall_status': 'All tests passed' if report['summary']['failed_tests'] == 0 else 'Some tests failed',
-            'test_coverage': f"Ran {report['summary']['total_tests']} tests across multiple categories"
+            'overall_status': overall_status,
+            'test_coverage': coverage
         },
         'key_findings': [],
         'recommendations': [],
@@ -940,7 +946,8 @@ def interpret_test_results(report: Dict[str, Any]) -> Dict[str, Any]:
     if 'basic_records' in report['results']:
         basic = report['results']['basic_records']
         interpretation['key_findings'].append(
-            f"Basic DNS records: {basic['summary']['successful']}/{basic['summary']['total_tests']} tests passed"
+            f"Basic DNS records: {basic['summary']['successful']}/"
+            + f"{basic['summary']['total_tests']} tests passed"
         )
 
     if 'performance' in report['results']:
@@ -963,8 +970,11 @@ def interpret_test_results(report: Dict[str, Any]) -> Dict[str, Any]:
 
     if 'robustness' in report['results']:
         rob = report['results']['robustness']
+        query_handling = "Needs Improvement"
+        if rob['summary']['passed'] > rob['summary']['failed']:
+            query_handling = "Good"
         interpretation['security_analysis'].update({
-            'malformed_query_handling': 'Good' if rob['summary']['passed'] > rob['summary']['failed'] else 'Needs Improvement',
+            'malformed_query_handling': query_handling,
             'issues_found': rob['summary'].get('errors', [])
         })
 
@@ -986,15 +996,31 @@ def interpret_test_results(report: Dict[str, Any]) -> Dict[str, Any]:
     # Standards compliance
     if 'edns_support' in report['results']:
         edns = report['results']['edns_support']
+        status = "Non-compliant to RFC 6891 Extension Mechanisms for DNS"
+        if edns['summary']['passed'] > edns['summary']['failed']:
+            status = "Compliant to RFC 6891 Extension Mechanisms for DNS"
         interpretation['compliance_analysis']['edns_support'] = {
-            'status': 'Compliant' if edns['summary']['passed'] > edns['summary']['failed'] else 'Non-compliant',
+            'status': status,
             'issues': edns['summary'].get('errors', [])
+        }
+
+    if 'dns_cookie' in report['results']:
+        dns_cookie = report['results']['dns_cookie']
+        status = "Non-Compliant to RFC 7873 DNS Cookies"
+        if dns_cookie['summary']['passed'] > dns_cookie['summary']['failed']:
+            status = "Compliant to RFC 7873 DNS Cookies"
+        interpretation['compliance_analysis']['dns_cookie'] = {
+            'status': status,
+            'issues': dns_cookie['summary'].get('errors', [])
         }
 
     if 'any_queries' in report['results']:
         any_results = report['results']['any_queries']
+        status = "Non-compliant to RFC 8482 Providing Minimal-Sized Responses"
+        if any_results['summary']['passed'] > any_results['summary']['failed']:
+            status = "Compliant to RFC 8482 Providing Minimal-Sized Responses"
         interpretation['compliance_analysis']['rfc8482_compliance'] = {
-            'status': 'Compliant' if any_results['summary']['passed'] > any_results['summary']['failed'] else 'Non-compliant',
+            'status': status,
             'issues': any_results['summary'].get('errors', []),
             'notes': [test['note'] for test in any_results['tests'].values() 
                      if isinstance(test, dict) and 'note' in test]
