@@ -64,6 +64,7 @@ class Resolver:
         self.resolver = dns.resolver.Resolver(configure=True)
         self.resolver.lifetime = timeout
         if nameservers:
+            #TODO: Check if nameservers is list of IPs. Convert to IP if FQDNs.
             self.resolver.nameservers = nameservers
 
     async def async_resolve(
