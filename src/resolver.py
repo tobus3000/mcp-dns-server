@@ -95,7 +95,7 @@ class Resolver:
             QueryResult: Result of the DNS query operation.
         """
         try:
-            qname = dns.name.from_text(domain)
+            qname = dns.name.from_text(Resolver.convert_idn_to_punnycode(domain))
             rdtype_obj = dns.rdatatype.from_text(rdtype)
 
             # Create the query message
@@ -235,7 +235,29 @@ class Resolver:
         if timeout is not None:
             self.resolver.lifetime = self.default_timeout
 
+
         return result
+
+    @staticmethod
+    def convert_idn_to_punnycode(domain: str) -> str:
+        """Convert Internationalized Domain Name (IDN) to ASCII-compatible Punycode.
+        
+        Args:
+            domain (str): Domain name that may contain Unicode characters.
+        
+        Returns:
+            str: ASCII-compatible domain name (Punycode if needed)
+        """
+        try:
+            # Check if domain contains non-ASCII characters.
+            if any(ord(char) > 127 for char in domain):
+                # Convert Unicode domain to Punycode.
+                punycode_domain = domain.encode('idna').decode('ascii')
+                return punycode_domain
+            else:
+                return domain
+        except (UnicodeError, Exception) as exc:
+            return domain
 
     def fetch_dnskey(
         self,
