@@ -18,7 +18,8 @@ try:
         check_dnssec_impl,
         dns_troubleshooting_impl,
         lookalike_risk_impl,
-        dns_trace_impl
+        dns_trace_impl,
+        punycode_converter_impl
     )
     from .resolver import Resolver
 except ImportError:
@@ -33,7 +34,8 @@ except ImportError:
         check_dnssec_impl,
         dns_troubleshooting_impl,
         lookalike_risk_impl,
-        dns_trace_impl
+        dns_trace_impl,
+        punycode_converter_impl
     )
     from resolver import Resolver
 
@@ -192,6 +194,14 @@ class DNSMCPServer:
         )
         async def lookalike_risk(domain: str, check_dns: bool = False) -> ToolResult:
             return await lookalike_risk_impl(domain, check_dns)
+
+        @self.server.tool(name="punycode_converter",
+            description="Converts any given internationalized domain name (IDN) into punycode format.",
+            tags=set(("dns", "idn", "punycode", "converter")),
+            enabled=True
+        )
+        async def punycode_converter(domain: str) -> ToolResult:
+            return await punycode_converter_impl(domain)
 
     def setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
@@ -570,6 +580,15 @@ class DNSMCPServer:
                 f"The supported DNS record types are: {types}. Use these types with the"
                 " advanced dns lookup tool provided by the DNS MCP Server."
             )
+
+        @self.server.prompt(name="punycode_converter",
+            description="Return the punycode version of an internationalized domain name (IDN).",
+            tags=set(("dns", "idn", "punycode", "converter")),
+            enabled=True
+        )
+        def punycode_converter(domain: str) -> str:
+            """Convert IDN domain name to punycode."""
+            return (f"Convert the domain {domain} to punycode format.")
 
 async def main() -> None:
     """Main entry point."""
