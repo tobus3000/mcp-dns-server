@@ -3,6 +3,7 @@ import asyncio
 import logging
 import signal
 import sys
+import ipaddress
 from typing import Any, Dict
 import yaml
 from fastmcp import FastMCP
@@ -211,7 +212,14 @@ class DNSMCPServer:
             enabled=self.config['features'].get('open_resolver_scan_tool', False)
         )
         async def detect_open_resolvers(cidr: str, domain: str) -> ToolResult:
-            return await scan_subnet_for_open_resolvers_impl(cidr, domain)
+            network = ipaddress.ip_network(cidr, strict=False)
+            if network.is_private:
+                return await scan_subnet_for_open_resolvers_impl(cidr, domain)
+
+            return ToolResult(
+                success=False,
+                error="Tool is limited to only scan private networks in the RFC1918 range."
+            )
         # async def detect_open_resolvers(cidr: str, domain: str, ctx: Context) -> ToolResult:
         #     result = await ctx.elicit(
         #         message="This will scan a very large network. Confirm with `yes` to proceed.",

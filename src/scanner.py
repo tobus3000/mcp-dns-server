@@ -1,6 +1,5 @@
 import asyncio
 import ipaddress
-from typing import List, Dict, Optional
 
 try:
     from .resolver import Resolver
@@ -90,17 +89,42 @@ async def detect_open_resolvers_in_subnet(
 
     tasks = [asyncio.create_task(worker(ip)) for ip in hosts]
     await asyncio.gather(*tasks)
+    rating = "normal"
+    cnt = len(open_res)
+    if cnt > 2:
+        rating = "high"
+    if cnt > 10:
+        rating = "very high"
+    if cnt > 85:
+        rating = "abnormaly high"
+    percent = "%.2f" % float((100/network.num_addresses)*cnt)
+    note = [
+        f"A {rating} count of {cnt} open DNS resolvers has been "
+        + f"found in network {network.exploded}.",
+        f"{percent}% of hosts in the network are open resolvers."
+    ]
+    if cnt > 2:
+        note.append(
+            "Make sure to implement DNS filtering and/or appropriate firewall "
+            + "rules to prevent these devices from accessing the Internet."
+        )
+    if cnt > 85:
+        note.append(
+            "Such a high number of open resolvers in a network can be a sign that "
+            + "a router/firewall intercepts and responds to the DNS queries instead "
+            + "of the clients in that network."
+        )
     return ToolResult(
         success=True,
         output={
+            "summary": note,
             "network": network.exploded,
-            "rfc1918_network": network.is_private,
-            "num_addresses": network.num_addresses,
-            "open_resolvers": open_res
+            "total_addresses": network.num_addresses,
+            "open_resolver_count": cnt,
+            "open_resolver_ip_list": open_res
         },
         details={
-            "open_resolvers": open_res_details,
-            "scanned_hosts": hosts
+            "open_resolver_details": open_res_details
         }
     )
 
