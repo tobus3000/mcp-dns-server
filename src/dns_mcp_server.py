@@ -19,7 +19,8 @@ try:
         dns_troubleshooting_impl,
         lookalike_risk_impl,
         dns_trace_impl,
-        punycode_converter_impl
+        punycode_converter_impl,
+        scan_subnet_for_open_resolvers_impl
     )
     from .resolver import Resolver
 except ImportError:
@@ -35,7 +36,8 @@ except ImportError:
         dns_troubleshooting_impl,
         lookalike_risk_impl,
         dns_trace_impl,
-        punycode_converter_impl
+        punycode_converter_impl,
+        scan_subnet_for_open_resolvers_impl
     )
     from resolver import Resolver
 
@@ -202,6 +204,36 @@ class DNSMCPServer:
         )
         async def punycode_converter(domain: str) -> ToolResult:
             return await punycode_converter_impl(domain)
+
+        @self.server.tool(name="detect_open_resolvers",
+            description="Scans a given subnet for open resolvers.",
+            tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
+            enabled=self.config['features'].get('open_resolver_scan_tool', False)
+        )
+        async def detect_open_resolvers(cidr: str, domain: str) -> ToolResult:
+            return await scan_subnet_for_open_resolvers_impl(cidr, domain)
+        # async def detect_open_resolvers(cidr: str, domain: str, ctx: Context) -> ToolResult:
+        #     result = await ctx.elicit(
+        #         message="This will scan a very large network. Confirm with `yes` to proceed.",
+        #         response_type=UserDecision
+        #     )
+        #     if result.action == "accept":
+        #         if result.data.answer.strip().lower() == "yes":
+        #             return await scan_subnet_for_open_resolvers_impl(cidr, domain)
+        #         return ToolResult(
+        #             success=False,
+        #             error="Information not provided"
+        #         )
+        #     if result.action == "decline":
+        #         return ToolResult(
+        #             success=False,
+        #             error="Information not provided"
+        #         )
+        #     # cancel
+        #     return ToolResult(
+        #         success=False,
+        #         error="Operation cancelled"
+        #     )
 
     def setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
@@ -528,8 +560,8 @@ class DNSMCPServer:
         def dns_cookie_test(domain: str, nameserver: str) -> str:
             """Perform DNS Cookie test against a nameserver."""
             return (
-                f"Perform a DNS Cookie test for domain {domain} against nameserver {nameserver} using"
-                " the dns cookie test tool provided by the DNS MCP Server."
+                f"Perform a DNS Cookie test for domain {domain} against nameserver {nameserver} "
+                "using the dns cookie test tool provided by the DNS MCP Server."
             )
 
         @self.server.prompt(name="check_dnssec",
@@ -588,7 +620,16 @@ class DNSMCPServer:
         )
         def punycode_converter(domain: str) -> str:
             """Convert IDN domain name to punycode."""
-            return (f"Convert the domain {domain} to punycode format.")
+            return f"Convert the domain {domain} to punycode format."
+
+        @self.server.prompt(name="detect_open_resolvers",
+            description="Scan a subnet in CIDR notation for open DNS resolvers.",
+            tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
+            enabled=self.config['features'].get('open_resolver_scan_tool', False)
+        )
+        def detect_open_resolvers(cidr: str, domain: str) -> str:
+            """Scan a subnet in CIDR notation for open DNS resolvers."""
+            return f"Scan for open resolvers in subnet {cidr} using domain {domain}."
 
 async def main() -> None:
     """Main entry point."""

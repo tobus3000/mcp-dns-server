@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 import dns.message
 import dns.name
 import dns.rdatatype
+import dns.zone
 
 @dataclass
 class QueryResult:
@@ -49,11 +50,34 @@ class QueryResult:
     details: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
+class AXFRResult:
+    """Stores the result of a AXFR zone transfer operation."""
+    success: bool
+    zone_name: str
+    nameserver: str
+    response: Optional[dns.zone.Zone] = None
+    error: Optional[str] = None
+    rcode: Optional[int] = None
+    rcode_text: Optional[str] = None
+    duration: Optional[float] = None
+    details: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class ToolResult:
     """Stores the result of a DNS tool operation."""
     success: bool
     output: Optional[str|List[str]|Dict[str, Any]|List[Dict[str, Any]]] = None
     error: Optional[str] = None
+    details: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class OpenResolver:
+    """Stores the details of a Open Resolver."""
+    success: bool
+    ip: str
+    rcode: Optional[int] = None
+    rcode_text: Optional[str] = None
+    duration: Optional[float] = None
     details: Dict[str, Any] = field(default_factory=dict)
 
 # Type definitions for result dictionaries
@@ -96,3 +120,8 @@ class TestResult(TypedDict):
     description: str
     passed: bool
     error: Optional[str]
+
+@dataclass
+class UserDecision:
+    """Used in elicit workflow where a user needs to provide consent."""
+    answer: str

@@ -52,8 +52,20 @@ async def test_basic_records(domain: str, nameserver: str) -> Dict[str, Any]:
     for rdtype in COMMON_RECORD_TYPES:
         # Test both with and without EDNS
         resolver = Resolver()
-        standard_result = await resolver.async_resolve(domain, rdtype, nameserver, use_edns=False)
-        edns_result = await resolver.async_resolve(domain, rdtype, nameserver, use_edns=True)
+        standard_result = await resolver.async_resolve(
+            domain,
+            rdtype=rdtype,
+            rdclass='IN',
+            nameserver=nameserver,
+            use_edns=False
+        )
+        edns_result = await resolver.async_resolve(
+            domain,
+            rdtype=rdtype,
+            rdclass='IN',
+            nameserver=nameserver,
+            use_edns=True
+        )
         results['record_tests'][rdtype] = {
             'standard': {
                 'success': standard_result.success,
@@ -89,7 +101,7 @@ async def test_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
         'domain': domain,
         'nameserver': nameserver,
         'tests': {},
-        'summary': {'passed': 0, 'failed': 0, 'errors': []}
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0, 'errors': []}
     }
 
     # Test cases
@@ -103,7 +115,12 @@ async def test_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
     }
     resolver = Resolver()
     for test_name, test_domain in test_cases.items():
-        result = await resolver.async_resolve(test_domain, 'A', nameserver)
+        result = await resolver.async_resolve(
+            test_domain,
+            rdtype='A',
+            rdclass='IN',
+            nameserver=nameserver
+        )
         results['tests'][test_name] = {
             'domain': test_domain,
             'success': result.success,
@@ -128,7 +145,12 @@ async def test_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
     }
     resolver = Resolver()
     for test_name, test_domain in invalid_cases.items():
-        result = await resolver.async_resolve(test_domain, 'A', nameserver)
+        result = await resolver.async_resolve(
+            test_domain,
+            rdtype='A',
+            rdclass='IN',
+            nameserver=nameserver
+        )
         results['tests'][test_name] = {
             'domain': test_domain,
             'success': result.success,
@@ -145,7 +167,7 @@ async def test_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
             results['summary']['errors'].append(
                 f"{test_name} test failed: Server accepted invalid domain"
             )
-
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
     return results
 
 
@@ -155,7 +177,7 @@ async def test_edns_support(domain: str, nameserver: str) -> Dict[str, Any]:
         'domain': domain,
         'nameserver': nameserver,
         'tests': {},
-        'summary': {'passed': 0, 'failed': 0, 'errors': []}
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0, 'errors': []}
     }
 
     # Test different EDNS buffer sizes
@@ -164,8 +186,9 @@ async def test_edns_support(domain: str, nameserver: str) -> Dict[str, Any]:
     for size in buffer_sizes:
         result = await resolver.async_resolve(
             domain,
-            'A',
-            nameserver,
+            rdtype='A',
+            rdclass='IN',
+            nameserver=nameserver,
             use_edns=True,
             payload_size=size
         )
@@ -210,7 +233,7 @@ async def test_edns_support(domain: str, nameserver: str) -> Dict[str, Any]:
             }
             results['summary']['failed'] += 1
             results['summary']['errors'].append(f"EDNS option {option_name} failed: {str(e)}")
-
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
     return results
 
 
@@ -220,12 +243,18 @@ async def test_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
         'domain': domain,
         'nameserver': nameserver,
         'tests': {},
-        'summary': {'passed': 0, 'failed': 0, 'errors': []}
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0, 'errors': []}
     }
 
     # Basic TCP connectivity
     resolver = Resolver()
-    result = await resolver.async_resolve(domain, 'A', nameserver, use_tcp=True)
+    result = await resolver.async_resolve(
+        domain,
+        rdtype='A',
+        rdclass='IN',
+        nameserver=nameserver,
+        use_tcp=True
+    )
     results['tests']['basic_tcp'] = {
         'success': result.success,
         'error': result.error,
@@ -242,8 +271,9 @@ async def test_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
     # Request many records to force TCP
     result = await resolver.async_resolve(
         domain,
-        'ANY',
-        nameserver,
+        rdtype='ANY',
+        rdclass='IN',
+        nameserver=nameserver,
         use_edns=True,
         payload_size=4096
     )
@@ -314,14 +344,17 @@ async def test_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
         }
         results['summary']['failed'] += 1
         results['summary']['errors'].append(f"TCP setup failed: {str(e)}")
-
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
     return results
 
 
 async def test_performance(domain: str, nameserver: str,
                          num_queries: int = 100,
                          concurrent: int = 10) -> Dict[str, Any]:
-    """Test nameserver performance under load."""
+    """
+    Test nameserver performance under load.
+    TODO: Refactor to return tests stats (total_tests, etc.)
+    """
     results = {
         'domain': domain,
         'nameserver': nameserver,
@@ -342,7 +375,12 @@ async def test_performance(domain: str, nameserver: str,
         rdtype = random.choice(COMMON_RECORD_TYPES)
         # Add some randomness to prevent caching
         test_domain = f"perf-test-{i}-{random.randint(1, 1000)}.{domain}"
-        return await resolver.async_resolve(test_domain, rdtype, nameserver)
+        return await resolver.async_resolve(
+            test_domain,
+            rdtype=rdtype,
+            rdclass='IN',
+            nameserver=nameserver
+        )
 
     start_time = time.time()
 
@@ -409,12 +447,17 @@ async def test_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
         'domain': domain,
         'nameserver': nameserver,
         'tests': {},
-        'summary': {'passed': 0, 'failed': 0, 'errors': []}
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0, 'errors': []}
     }
 
     # Get NS records
     resolver = Resolver()
-    ns_result = await resolver.async_resolve(domain, 'NS', nameserver)
+    ns_result = await resolver.async_resolve(
+        domain,
+        rdtype='NS',
+        rdclass='IN',
+        nameserver=nameserver
+    )
     if not ns_result.success:
         results['tests']['ns_records'] = {
             'success': False,
@@ -437,7 +480,12 @@ async def test_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
         ns_name = ns.target.to_text()
 
         # Check glue records
-        glue_result = await resolver.async_resolve(ns_name, 'A', nameserver)
+        glue_result = await resolver.async_resolve(
+            ns_name,
+            rdtype='A',
+            rdclass='IN',
+            nameserver=nameserver
+        )
         results['tests'][f'glue_{ns_name}'] = {
             'success': glue_result.success,
             'has_glue': bool(glue_result.response and glue_result.response.additional),
@@ -452,14 +500,19 @@ async def test_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
 
     # Test parent zone delegation
     parent_domain = '.'.join(domain.split('.')[1:]) or '.'
-    parent_result = await resolver.async_resolve(parent_domain, 'NS', nameserver)
+    parent_result = await resolver.async_resolve(
+        parent_domain,
+        rdtype='NS',
+        rdclass='IN',
+        nameserver=nameserver
+    )
 
     results['tests']['parent_delegation'] = {
         'success': parent_result.success,
         'error': parent_result.error,
         'has_parent_ns': bool(parent_result.response and parent_result.response.answer)
     }
-
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
     return results
 
 
@@ -469,7 +522,7 @@ async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
         'domain': domain,
         'nameserver': nameserver,
         'tests': {},
-        'summary': {'passed': 0, 'failed': 0, 'errors': []}
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0, 'errors': []}
     }
 
     # Test ANY query behavior with different configurations
@@ -481,7 +534,13 @@ async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
     ]
     resolver = Resolver()
     for test_name, params in test_cases:
-        result = await resolver.async_resolve(domain, 'ANY', nameserver, **params)
+        result = await resolver.async_resolve(
+            domain,
+            rdtype='ANY',
+            rdclass='IN',
+            nameserver=nameserver,
+            **params
+        )
         results['tests'][test_name] = {
             'success': result.success,
             'rcode': result.rcode,
@@ -549,7 +608,13 @@ async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
         test_results = []
 
         for _ in range(test_count):
-            result = await resolver.async_resolve(domain, 'ANY', nameserver, use_edns=True)
+            result = await resolver.async_resolve(
+                domain,
+                rdtype='ANY',
+                rdclass='IN',
+                nameserver=nameserver,
+                use_edns=True
+            )
             test_results.append(result)
 
         duration = time.time() - start_time
@@ -579,9 +644,188 @@ async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
             'error': str(e)
         }
         results['summary']['errors'].append(f"Rate limiting test failed: {str(e)}")
-
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
     return results
 
+async def test_zone_transfer(domain: str, nameserver: str) -> Dict[str, Any]:
+    """Test if server allows a zone transfer.
+
+    Args:
+        domain (str): The domain we try to transfer from the server.
+        nameserver (str): The DNS server try to get our zone from.
+
+    Returns:
+        Dict[str, Any]: Test results and details.
+    """
+    results = {
+        'domain': domain,
+        'nameserver': nameserver,
+        'tests': {},
+        'details': {
+            'axfr_allowed': False,
+        },
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0}
+    }
+    ns = Resolver(nameservers=[nameserver])
+
+    # Test 1: Try AXFR
+    res = await ns.async_axfr(
+        zone_name=domain,
+        nameserver=nameserver,
+        timeout=5.0
+    )
+    if res.success and res.response:
+        if res.rcode_text != 'REFUSED':
+            results['details']['axfr_allowed'] = True
+        results['tests']['axfr_transfer'] = {
+            'success': True,
+            'zone_name': res.zone_name,
+            'nameserver': res.nameserver,
+            'rcode': res.rcode_text,
+            'duration': res.duration,
+            'names': res.details.get('names', []),
+        }
+        results['summary']['passed'] += 1
+    else:
+        results['tests']['axfr_transfer'] = {
+            'success': False,
+            'zone_name': res.zone_name,
+            'nameserver': res.nameserver,
+            'error': res.error
+        }
+        results['summary']['failed'] += 1
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
+    return results
+
+async def test_chaos_records(domain: str, nameserver: str) -> Dict[str, Any]:
+    """Test if a nameserver responds to version.bind and others in CHAOS rdclass.
+
+    Args:
+        domain (str): Not required but all tests need 2 arguments.
+        nameserver (str): The nameserver to be queried.
+
+    Returns:
+        Dict[str, Any]: Test results and details.
+    """
+    results = {
+        'nameserver': nameserver,
+        'tests': {},
+        'details': {
+            'version.bind': None,
+            'hostname.bind': None,
+            'authors.bind': None,
+            'id.server': None,
+        },
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0}
+    }
+
+    ns = Resolver(nameservers=[nameserver])
+
+    # Test 1: version.bind query
+    res = await ns.query_version_bind(nameserver=nameserver)
+    if res.success and res.response:
+        if res.rcode_text == 'REFUSED':
+            version_bind = "Query for `version.bind` was REFUSED by the server."
+        else:
+            version_bind = "No response to `version.bind` query."
+        for answer in res.response.answer:
+            if answer.rdtype == dns.rdatatype.TXT:
+                for rdata in answer:
+                    version_bind = b"".join(rdata.strings).decode(errors="ignore")
+        results['details']['version.bind'] = version_bind
+        results['tests']['version_bind'] = {
+            'success': True,
+            'rcode': res.rcode_text,
+            'answer_count': res.details.get('answer_count', 1),
+            'version.bind': version_bind
+        }
+        results['summary']['passed'] += 1
+    else:
+        results['tests']['version_bind'] = {
+            'success': False,
+            'error': res.error
+        }
+        results['summary']['failed'] += 1
+
+    # Test 2: hostname.bind query
+    res = await ns.query_hostname_bind(nameserver=nameserver)
+    if res.success and res.response:
+        if res.rcode_text == 'REFUSED':
+            bind_host = "Query for `hostname.bind` was REFUSED by the server."
+        else:
+            bind_host = "No response to `hostname.bind` query."
+        for answer in res.response.answer:
+            if answer.rdtype == dns.rdatatype.TXT:
+                for rdata in answer:
+                    bind_host = b"".join(rdata.strings).decode(errors="ignore")
+        results['details']['hostname.bind'] = bind_host
+        results['tests']['hostname_bind'] = {
+            'success': True,
+            'rcode': res.rcode_text,
+            'answer_count': res.details.get('answer_count', 1),
+            'hostname.bind': bind_host
+        }
+        results['summary']['passed'] += 1
+    else:
+        results['tests']['hostname_bind'] = {
+            'success': False,
+            'error': res.error
+        }
+        results['summary']['failed'] += 1
+
+    # Test 3: id.server query
+    res = await ns.query_id_server(nameserver=nameserver)
+    if res.success and res.response:
+        if res.rcode_text == 'REFUSED':
+            id_server = "Query for `id.server` was REFUSED by the server."
+        else:
+            id_server = "No response to `id.server` query."
+        for answer in res.response.answer:
+            if answer.rdtype == dns.rdatatype.TXT:
+                for rdata in answer:
+                    id_server = b"".join(rdata.strings).decode(errors="ignore")
+        results['details']['id.server'] = id_server
+        results['tests']['id_server'] = {
+            'success': True,
+            'rcode': res.rcode_text,
+            'answer_count': res.details.get('answer_count', 1),
+            'id.server': id_server
+        }
+        results['summary']['passed'] += 1
+    else:
+        results['tests']['id_server'] = {
+            'success': False,
+            'error': res.error
+        }
+        results['summary']['failed'] += 1
+
+    # Test 4: authors.bind query
+    res = await ns.query_authors_bind(nameserver=nameserver)
+    if res.success and res.response:
+        if res.rcode_text == 'REFUSED':
+            authors_bind = "Query for `authors.bind` was REFUSED by the server."
+        else:
+            authors_bind = "No response to `authors.bind` query."
+        for answer in res.response.answer:
+            if answer.rdtype == dns.rdatatype.TXT:
+                for rdata in answer:
+                    id_server = b"".join(rdata.strings).decode(errors="ignore")
+        results['details']['authors.bind'] = authors_bind
+        results['tests']['authors_bind'] = {
+            'success': True,
+            'rcode': res.rcode_text,
+            'answer_count': res.details.get('answer_count', 1),
+            'authors.bind': authors_bind
+        }
+        results['summary']['passed'] += 1
+    else:
+        results['tests']['authors_bind'] = {
+            'success': False,
+            'error': res.error
+        }
+        results['summary']['failed'] += 1
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
+    return results
 
 async def test_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test if nameserver behaves like an open resolver.
@@ -601,7 +845,7 @@ async def test_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
         'tests': {},
         'details': {},
         'security_risk': 'none',
-        'summary': {'passed': 0, 'failed': 0, 'errors': []}
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0, 'errors': []}
     }
 
     # Test 1: Basic recursive query
@@ -684,7 +928,7 @@ async def test_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
             'success': False,
             'error': str(e)
         }
-
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
     return results
 
 
@@ -694,7 +938,7 @@ async def test_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
         'domain': domain,
         'nameserver': nameserver,
         'tests': {},
-        'summary': {'passed': 0, 'failed': 0, 'errors': []}
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0, 'errors': []}
     }
 
     # Test cases for malformed queries
@@ -707,7 +951,12 @@ async def test_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
     ]
     resolver = Resolver()
     for test_name, test_domain in malformed_tests:
-        result = await resolver.async_resolve(test_domain, 'A', nameserver)
+        result = await resolver.async_resolve(
+            test_domain,
+            rdtype='A',
+            rdclass='IN',
+            nameserver=nameserver
+        )
         results['tests'][test_name] = {
             'success': result.success,
             'rcode': result.rcode,
@@ -726,7 +975,12 @@ async def test_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
     # Test unusual record types
     unusual_types = ['NULL', 'HINFO', 'RP', 'AFSDB']
     for rdtype in unusual_types:
-        result = await resolver.async_resolve(domain, rdtype, nameserver)
+        result = await resolver.async_resolve(
+            domain,
+            rdtype=rdtype,
+            rdclass='IN',
+            nameserver=nameserver
+        )
         results['tests'][f'unusual_type_{rdtype}'] = {
             'success': result.success,
             'rcode': result.rcode,
@@ -758,6 +1012,7 @@ async def test_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
             'handled_correctly': True  # Rejecting invalid EDNS is acceptable
         }
 
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
     return results
 
 async def test_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
@@ -767,7 +1022,7 @@ async def test_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
         'domain': domain,
         'nameserver': nameserver,
         'tests': {},
-        'summary': {'passed': 0, 'failed': 0, 'errors': []}
+        'summary': {'passed': 0, 'failed': 0, 'total_tests': 0, 'errors': []}
     }
 
     resolver = Resolver()  # Use your custom Resolver class
@@ -780,6 +1035,7 @@ async def test_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
         query_result = await resolver.async_resolve(
             domain=domain,
             rdtype='A',
+            rdclass='IN',
             nameserver=nameserver,
             use_tcp=False,
             use_edns=True,
@@ -854,8 +1110,10 @@ async def test_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
             'error': str(e)
         }
         results['summary']['failed'] += 1
-        results['summary']['errors'].append(f"RFC 7873 DNS Cookie test failed for {nameserver}: {e}")
-
+        results['summary']['errors'].append(
+            f"RFC 7873 DNS Cookie test failed for {nameserver}: {e}"
+        )
+    results['summary']['total_tests'] = results['summary']['failed'] + results['summary']['passed']
     return results
 
 async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any]:
@@ -884,7 +1142,9 @@ async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any
         'robustness': test_robustness,
         'performance': test_performance,
         'open_resolver': test_open_resolver,
-        "dns_cookie": test_dns_cookie
+        'dns_cookie': test_dns_cookie,
+        'zone_transfer': test_zone_transfer,
+        'chaos_records': test_chaos_records
     }
 
     # Run all test suites concurrently
@@ -902,6 +1162,7 @@ async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any
     suite_results = await asyncio.gather(*suite_tasks)
 
     # Process results
+    report['nameserver'] = nameserver
     for suite_name, results in suite_results:
         report['results'][suite_name] = results
 
@@ -931,7 +1192,9 @@ def interpret_test_results(report: Dict[str, Any]) -> Dict[str, Any]:
         overall_status = "All tests passed"
     interpretation = {
         'summary': {
-            'description': f"Comprehensive DNS server test results for {report['domain']}",
+            'description': (
+                f"Comprehensive DNS server test results for `{report['nameserver']}` "
+                f"using domain `{report['domain']}`"),
             'overall_status': overall_status,
             'test_coverage': coverage
         },
@@ -992,6 +1255,47 @@ def interpret_test_results(report: Dict[str, Any]) -> Dict[str, Any]:
                     "Configure access controls to restrict recursive queries."
                 )
             )
+
+    if 'zone_transfer' in report['results']:
+        status = "The non TSIG AXFR zone transfer request has been denied by the server."
+        recommend = False
+        axfr_allowed = False
+        axfr_stats = report['results']['zone_transfer']
+        if axfr_stats['status'] == "failed":
+            if "REFUSED" in axfr_stats['error']:
+                status = "Non TSIG AXFR zone transfers are `REFUSED` by the server."
+                recommend = (
+                    "Try a manual AXFR zone transfer and provide the correct TSIG key if this "
+                    "server is meant to respond to zone transfer requests."
+                )
+            else:
+                axfr_allowed = True
+                status = (
+                    "The server has **not** actively `REFUSED` our AXFR zone transfer request. "
+                    "Instead the server tried and failed to serve the DNS zone information. "
+                )
+                recommend = (
+                    "The server might be misconfigured to respond with a zone transfer for the "
+                    "requested domain (without insisting on a TSIG key). "
+                    "A DNS server must **refuse** all (A)XFR requests unless configured to respond."
+                )
+        else:
+            axfr_allowed = axfr_stats['details']['axfr_allowed']
+            if axfr_allowed:
+                status = "Non TSIG AXFR zone transfer seems to be generally allowed."
+                if axfr_stats['tests']['axfr_transfer']['rcode'] == "NOERROR":
+                    status = "The AXFR zone transfer from the DNS server was successful."
+                    recommend = (
+                        "Check if this is the expected behaviour and consider protecting AXFR "
+                        "zone transfer through the use of TSIG keys and/or a strict access "
+                        "control list (ACL)."
+                    )
+        interpretation['security_analysis'].update({
+            'zone_transfer_status': 'Allowed' if axfr_allowed else 'Denied',
+            'zone_transfer_details': status
+        })
+        if recommend:
+            interpretation['recommendations'].append(recommend)
 
     # Standards compliance
     if 'edns_support' in report['results']:

@@ -16,6 +16,7 @@ try:
     from .resolver import Resolver
     from .dnstrace import Trace
     from .typedefs import ToolResult
+    from .scanner import detect_open_resolvers_in_subnet, check_open_resolver
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
     from dnssec import validate_domain, pretty_report
@@ -23,6 +24,7 @@ except ImportError:
     from resolver import Resolver
     from dnstrace import Trace
     from typedefs import ToolResult
+    from scanner import detect_open_resolvers_in_subnet, check_open_resolver
 
 async def simple_dns_lookup_impl(hostname: str) -> ToolResult:
     """Resolve the A record of a given hostname.
@@ -292,4 +294,21 @@ async def punycode_converter_impl(domain: str) -> ToolResult:
             "domain": domain,
             "punycode": punycode
         }
+    )
+
+async def scan_subnet_for_open_resolvers_impl(cidr: str, domain: str) -> ToolResult:
+    """Perform a subnet wide scan for open resolvers.
+
+    Args:
+        cidr (str): The subnet to scan for open resolvers.
+        domain (str): The domain to use for the DNS queries during the scan.
+
+    Returns:
+        ToolResult: Complete list of discovered open resolvers and more details.
+    """
+    return await detect_open_resolvers_in_subnet(
+        cidr=cidr,
+        domain=domain,
+        timeout=2.0,
+        concurrency=200
     )

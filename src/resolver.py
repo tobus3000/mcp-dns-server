@@ -17,12 +17,15 @@ import dns.rrset
 import dns.rcode
 import dns.message
 import dns.rdatatype
+import dns.rdataclass
 import dns.flags
 import dns.asyncquery
+import dns.query
+import dns.zone
 try:
-    from .typedefs import QueryResult
+    from .typedefs import QueryResult, AXFRResult
 except ImportError:
-    from typedefs import QueryResult
+    from typedefs import QueryResult, AXFRResult
 
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA
@@ -71,6 +74,7 @@ class Resolver:
         self,
         domain: str,
         rdtype: str,
+        rdclass: str = "IN",
         nameserver: str | None = None,
         use_tcp: bool = False,
         use_edns: bool = True,
@@ -84,6 +88,7 @@ class Resolver:
         Args:
             qname: The domain name to query.
             rdtype: DNS record type to query for.
+            rdclass: The rdclass to use. Defaults to: IN
             nameserver: Optional specific nameserver to query.
             use_tcp: Whether to use TCP for the query (default: False).
             use_edns: Whether to use EDNS (default: True).
@@ -97,11 +102,13 @@ class Resolver:
         try:
             qname = dns.name.from_text(Resolver.convert_idn_to_punnycode(domain))
             rdtype_obj = dns.rdatatype.from_text(rdtype)
+            rdclass_obj = dns.rdataclass.from_text(rdclass)
 
             # Create the query message
             query = dns.message.make_query(
                 qname,
                 rdtype_obj,
+                rdclass=rdclass_obj,
                 want_dnssec=bool(flags & dns.flags.DO)
             )
 
@@ -154,10 +161,9 @@ class Resolver:
                     else:
                         raise
 
-            duration = time.time() - start_time
             return QueryResult(
                 success=True,
-                duration=duration,
+                duration=time.time() - start_time,
                 qname=qname,
                 rdtype=rdtype_obj,
                 response=response,
@@ -185,6 +191,62 @@ class Resolver:
                 error=f"Unexpected error: {str(e)}",
                 details={'exception_type': type(e).__name__}
             )
+
+    async def async_axfr(
+        self,
+        zone_name: str,
+        nameserver: str,
+        port: int = 53,
+        timeout: float = DEFAULT_TIMEOUT
+    ) -> AXFRResult:
+        """Attempt an asynchronous AXFR zone transfer.
+
+        Args:
+            zone_name (str): The zone name we try to receive.
+            nameserver (str | None, optional): The DNS server to ask for the zone transfer.
+            port (int, optional): DNS server port for zone transfer. Defaults to 53.
+            timeout (float, optional): The overall timeout. Defaults to DEFAULT_TIMEOUT.
+
+        Returns:
+            AXFRResult: A result dictionary holding the zone data if retrieved.
+        """
+        try:
+            start_time = time.time()
+            # dns.query.xfr is blocking; run it in a thread
+            axfr_iter = await asyncio.to_thread(
+                dns.query.xfr,
+                nameserver,
+                zone_name,
+                lifetime=timeout,
+                port=port
+            )
+            first_msg = next(axfr_iter)
+            rcode = first_msg.rcode()
+
+            # dns.zone.from_xfr consumes the iterator and builds a Zone object (also blocking)
+            z = await asyncio.to_thread(dns.zone.from_xfr, axfr_iter)
+            return AXFRResult(
+                success=True,
+                zone_name=zone_name,
+                nameserver=nameserver,
+                response=z,
+                rcode=rcode,
+                rcode_text=dns.rcode.to_text(rcode),
+                duration=time.time() - start_time,
+                details={
+                    'names': z.nodes.items()
+                }
+            )
+
+        except (dns.exception.FormError, dns.exception.Timeout, ConnectionRefusedError) as e:
+            return AXFRResult(
+                zone_name=zone_name,
+                nameserver=nameserver,
+                success=False,
+                error=str(e),
+                details={'exception_type': type(e).__name__}
+            )
+
 
     def resolve(
         self,
@@ -237,27 +299,6 @@ class Resolver:
 
 
         return result
-
-    @staticmethod
-    def convert_idn_to_punnycode(domain: str) -> str:
-        """Convert Internationalized Domain Name (IDN) to ASCII-compatible Punycode.
-        
-        Args:
-            domain (str): Domain name that may contain Unicode characters.
-        
-        Returns:
-            str: ASCII-compatible domain name (Punycode if needed)
-        """
-        try:
-            # Check if domain contains non-ASCII characters.
-            if any(ord(char) > 127 for char in domain):
-                # Convert Unicode domain to Punycode.
-                punycode_domain = domain.encode('idna').decode('ascii')
-                return punycode_domain
-            else:
-                return domain
-        except (UnicodeError, Exception) as exc:
-            return domain
 
     def fetch_dnskey(
         self,
@@ -318,6 +359,92 @@ class Resolver:
                 return soa_record.serial
         return None
 
+    async def query_version_bind(
+        self,
+        nameserver: str,
+    ) -> QueryResult:
+        """Query a nameserver for its DNS software version using CHAOS TXT version.bind.
+
+        This emulates:  dig @<nameserver> chaos txt version.bind
+
+        Args:
+            nameserver: IP address of the target DNS server.
+
+        Returns:
+            QueryResult: Result of the DNS query operation.
+        """
+        return await self.async_resolve(
+            domain="version.bind",
+            rdtype="TXT",
+            rdclass="CH",
+            nameserver=nameserver
+        )
+
+    async def query_hostname_bind(
+        self,
+        nameserver: str,
+    ) -> QueryResult:
+        """Query a nameserver for its hostname using CHAOS TXT hostname.bind.
+
+        This emulates:  dig @<nameserver> chaos txt hostname.bind
+
+        Args:
+            nameserver: IP address of the target DNS server.
+
+        Returns:
+            QueryResult: Result of the DNS query operation.
+        """
+        return await self.async_resolve(
+            domain="hostname.bind",
+            rdtype="TXT",
+            rdclass="CH",
+            nameserver=nameserver
+        )
+
+    async def query_authors_bind(
+        self,
+        nameserver: str,
+    ) -> QueryResult:
+        """Query a nameserver for the list of authors of the DNS software.
+
+        This emulates:  dig @<nameserver> chaos txt authors.bind
+
+        Args:
+            nameserver: IP address of the target DNS server.
+
+        Returns:
+            QueryResult: Result of the DNS query operation.
+        """
+        return await self.async_resolve(
+            domain="authors.bind",
+            rdtype="TXT",
+            rdclass="CH",
+            nameserver=nameserver
+        )
+
+    async def query_id_server(
+        self,
+        nameserver: str,
+    ) -> QueryResult:
+        """Query a nameserver for its hostname/ID using CHAOS TXT id.server.
+
+        This emulates:  dig @<nameserver> chaos txt id.server
+
+        Args:
+            nameserver: IP address of the target DNS server.
+
+        Returns:
+            QueryResult: Result of the DNS query operation.
+        """
+        return await self.async_resolve(
+            domain="id.server",
+            rdtype="TXT",
+            rdclass="CH",
+            nameserver=nameserver
+        )
+
+
+    # STATIC METHODS
     @staticmethod
     def get_parent_name(qname: str) -> str:
         """Get the parent zone name for a given domain name.
@@ -521,3 +648,23 @@ class Resolver:
             else:
                 records.append(str(rdata))
         return records
+
+    @staticmethod
+    def convert_idn_to_punnycode(domain: str) -> str:
+        """Convert Internationalized Domain Name (IDN) to ASCII-compatible Punycode.
+        
+        Args:
+            domain (str): Domain name that may contain Unicode characters.
+        
+        Returns:
+            str: ASCII-compatible domain name (Punycode if needed)
+        """
+        try:
+            # Check if domain contains non-ASCII characters.
+            if any(ord(char) > 127 for char in domain):
+                # Convert Unicode domain to Punycode.
+                punycode_domain = domain.encode('idna').decode('ascii')
+                return punycode_domain
+            return domain
+        except (UnicodeError, UnicodeDecodeError, UnicodeEncodeError) as _:
+            return domain

@@ -34,3 +34,10 @@ mcp-dns-server
 ## Configuration
 
 The server can be configured via the `config/config.yaml` file.
+
+## Todo
+
+- TODO: IoT DNS server inspection.
+- TODO: Environment check - Internal or Internet root server detection
+- TODO: Environment check - Check root server types. IANA root, other roots, or internal root?
+- TODO: Feature flag for AXFR checks.

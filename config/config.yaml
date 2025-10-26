@@ -30,3 +30,6 @@ features:
 
   # Enable lookalike domain risk assessment
   lookalike_risk_tool: true
+
+  # Enable Open Resolver scanner
+  open_resolver_scan_tool: true
