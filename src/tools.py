@@ -16,7 +16,8 @@ try:
     from .resolver import Resolver
     from .dnstrace import Trace
     from .typedefs import ToolResult
-    from .scanner import detect_open_resolvers_in_subnet, check_open_resolver
+    from .scanner import detect_open_resolvers_in_subnet
+    from .intercept import detect_dns_spoof_async
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
     from dnssec import validate_domain, pretty_report
@@ -24,7 +25,8 @@ except ImportError:
     from resolver import Resolver
     from dnstrace import Trace
     from typedefs import ToolResult
-    from scanner import detect_open_resolvers_in_subnet, check_open_resolver
+    from scanner import detect_open_resolvers_in_subnet
+    from intercept import detect_dns_spoof_async
 
 async def simple_dns_lookup_impl(hostname: str) -> ToolResult:
     """Resolve the A record of a given hostname.
@@ -311,4 +313,21 @@ async def scan_subnet_for_open_resolvers_impl(cidr: str, domain: str) -> ToolRes
         domain=domain,
         timeout=2.0,
         concurrency=200
+    )
+
+async def scan_server_for_dns_spoofing_impl(nameserver: str, domain: str, router_mac: str | None = None) -> ToolResult:
+    """Detect DNS interception/spoofing including MAC-level fingerprinting.
+    
+    Args:
+        nameserver (str): The nameserver IP to be tested.
+        domain (str): The domain to use for the spoofing detection.
+        router_mac (str): The MAC address of the default gateway (or L3 router).
+        
+    Returns:
+        ToolResult: Complete report of the spoofing detection operation.
+    """
+    return await detect_dns_spoof_async(
+        target_dns_ip=nameserver,
+        domain=domain,
+        router_mac=router_mac
     )

@@ -33,3 +33,6 @@ features:
 
   # Enable Open Resolver scanner
   open_resolver_scan_tool: true
+
+  # Enable DNS Spoofing scanner (requires elevated privileges!)
+  detect_dns_spoofing: true

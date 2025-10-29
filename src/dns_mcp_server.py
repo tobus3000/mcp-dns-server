@@ -21,7 +21,8 @@ try:
         lookalike_risk_impl,
         dns_trace_impl,
         punycode_converter_impl,
-        scan_subnet_for_open_resolvers_impl
+        scan_subnet_for_open_resolvers_impl,
+        scan_server_for_dns_spoofing_impl
     )
     from .resolver import Resolver
 except ImportError:
@@ -38,7 +39,8 @@ except ImportError:
         lookalike_risk_impl,
         dns_trace_impl,
         punycode_converter_impl,
-        scan_subnet_for_open_resolvers_impl
+        scan_subnet_for_open_resolvers_impl,
+        scan_server_for_dns_spoofing_impl
     )
     from resolver import Resolver
 
@@ -242,6 +244,18 @@ class DNSMCPServer:
         #         success=False,
         #         error="Operation cancelled"
         #     )
+
+        @self.server.tool(name="detect_dns_spoofing",
+            description="Detect DNS interception/spoofing including MAC-level fingerprinting.",
+            tags=set(("dns", "spoofing", "mac", "fingerprinting")),
+            enabled=self.config['features'].get('detect_dns_spoofing', False)
+        )
+        async def detect_dns_spoofing(nameserver: str, domain: str, router_mac: str | None) -> ToolResult:
+            return await scan_server_for_dns_spoofing_impl(
+                nameserver=nameserver,
+                domain=domain,
+                router_mac=router_mac
+            )
 
     def setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
@@ -638,6 +652,26 @@ class DNSMCPServer:
         def detect_open_resolvers(cidr: str, domain: str) -> str:
             """Scan a subnet in CIDR notation for open DNS resolvers."""
             return f"Scan for open resolvers in subnet {cidr} using domain {domain}."
+
+        @self.server.prompt(name="detect_dns_spoofing",
+            description="Detect DNS interception/spoofing.",
+            tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
+            enabled=self.config['features'].get('open_resolver_scan_tool', False)
+        )
+        def detect_dns_spoofing(nameserver: str, domain: str) -> str:
+            """Detect DNS interception/spoofing including MAC-level fingerprinting."""
+            return f"Scan for DNS spoofing between client and {nameserver} IP using domain {domain}."
+
+        @self.server.prompt(name="detect_dns_spoofing_with_router_mac",
+            description="Detect DNS interception/spoofing including MAC-level fingerprinting.",
+            tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
+            enabled=self.config['features'].get('open_resolver_scan_tool', False)
+        )
+        def detect_dns_spoofing_with_router_mac(nameserver: str, domain: str, router_mac: str) -> str:
+            """Detect DNS interception/spoofing including MAC-level fingerprinting."""
+            return f"Scan for DNS spoofing on gateway with MAC address {router_mac} and nameserver IP {nameserver} using domain {domain}."
+
+
 
 async def main() -> None:
     """Main entry point."""
