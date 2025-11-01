@@ -85,7 +85,7 @@ class DNSMCPServer:
         except (yaml.YAMLError, OSError) as e:
             self.logger.error("Error loading config: %s", e)
             self.config = {}
-        
+
         self.initialize_knowledge_base()
         self.register_tools()
         self.register_tools_prompts()
@@ -278,7 +278,7 @@ class DNSMCPServer:
         async def detect_dns_root_environment(ctx: Context) -> ToolResult:
             await ctx.info("Performing root DNS infrastructure test.")
             return await detect_dns_root_environment_impl()
-        
+
         @self.server.tool(name="top_level_domain_verification",
             description="Verify the top-level domain part of a given domain name.",
             tags=set(("dns", "authority", "root", "TLD", "gTLD")),
@@ -294,17 +294,17 @@ class DNSMCPServer:
             enabled=self.config['features'].get('basic_dns_assistant', False)
         )
         async def basic_dns_assistant(ctx: Context) -> ToolResult:
-            """Interactive DNS support assistant that gathers additional information from the user when needed.
+            """Interactive DNS support assistant that gathers additional
+            information from the user when needed.
 
             Args:
                 ctx (Context): The MCP session context used for elicitation.
 
             Returns:
-                ToolResult: The final analysis of the user problem and eventual help in how to fix the problem.
+                ToolResult: The final analysis of the user problem and eventual
+                help in how to fix the problem.
             """
             return await basic_dns_assistant_impl(ctx)
-            
-            
 
     # ---------------------------------------------------------------------------
     def setup_signal_handlers(self) -> None:
@@ -399,7 +399,7 @@ class DNSMCPServer:
 
     def register_resolver_resources(self) -> None:
         """Register DNS Resolver resources such as root servers, etc."""
-        
+
         @self.server.resource(
             uri="resource://root_dns_servers",
             name="root_dns_servers",
@@ -782,7 +782,7 @@ class DNSMCPServer:
         def dns_assistant() -> str:
             """Interactive assistant that gathers information progressively from the user to help solve a DNS related problem."""
             return "Help me solve a DNS related problem."
-        
+
 async def main() -> None:
     """Main entry point."""
     server = DNSMCPServer()

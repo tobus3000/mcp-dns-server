@@ -1,11 +1,7 @@
 import asyncio
 import ipaddress
-try:
-    from .resolver import Resolver
-    from .typedefs import ToolResult, OpenResolver
-except ImportError:
-    from resolver import Resolver
-    from typedefs import ToolResult, OpenResolver
+from resolver import Resolver
+from typedefs import ToolResult, OpenResolver
 
 async def check_open_resolver(
     target: str,
@@ -127,6 +123,22 @@ async def detect_open_resolvers_in_subnet(
         }
     )
 
+async def scan_subnet_for_open_resolvers_impl(cidr: str, domain: str) -> ToolResult:
+    """Perform a subnet wide scan for open resolvers.
+
+    Args:
+        cidr (str): The subnet to scan for open resolvers.
+        domain (str): The domain to use for the DNS queries during the scan.
+
+    Returns:
+        ToolResult: Complete list of discovered open resolvers and more details.
+    """
+    return await detect_open_resolvers_in_subnet(
+        cidr=cidr,
+        domain=domain,
+        timeout=2.0,
+        concurrency=200
+    )
 
 # Example CLI runner
 if __name__ == "__main__":

@@ -1,13 +1,12 @@
 """DNS Trace tool that mimics 'dig +trace' behavior.
+#TODO: Fix trace function. Stops on 2nd (wrong) hop...
 """
 from typing import Any, Dict, List, Optional, Tuple
 import dns.name
 import dns.rdatatype
 from dns.rrset import RRset
-try:
-    from .resolver import Resolver
-except ImportError:
-    from resolver import Resolver
+from resolver import Resolver
+from typedefs import ToolResult
 
 class Trace:
     """
@@ -270,3 +269,22 @@ class Trace:
             rrsets = new_rrsets
 
         return final_records
+
+async def dns_trace_impl(domain: str) -> ToolResult:
+    """Perform a DNS trace for the given domain.
+
+    Args:
+        domain (str): The domain to trace.
+
+    Returns:
+        Dict[str, Any]: Trace report or error details.
+    """
+    tracer = Trace(follow_cname=True)
+    tracer.perform_trace(domain.strip())
+    return ToolResult(
+        success=True,
+        output={
+            "domain": domain,
+            "dns_trace": tracer.get_dig_style()
+        }
+    )

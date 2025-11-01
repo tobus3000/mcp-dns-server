@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import traceback
 import statistics
 import sys
 import time
@@ -21,7 +22,7 @@ import dns.rdtypes.ANY.SOA
 from dns.rdtypes.ANY.NSEC import NSEC
 from dns.rdtypes.ANY.NSEC3 import NSEC3
 from dns.rdtypes.ANY.RRSIG import RRSIG
-from typedefs import ValidationResult, TestResult
+from typedefs import ValidationResult, TestResult, ToolResult
 from exceptions import ValidationError, handle_dns_error
 from resolver import Resolver
 
@@ -1141,6 +1142,26 @@ def pretty_report(report: Dict[str, Any]) -> str:
     }
     return json.dumps(formatted_report, indent=2)
 
+async def check_dnssec_impl(domain: str) -> ToolResult:
+    """DNSSEC validation tool implementation.
+
+    Args:
+        domain (str): The DNSSEC enabled domain to validate.
+
+    Returns:
+        ToolResult: Validation report or error details.
+    """
+    try:
+        return ToolResult(
+            success=True,
+            output=pretty_report(validate_domain(domain))
+        )
+    except Exception as e:
+        return ToolResult(
+            success=False,
+            error=str(e),
+            details={"traceback": traceback.format_exc()}
+        )
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:

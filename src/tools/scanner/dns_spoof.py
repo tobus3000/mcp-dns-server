@@ -1,10 +1,7 @@
 import asyncio
 import time
 from scapy.all import IP, UDP, DNS, DNSQR, sr1, AsyncSniffer, ICMP, Ether, ARP, get_if_hwaddr, conf
-try:
-    from .typedefs import ToolResult
-except ImportError:
-    from typedefs import ToolResult
+from typedefs import ToolResult
 
 async def detect_dns_spoof_async(
     target_dns_ip: str,
@@ -112,6 +109,23 @@ async def detect_dns_spoof_async(
             "ttl": observed_ttl,
             "rtt_ms": round(rtt, 2)
         }
+    )
+
+async def scan_server_for_dns_spoofing_impl(nameserver: str, domain: str, router_mac: str | None = None) -> ToolResult:
+    """Detect DNS interception/spoofing including MAC-level fingerprinting.
+    
+    Args:
+        nameserver (str): The nameserver IP to be tested.
+        domain (str): The domain to use for the spoofing detection.
+        router_mac (str): The MAC address of the default gateway (or L3 router).
+        
+    Returns:
+        ToolResult: Complete report of the spoofing detection operation.
+    """
+    return await detect_dns_spoof_async(
+        target_dns_ip=nameserver,
+        domain=domain,
+        router_mac=router_mac        
     )
 
 if __name__ == "__main__":

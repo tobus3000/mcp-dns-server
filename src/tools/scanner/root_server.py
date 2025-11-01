@@ -1,11 +1,7 @@
 import asyncio
 from typing import List, Dict, Optional, Any
-try:
-    from .resolver import Resolver
-    from .typedefs import ToolResult
-except ImportError:
-    from resolver import Resolver
-    from typedefs import ToolResult
+from resolver import Resolver
+from typedefs import ToolResult
 
 class RootServerDetector:
     """Asynchronous detector for identifying which DNS root infrastructure is in use."""
@@ -145,6 +141,14 @@ class RootServerDetector:
                 details={"exception_type": type(e).__name__}
             )
 
+async def detect_dns_root_environment_impl() -> ToolResult:
+    """Test what DNS root infrastructure is being used by the resolver.
+
+    Returns:
+        ToolResult: A report of the detected root DNS infrastructure.
+    """
+    detector = RootServerDetector()
+    return await detector.detect_environment()
 
 # Example usage
 if __name__ == "__main__":

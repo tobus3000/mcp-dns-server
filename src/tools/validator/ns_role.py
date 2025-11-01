@@ -1,11 +1,7 @@
 import dns.flags
 from typing import Optional
-try:
-    from .typedefs import ToolResult
-    from .resolver import Resolver
-except ImportError:
-    from typedefs import ToolResult
-    from resolver import Resolver
+from typedefs import ToolResult
+from resolver import Resolver
 
 async def test_nameserver_role(
     nameserver: str,
@@ -73,6 +69,25 @@ async def test_nameserver_role(
         + "unreachable or misconfigured."
     )
 
+async def test_nameserver_role_impl(nameserver: str, domain: str | None, authority_test_domain: str | None) -> ToolResult:
+    """Test whether a given DNS server is authoritative, a resolver, or mixed-mode.
+
+    Args:
+        nameserver (str): IP or hostname of the DNS server to test.
+        domain (str): Domain used to test recursion (default: example.com).
+        authority_test_domain (str | None): Zone used to test authority.
+            If None, uses the server's reverse domain.
+
+    Returns:
+        ToolResults: Human-readable report describing the detected role.
+    """
+    if not domain:
+        domain = "example.com"
+    return await test_nameserver_role(
+                nameserver=nameserver,
+                domain=domain,
+                authority_test_domain=authority_test_domain
+    )
 
 # Example usage
 if __name__ == "__main__":

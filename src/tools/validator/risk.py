@@ -24,10 +24,8 @@ import unicodedata
 from typing import List, Set, Dict, Tuple, Optional
 import difflib
 import math
-try:
-    from .resolver import Resolver
-except:
-    from resolver import Resolver
+from typedefs import ToolResult
+from resolver import Resolver
 
 # ----- Configurable small datasets (keyboard adjacency + homoglyphs) -----
 # Keyboard adjacency (QWERTY) for simple substitution/insertion choices
@@ -471,7 +469,30 @@ def assess_domain_risk(domain: str,
         'resolving_variants': list(resolving),
     }
 
-# ----- Example runner -----
+
+async def lookalike_risk_impl(domain: str, check_dns: bool = False) -> ToolResult:
+    """Lookalike domain risk assessment tool implementation.
+    
+    Args:
+        domain (str): The domain to assess for lookalike risk.
+        check_dns (bool): Whether to perform DNS checks on variants.
+        
+    Returns:
+        Dict[str, Any]: Risk assessment report.
+    """
+    report = assess_domain_risk(domain, check_dns=check_dns)
+    return ToolResult(
+        success=True,
+        output={
+            "domain": domain,
+            "risk_score": report.get('risk_score', None),
+            "summary": f"{domain} → {report.get('summary', '')}",
+            "variants": report.get('all_variants', []),
+            "resolving_variants": report.get('resolving_variants', [])
+        },
+        details=report.get('details', {})
+    )
+
 
 if __name__ == "__main__":
     test_domains = [

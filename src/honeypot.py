@@ -1,4 +1,6 @@
+"""A veeery simple and heuristic DNS Honeypot detection"""
 #TODO: Add `detect_honeypot_dns` function to list of tools.
+#TODO: Move module to `tools` sub-module.
 import asyncio
 import uuid
 import ipaddress

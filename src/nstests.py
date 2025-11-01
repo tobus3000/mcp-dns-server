@@ -6,6 +6,8 @@ Provides comprehensive testing of DNS server implementations covering:
 - DNSSEC features
 - Performance and robustness
 - Edge cases and error handling
+
+#TODO: Move module to `tools` sub-module.
 """
 
 from __future__ import annotations
