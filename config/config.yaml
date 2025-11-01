@@ -42,3 +42,9 @@ features:
 
   # Enable DNS root infrastructure detection
   detect_dns_root_environment: true
+
+  # Enable top-level-domain verification
+  top_level_domain_verification: true
+
+  # Enable the basic DNS assistant (requires clients to support elicitation)
+  basic_dns_assistant: true

@@ -24,7 +24,9 @@ try:
         scan_subnet_for_open_resolvers_impl,
         scan_server_for_dns_spoofing_impl,
         test_nameserver_role_impl,
-        detect_dns_root_environment_impl
+        detect_dns_root_environment_impl,
+        tld_check_impl,
+        basic_dns_assistant_impl
     )
     from .resolver import Resolver
 except ImportError:
@@ -44,7 +46,9 @@ except ImportError:
         scan_subnet_for_open_resolvers_impl,
         scan_server_for_dns_spoofing_impl,
         test_nameserver_role_impl,
-        detect_dns_root_environment_impl
+        detect_dns_root_environment_impl,
+        tld_check_impl,
+        basic_dns_assistant_impl
     )
     from resolver import Resolver
 logger = get_logger(__name__)
@@ -66,6 +70,7 @@ class DNSMCPServer:
                 "An MCP server that provides DNS resolution and troubleshooting"
                 " capabilities."
             ),
+            log_level="DEBUG"
         )
         self.logger = get_logger(__name__)
         try:
@@ -273,7 +278,35 @@ class DNSMCPServer:
         async def detect_dns_root_environment(ctx: Context) -> ToolResult:
             await ctx.info("Performing root DNS infrastructure test.")
             return await detect_dns_root_environment_impl()
+        
+        @self.server.tool(name="top_level_domain_verification",
+            description="Verify the top-level domain part of a given domain name.",
+            tags=set(("dns", "authority", "root", "TLD", "gTLD")),
+            enabled=self.config['features'].get('top_level_domain_verification', False)
+        )
+        async def top_level_domain_verification(ctx: Context, domain: str) -> ToolResult:
+            await ctx.info("Performing top-level-domain check.")
+            return await tld_check_impl(domain=domain)
 
+        @self.server.tool(name="dns_assistant",
+            description="Basic DNS support assistant gathers information progressively to help finding a DNS related problem.",
+            tags=set(("interactive", "elicitation", "dns", "assistant", "problem", "help")),
+            enabled=self.config['features'].get('basic_dns_assistant', False)
+        )
+        async def basic_dns_assistant(ctx: Context) -> ToolResult:
+            """Interactive DNS support assistant that gathers additional information from the user when needed.
+
+            Args:
+                ctx (Context): The MCP session context used for elicitation.
+
+            Returns:
+                ToolResult: The final analysis of the user problem and eventual help in how to fix the problem.
+            """
+            return await basic_dns_assistant_impl(ctx)
+            
+            
+
+    # ---------------------------------------------------------------------------
     def setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
         if sys.platform == "win32":
@@ -732,6 +765,24 @@ class DNSMCPServer:
             """
             return "Detect the DNS root server infrastructure that is used for name resolution."
 
+        @self.server.prompt(name="top_level_domain_verification",
+            description="Check if the top-level domain of a given domain is valid.",
+            tags=set(("dns", "authority", "root", "TLD", "gTLD")),
+            enabled=self.config['features'].get('top_level_domain_verification', False)
+        )
+        def top_level_domain_verification(domain: str) -> str:
+            """Check if the top-level domain of a given domain is valid."""
+            return f"Check if the top-level domain of domain {domain} is valid."
+
+        @self.server.prompt(name="dns_assistant",
+            description="Interactive assistant that gathers information progressively from the user to help solve a DNS related problem.",
+            tags=set(("interactive", "elicitation", "dns", "assistant", "problem", "help")),
+            enabled=self.config['features'].get('basic_dns_assistant', False)
+        )
+        def dns_assistant() -> str:
+            """Interactive assistant that gathers information progressively from the user to help solve a DNS related problem."""
+            return "Help me solve a DNS related problem."
+        
 async def main() -> None:
     """Main entry point."""
     server = DNSMCPServer()

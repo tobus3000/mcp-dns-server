@@ -21,6 +21,7 @@ try:
     from .intercept import detect_dns_spoof_async
     from .server_role import test_nameserver_role
     from .root_detector import RootServerDetector
+    from .tld_validator import is_valid_tld
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
     from dnssec import validate_domain, pretty_report
@@ -32,6 +33,7 @@ except ImportError:
     from intercept import detect_dns_spoof_async
     from server_role import test_nameserver_role
     from root_detector import RootServerDetector
+    from tld_validator import is_valid_tld
 
 async def simple_dns_lookup_impl(hostname: str) -> ToolResult:
     """Resolve the A record of a given hostname.
@@ -359,5 +361,65 @@ async def test_nameserver_role_impl(nameserver: str, domain: str | None, authori
     )
 
 async def detect_dns_root_environment_impl() -> ToolResult:
+    """Test what DNS root infrastructure is being used by the resolver.
+
+    Returns:
+        ToolResult: A report of the detected root DNS infrastructure.
+    """
     detector = RootServerDetector()
     return await detector.detect_environment()
+
+async def tld_check_impl(domain: str) -> ToolResult:
+    """Performs a TLD validation for the given domain.
+
+    Args:
+        domain (str): The domain to extract the top-level-domain from.
+
+    Returns:
+        ToolResult: The result of the verification.
+    """
+    return await is_valid_tld(domain=domain.strip())
+
+async def basic_dns_assistant_impl(ctx: Context) -> ToolResult:
+    """Interactive DNS support assistant that gathers additional 
+    information from the user when needed.
+
+    Args:
+        ctx (Context): The MCP session context used for elicitation.
+
+    Returns:
+        ToolResult: The final analysis of the user problem and eventual help in how to fix the problem.
+    """
+    domain = await ctx.elicit(
+        "What DNS name or domain are you having trouble with?",
+        response_type=str
+    )
+    if domain.action != "accept":
+        return ToolResult(
+            success=False,
+            error="DNS assistant cancelled"
+        )
+    
+    resolved_domain = await simple_dns_lookup_impl(domain.data.strip())
+    #TODO: progress with checking...
+    if resolved_domain.success:
+        if ip := resolved_domain.output and resolved_domain.details['rcode_text']:
+            if resolved_domain.details['rcode_text'] == "NOERROR":
+                if len(ip) >= 1:
+                    resolved_domain.output = f"The domain {domain.data.strip()} seems to be resolving correctly to IP {ip}."
+                else:
+                    resolved_domain.output = f"The domain {domain.data.strip()} seems to be resolving correctly but has no response data. This is normal and can have various reasons. Example: The DNS name points at a Load Balanced resource that does not currently have any online servers in the pool."
+            elif resolved_domain.details['rcode_text'] == "NXDOMAIN":
+                # Domain does not seem to exist. Check if TLD is valid.
+                tld_check = await is_valid_tld(domain=domain.data.strip())
+                if tld_check.success:
+                    resolved_domain.output = f"The DNS name {domain.data.strip()} does not exist but the {tld_check.output}"
+                else:
+                    resolved_domain.output = f"The DNS name {domain.data.strip()} does not exist but the problem is most likely down to the top-level domain. {tld_check.output}"
+                        
+        return resolved_domain
+    else:
+        # Failure to resolve the name requires some additional checking as to why it failed.
+        tld_check = await is_valid_tld(domain=domain.data.strip())
+        
+        return tld_check
