@@ -6,6 +6,7 @@ by the Model Context Protocol (MCP) server.
 import traceback
 from typing import Dict, Any, Optional
 import ipaddress
+from fastmcp import Context
 import dns.rcode
 import dns.rdatatype
 import dns.rdataclass
@@ -18,6 +19,8 @@ try:
     from .typedefs import ToolResult
     from .scanner import detect_open_resolvers_in_subnet
     from .intercept import detect_dns_spoof_async
+    from .server_role import test_nameserver_role
+    from .root_detector import RootServerDetector
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
     from dnssec import validate_domain, pretty_report
@@ -27,6 +30,8 @@ except ImportError:
     from typedefs import ToolResult
     from scanner import detect_open_resolvers_in_subnet
     from intercept import detect_dns_spoof_async
+    from server_role import test_nameserver_role
+    from root_detector import RootServerDetector
 
 async def simple_dns_lookup_impl(hostname: str) -> ToolResult:
     """Resolve the A record of a given hostname.
@@ -78,15 +83,16 @@ async def advanced_dns_lookup_impl(hostname: str, record_type: str) -> ToolResul
     """
     auth_nameservers = []
     resolver = Resolver(timeout=5.0)
-    ns_res = await resolver.async_resolve(hostname, "NS")
-    if ns_res.success and ns_res.response and ns_res.qname and ns_res.rdtype:
-        rrset = ns_res.response.get_rrset(
-            section=ns_res.response.answer,
-            name=ns_res.qname,
-            rdclass=dns.rdataclass.IN,
-            rdtype=ns_res.rdtype
-        )
-        auth_nameservers = [str(rr) for rr in rrset] if rrset else []
+    if not record_type == "NS":
+        ns_res = await resolver.async_resolve(hostname, "NS")
+        if ns_res.success and ns_res.response and ns_res.qname and ns_res.rdtype:
+            rrset = ns_res.response.get_rrset(
+                section=ns_res.response.answer,
+                name=ns_res.qname,
+                rdclass=dns.rdataclass.IN,
+                rdtype=ns_res.rdtype
+            )
+            auth_nameservers = [str(rr) for rr in rrset] if rrset else []
 
     result = await resolver.async_resolve(hostname, record_type)
     records = []
@@ -329,5 +335,29 @@ async def scan_server_for_dns_spoofing_impl(nameserver: str, domain: str, router
     return await detect_dns_spoof_async(
         target_dns_ip=nameserver,
         domain=domain,
-        router_mac=router_mac
+        router_mac=router_mac        
     )
+
+async def test_nameserver_role_impl(nameserver: str, domain: str | None, authority_test_domain: str | None) -> ToolResult:
+    """Test whether a given DNS server is authoritative, a resolver, or mixed-mode.
+
+    Args:
+        nameserver (str): IP or hostname of the DNS server to test.
+        domain (str): Domain used to test recursion (default: example.com).
+        authority_test_domain (str | None): Zone used to test authority.
+            If None, uses the server's reverse domain.
+
+    Returns:
+        ToolResults: Human-readable report describing the detected role.
+    """
+    if not domain:
+        domain = "example.com"
+    return await test_nameserver_role(
+                nameserver=nameserver,
+                domain=domain,
+                authority_test_domain=authority_test_domain
+    )
+
+async def detect_dns_root_environment_impl() -> ToolResult:
+    detector = RootServerDetector()
+    return await detector.detect_environment()

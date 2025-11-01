@@ -78,7 +78,8 @@ async def detect_dns_spoof_async(
     if icmp_ttl is not None and abs(observed_ttl - icmp_ttl) > 2:
         tampered = True
         notes.append(
-            f"TTL mismatch: DNS reply TTL={observed_ttl}, ICMP TTL={icmp_ttl}. Possible local spoof."
+            f"TTL mismatch: DNS reply TTL={observed_ttl}, ICMP TTL={icmp_ttl}. "
+            + "Possible local spoof."
         )
 
     # Latency check

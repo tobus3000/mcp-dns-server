@@ -36,3 +36,9 @@ features:
 
   # Enable DNS Spoofing scanner (requires elevated privileges!)
   detect_dns_spoofing: true
+
+  # Enable the DNS server role test (authority/caching test)
+  nameserver_role_test: true
+
+  # Enable DNS root infrastructure detection
+  detect_dns_root_environment: true

@@ -1,6 +1,5 @@
 import asyncio
 import ipaddress
-
 try:
     from .resolver import Resolver
     from .typedefs import ToolResult, OpenResolver
