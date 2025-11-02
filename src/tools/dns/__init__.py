@@ -7,10 +7,10 @@ from .basic_dns import (
     dns_troubleshooting_impl
 )
 from .ns_tests import (
-    run_comprehensive_tests,
-    test_edns_support,
-    test_tcp_behavior,
-    test_dns_cookie
+    run_comprehensive_tests_impl,
+    run_edns_tests_impl,
+    run_tcp_behavior_tests_impl,
+    run_dns_cookie_tests_impl
 )
 
 __ALL__ = [
@@ -19,5 +19,8 @@ __ALL__ = [
     advanced_dns_lookup_impl,
     reverse_dns_lookup_impl,
     dns_troubleshooting_impl,
-    run_comprehensive_tests
+    run_comprehensive_tests_impl,
+    run_edns_tests_impl,
+    run_tcp_behavior_tests_impl,
+    run_dns_cookie_tests_impl
 ]

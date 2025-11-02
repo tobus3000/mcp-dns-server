@@ -26,10 +26,10 @@ try:
         detect_dns_root_environment_impl,
         tld_check_impl,
         basic_dns_assistant_impl,
-        run_comprehensive_tests,
-        test_edns_support,
-        test_tcp_behavior,
-        test_dns_cookie
+        run_comprehensive_tests_impl,
+        run_edns_tests_impl,
+        run_tcp_behavior_tests_impl,
+        run_dns_cookie_tests_impl
     )
     from .resolver import Resolver
 except ImportError:
@@ -51,10 +51,10 @@ except ImportError:
         detect_dns_root_environment_impl,
         tld_check_impl,
         basic_dns_assistant_impl,
-        run_comprehensive_tests,
-        test_edns_support,
-        test_tcp_behavior,
-        test_dns_cookie
+        run_comprehensive_tests_impl,
+        run_edns_tests_impl,
+        run_tcp_behavior_tests_impl,
+        run_dns_cookie_tests_impl
     )
     from resolver import Resolver
 logger = get_logger(__name__)
@@ -163,9 +163,12 @@ class DNSMCPServer:
             domain: str,
             nameserver: str,
             ctx: Context
-        ) -> Dict[str, Any]:
-            await ctx.info(f"Performing standard compliance tests against nameserver `{nameserver}` using domain `{domain}`.")
-            return await run_comprehensive_tests(domain, nameserver)
+        ) -> ToolResult:
+            await ctx.info(
+                f"Performing standard compliance tests against nameserver `{nameserver}` "
+                + f"using domain `{domain}`."
+            )
+            return await run_comprehensive_tests_impl(domain, nameserver)
 
         @self.server.tool(name="dns_trace",
             description="Perform a DNS trace to see the resolution path for a domain",
@@ -181,30 +184,30 @@ class DNSMCPServer:
             tags=set(("dns", "edns", "troubleshooting", "diagnostics", "server", "nameserver")),
             enabled=self.config['features'].get('advanced_troubleshooting', False)
         )
-        async def dns_server_edns_test(domain: str, nameserver: str, ctx: Context) -> Dict[str, Any]:
+        async def dns_server_edns_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Performing EDNS tests against nameserver `{nameserver}` "
                            + f"using domain `{domain}` for testing.")
-            return await test_edns_support(domain, nameserver)
+            return await run_edns_tests_impl(domain, nameserver)
 
         @self.server.tool(name="dns_udp_tcp_test",
             description="Perform UDP and TCP behavior tests on a given domain and nameserver.",
             tags=set(("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")),
             enabled=self.config['features'].get('advanced_troubleshooting', False)
         )
-        async def dns_udp_tcp_test(domain: str, nameserver: str, ctx: Context) -> Dict[str, Any]:
+        async def dns_udp_tcp_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Performing UDP/TCP validation tests against nameserver {nameserver} "
                            + f"using domain `{domain}` for testing.")
-            return await test_tcp_behavior(domain, nameserver)
+            return await run_tcp_behavior_tests_impl(domain, nameserver)
 
         @self.server.tool(name="dns_cookie_test",
             description="Perform a DNS Cookie behavior test on a given domain and nameserver.",
             tags=set(("dns", "cookie", "edns", "diagnostics", "troubleshooting")),
             enabled=self.config['features'].get('advanced_troubleshooting', False)
         )
-        async def dns_cookie_test(domain: str, nameserver: str, ctx: Context) -> Dict[str, Any]:
+        async def dns_cookie_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Performing DNS Cookie validation against nameserver {nameserver} "
                            + f"using domain `{domain}` for testing.")
-            return await test_dns_cookie(domain, nameserver)
+            return await run_dns_cookie_tests_impl(domain, nameserver)
 
         @self.server.tool(name="check_dnssec",
             description="Check DNSSEC validation for a given domain",

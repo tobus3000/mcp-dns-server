@@ -24,10 +24,10 @@ import dns.flags
 import dns.edns
 import dns.rcode
 try:
-    from ...typedefs import QueryResult
+    from ...typedefs import QueryResult, ToolResult
     from ...resolver import Resolver
 except ImportError:
-    from typedefs import QueryResult
+    from typedefs import QueryResult, ToolResult
     from resolver import Resolver
 
 DEFAULT_TIMEOUT = 5.0
@@ -1331,3 +1331,103 @@ def interpret_test_results(report: Dict[str, Any]) -> Dict[str, Any]:
         }
 
     return interpretation
+
+# Wrapper functions used to export MCP tools
+async def run_comprehensive_tests_impl(domain: str, nameserver: str) -> ToolResult:
+    """Wrapper function to run comprehensive tests.
+
+    Args:
+        domain (str): The domain used for testing.
+        nameserver (str): The nameserver to test.
+
+    Returns:
+        ToolResult: A standard result to be in-line with our other tools.
+    """
+    report = await run_comprehensive_tests(domain, nameserver)
+    return ToolResult(
+        success=True,
+        output={
+            "domain": report.get('domain'),
+            "nameserver": report.get('nameserver'),
+            "interpretation": report.get('interpretation')
+        },
+        details={
+            "summary": report.get('summary'),
+            "results": report.get('results')
+        }
+    )
+
+async def run_edns_tests_impl(domain: str, nameserver: str) -> ToolResult:
+    """Wrapper function to run EDNS tests.
+
+    Args:
+        domain (str): The domain used for testing.
+        nameserver (str): The nameserver to test.
+
+    Returns:
+        ToolResult: A standard result to be in-line with our other tools.
+    """
+    report = await test_edns_support(domain, nameserver)
+    report['interpretation'] = interpret_test_results(report)
+    return ToolResult(
+        success=True,
+        output={
+            "domain": report.get('domain'),
+            "nameserver": report.get('nameserver'),
+            "interpretation": report.get('interpretation')
+        },
+        details={
+            "summary": report.get('summary'),
+            "results": report.get('results')
+        }
+    )
+
+async def run_tcp_behavior_tests_impl(domain: str, nameserver: str) -> ToolResult:
+    """Wrapper function to run UDP/TCP behavior tests.
+
+    Args:
+        domain (str): The domain used for testing.
+        nameserver (str): The nameserver to test.
+
+    Returns:
+        ToolResult: A standard result to be in-line with our other tools.
+    """
+    report = await test_tcp_behavior(domain, nameserver)
+    report['interpretation'] = interpret_test_results(report)
+    return ToolResult(
+        success=True,
+        output={
+            "domain": report.get('domain'),
+            "nameserver": report.get('nameserver'),
+            "interpretation": report.get('interpretation')
+        },
+        details={
+            "summary": report.get('summary'),
+            "results": report.get('results')
+        }
+    )
+
+async def run_dns_cookie_tests_impl(domain: str, nameserver: str) -> ToolResult:
+    """Wrapper function to run DNS Cookie behavior tests.
+
+    Args:
+        domain (str): The domain used for testing.
+        nameserver (str): The nameserver to test.
+
+    Returns:
+        ToolResult: A standard result to be in-line with our other tools.
+    """
+    report = await test_dns_cookie(domain, nameserver)
+    report['interpretation'] = interpret_test_results(report)
+    return ToolResult(
+        success=True,
+        output={
+            "domain": report.get('domain'),
+            "nameserver": report.get('nameserver'),
+            "interpretation": report.get('interpretation')
+        },
+        details={
+            "summary": report.get('summary'),
+            "results": report.get('results')
+        }
+    )

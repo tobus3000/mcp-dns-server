@@ -1,15 +1,15 @@
 """Tools related submodule to keep all things tool related in one place."""
 
-from .query import (
+from .dns import (
     dns_trace_impl,
     simple_dns_lookup_impl,
     advanced_dns_lookup_impl,
     reverse_dns_lookup_impl,
     dns_troubleshooting_impl,
-    run_comprehensive_tests,
-    test_edns_support,
-    test_tcp_behavior,
-    test_dns_cookie
+    run_comprehensive_tests_impl,
+    run_edns_tests_impl,
+    run_tcp_behavior_tests_impl,
+    run_dns_cookie_tests_impl
 )
 
 from .converter import punycode_converter_impl
@@ -41,8 +41,8 @@ __ALL__ = [
     tld_check_impl,
     test_nameserver_role_impl,
     detect_dns_root_environment_impl,
-    run_comprehensive_tests,
-    test_edns_support,
-    test_tcp_behavior,
-    test_dns_cookie
+    run_comprehensive_tests_impl,
+    run_edns_tests_impl,
+    run_tcp_behavior_tests_impl,
+    run_dns_cookie_tests_impl
 ]
