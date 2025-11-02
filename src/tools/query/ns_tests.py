@@ -6,8 +6,6 @@ Provides comprehensive testing of DNS server implementations covering:
 - DNSSEC features
 - Performance and robustness
 - Edge cases and error handling
-
-#TODO: Move module to `tools` sub-module.
 """
 
 from __future__ import annotations
@@ -26,8 +24,8 @@ import dns.flags
 import dns.edns
 import dns.rcode
 try:
-    from .typedefs import QueryResult
-    from .resolver import Resolver
+    from ...typedefs import QueryResult
+    from ...resolver import Resolver
 except ImportError:
     from typedefs import QueryResult
     from resolver import Resolver

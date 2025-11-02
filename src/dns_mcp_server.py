@@ -9,7 +9,6 @@ from fastmcp import FastMCP, Context
 from fastmcp.utilities.logging import get_logger
 try:
     # Try relative import first (when used as part of the package)
-    from . import nstests
     from .knowledge_base.manager import KnowledgeBaseManager
     from .typedefs import ToolResult
     from .tools import (
@@ -26,12 +25,15 @@ try:
         test_nameserver_role_impl,
         detect_dns_root_environment_impl,
         tld_check_impl,
-        basic_dns_assistant_impl
+        basic_dns_assistant_impl,
+        run_comprehensive_tests,
+        test_edns_support,
+        test_tcp_behavior,
+        test_dns_cookie
     )
     from .resolver import Resolver
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
-    import nstests
     from knowledge_base.manager import KnowledgeBaseManager
     from typedefs import ToolResult
     from tools import (
@@ -48,7 +50,11 @@ except ImportError:
         test_nameserver_role_impl,
         detect_dns_root_environment_impl,
         tld_check_impl,
-        basic_dns_assistant_impl
+        basic_dns_assistant_impl,
+        run_comprehensive_tests,
+        test_edns_support,
+        test_tcp_behavior,
+        test_dns_cookie
     )
     from resolver import Resolver
 logger = get_logger(__name__)
@@ -159,7 +165,7 @@ class DNSMCPServer:
             ctx: Context
         ) -> Dict[str, Any]:
             await ctx.info(f"Performing standard compliance tests against nameserver `{nameserver}` using domain `{domain}`.")
-            return await nstests.run_comprehensive_tests(domain, nameserver)
+            return await run_comprehensive_tests(domain, nameserver)
 
         @self.server.tool(name="dns_trace",
             description="Perform a DNS trace to see the resolution path for a domain",
@@ -178,7 +184,7 @@ class DNSMCPServer:
         async def dns_server_edns_test(domain: str, nameserver: str, ctx: Context) -> Dict[str, Any]:
             await ctx.info(f"Performing EDNS tests against nameserver `{nameserver}` "
                            + f"using domain `{domain}` for testing.")
-            return await nstests.test_edns_support(domain, nameserver)
+            return await test_edns_support(domain, nameserver)
 
         @self.server.tool(name="dns_udp_tcp_test",
             description="Perform UDP and TCP behavior tests on a given domain and nameserver.",
@@ -188,7 +194,7 @@ class DNSMCPServer:
         async def dns_udp_tcp_test(domain: str, nameserver: str, ctx: Context) -> Dict[str, Any]:
             await ctx.info(f"Performing UDP/TCP validation tests against nameserver {nameserver} "
                            + f"using domain `{domain}` for testing.")
-            return await nstests.test_tcp_behavior(domain, nameserver)
+            return await test_tcp_behavior(domain, nameserver)
 
         @self.server.tool(name="dns_cookie_test",
             description="Perform a DNS Cookie behavior test on a given domain and nameserver.",
@@ -198,7 +204,7 @@ class DNSMCPServer:
         async def dns_cookie_test(domain: str, nameserver: str, ctx: Context) -> Dict[str, Any]:
             await ctx.info(f"Performing DNS Cookie validation against nameserver {nameserver} "
                            + f"using domain `{domain}` for testing.")
-            return await nstests.test_dns_cookie(domain, nameserver)
+            return await test_dns_cookie(domain, nameserver)
 
         @self.server.tool(name="check_dnssec",
             description="Check DNSSEC validation for a given domain",

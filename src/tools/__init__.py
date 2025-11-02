@@ -1,12 +1,17 @@
 """Tools related submodule to keep all things tool related in one place."""
 
 from .query import (
+    dns_trace_impl,
     simple_dns_lookup_impl,
     advanced_dns_lookup_impl,
     reverse_dns_lookup_impl,
-    dns_troubleshooting_impl
+    dns_troubleshooting_impl,
+    run_comprehensive_tests,
+    test_edns_support,
+    test_tcp_behavior,
+    test_dns_cookie
 )
-from .trace import dns_trace_impl
+
 from .converter import punycode_converter_impl
 from .scanner import (
     scan_subnet_for_open_resolvers_impl,
@@ -35,5 +40,9 @@ __ALL__ = [
     basic_dns_assistant_impl,
     tld_check_impl,
     test_nameserver_role_impl,
-    detect_dns_root_environment_impl
+    detect_dns_root_environment_impl,
+    run_comprehensive_tests,
+    test_edns_support,
+    test_tcp_behavior,
+    test_dns_cookie
 ]
