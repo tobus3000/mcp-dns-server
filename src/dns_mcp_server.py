@@ -228,7 +228,8 @@ class DNSMCPServer:
             return await lookalike_risk_impl(domain, check_dns)
 
         @self.server.tool(name="punycode_converter",
-            description="Converts any given internationalized domain name (IDN) into punycode format.",
+            description=("Converts any given internationalized domain name (IDN) "
+                         "into punycode format."),
             tags=set(("dns", "idn", "punycode", "converter")),
             enabled=True
         )
@@ -258,8 +259,15 @@ class DNSMCPServer:
             tags=set(("dns", "spoofing", "mac", "fingerprinting")),
             enabled=self.config['features'].get('detect_dns_spoofing', False)
         )
-        async def detect_dns_spoofing(ctx: Context, nameserver: str, domain: str, router_mac: str | None) -> ToolResult:
-            await ctx.info(f"Performing DNS spoofing detection against nameserver `{nameserver}` using domain {domain}.")
+        async def detect_dns_spoofing(
+            ctx: Context,
+            nameserver: str,
+            domain: str,
+            router_mac: str | None
+        ) -> ToolResult:
+            await ctx.info(
+                f"Performing DNS spoofing detection against nameserver `{nameserver}` "
+                + f"using domain {domain}.")
             return await scan_server_for_dns_spoofing_impl(
                 nameserver=nameserver,
                 domain=domain,
@@ -267,12 +275,22 @@ class DNSMCPServer:
             )
 
         @self.server.tool(name="detect_nameserver_role",
-            description="Test whether a given DNS server is authoritative, a resolver, or mixed-mode.",
+            description=(
+                "Test whether a given DNS server is authoritative, "
+                "a resolver, or mixed-mode."),
             tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
             enabled=self.config['features'].get('nameserver_role_test', False)
         )
-        async def detect_nameserver_role(ctx: Context, nameserver: str, domain: str | None, authority_test_domain: str | None) -> ToolResult:
-            await ctx.info(f"Performing role check for nameserver `{nameserver}` using domain {domain}.")
+        async def detect_nameserver_role(
+            ctx: Context,
+            nameserver: str,
+            domain: str | None,
+            authority_test_domain: str | None
+        ) -> ToolResult:
+            await ctx.info(
+                f"Performing role check for nameserver `{nameserver}` "
+                + f"using domain {domain}."
+                )
             return await test_nameserver_role_impl(
                 nameserver=nameserver,
                 domain=domain,
@@ -298,7 +316,8 @@ class DNSMCPServer:
             return await tld_check_impl(domain=domain)
 
         @self.server.tool(name="dns_assistant",
-            description="Basic DNS support assistant gathers information progressively to help finding a DNS related problem.",
+            description=("Basic DNS support assistant gathers information progressively "
+                         "to help finding a DNS related problem."),
             tags=set(("interactive", "elicitation", "dns", "assistant", "problem", "help")),
             enabled=self.config['features'].get('basic_dns_assistant', False)
         )
@@ -683,7 +702,8 @@ class DNSMCPServer:
             )
 
         @self.server.prompt(name="lookalike_risk_check_dns",
-            description="Assess lookalike domain risk for a given domain and resolve all possible variants",
+            description=("Assess lookalike domain risk for a given domain and "
+                         "resolve all possible variants"),
             tags=set(("dns", "security", "lookalike", "typosquatting")),
             enabled=self.config['features'].get('lookalike_risk_tool', False)
         )
@@ -695,7 +715,8 @@ class DNSMCPServer:
             )
 
         @self.server.prompt(name="supported_record_types",
-            description="Return the DNS resource record types that are supported by this MCP server.",
+            description=("Return the DNS resource record types that are "
+                         "supported by this MCP server."),
             tags=set(("dns", "record_types")),
             enabled=self.config['features'].get('advanced_troubleshooting', False)
         )
@@ -732,39 +753,61 @@ class DNSMCPServer:
         )
         def detect_dns_spoofing(nameserver: str, domain: str) -> str:
             """Detect DNS interception/spoofing including MAC-level fingerprinting."""
-            return f"Scan for DNS spoofing between client and {nameserver} IP using domain {domain}."
+            return (
+                f"Scan for DNS spoofing between client and {nameserver} "
+                f"IP using domain {domain}."
+            )
 
         @self.server.prompt(name="detect_dns_spoofing_with_router_mac",
             description="Detect DNS interception/spoofing including MAC-level fingerprinting.",
             tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
             enabled=self.config['features'].get('open_resolver_scan_tool', False)
         )
-        def detect_dns_spoofing_with_router_mac(nameserver: str, domain: str, router_mac: str) -> str:
+        def detect_dns_spoofing_with_router_mac(
+            nameserver: str,
+            domain: str,
+            router_mac: str
+        ) -> str:
             """Detect DNS interception/spoofing including MAC-level fingerprinting."""
-            return f"Scan for DNS spoofing on gateway with MAC address {router_mac} and nameserver IP {nameserver} using domain {domain}."
+            return (
+                f"Scan for DNS spoofing on gateway with MAC address {router_mac} "
+                + f"and nameserver IP {nameserver} using domain {domain}."
+            )
 
         @self.server.prompt(name="detect_nameserver_role",
-            description="Test whether a given DNS server is authoritative, a resolver, or mixed-mode.",
+            description=("Test whether a given DNS server is authoritative, "
+                         "a resolver, or mixed-mode."),
             tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
             enabled=self.config['features'].get('nameserver_role_test', False)
         )
         def detect_nameserver_role(nameserver: str) -> str:
             """Test whether a given DNS server is authoritative, a resolver, or mixed-mode."""
-            return f"Test whether nameserver {nameserver} is authoritative, a resolver, or in mixed-mode."
+            return (
+                f"Test whether nameserver {nameserver} is authoritative, "
+                + "a resolver, or in mixed-mode."
+            )
 
         @self.server.prompt(name="detect_nameserver_role_with_auth_domain",
-            description="Test whether a given DNS server is authoritative, a resolver, or mixed-mode.",
+            description=("Test whether a given DNS server is authoritative, "
+                         "a resolver, or mixed-mode."),
             tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
             enabled=self.config['features'].get('nameserver_role_test', False)
         )
-        def detect_nameserver_role_with_auth_domain(nameserver: str, authority_test_domain: str) -> str:
-            """Test whether a given DNS server is authoritative, a resolver, or mixed-mode by testing
-            for the known authoritative domain.
+        def detect_nameserver_role_with_auth_domain(
+            nameserver: str,
+            authority_test_domain: str
+        ) -> str:
+            """Test whether a given DNS server is authoritative, a resolver,
+            or mixed-mode by testing for the known authoritative domain.
             """
-            return f"Test whether nameserver {nameserver} is authoritative, a resolver, or in mixed-mode by testing for the authoritative domain {authority_test_domain}."
+            return (
+                f"Test whether nameserver {nameserver} is authoritative, a resolver, or in "
+                + f"mixed-mode by testing for the authoritative domain {authority_test_domain}."
+            )
 
         @self.server.prompt(name="detect_dns_root_environment",
-            description="Helps to detect the DNS root server infrastructure that is used for name resolution by the resolver.",
+            description=("Helps to detect the DNS root server infrastructure that is used "
+                         "for name resolution by the resolver."),
             tags=set(("dns", "authority", "root", "nameserver")),
             enabled=self.config['features'].get('detect_dns_root_environment', False)
         )
@@ -784,12 +827,15 @@ class DNSMCPServer:
             return f"Check if the top-level domain of domain {domain} is valid."
 
         @self.server.prompt(name="dns_assistant",
-            description="Interactive assistant that gathers information progressively from the user to help solve a DNS related problem.",
+            description=("Interactive assistant that gathers information progressively from the "
+                         "user to help solve a DNS related problem."),
             tags=set(("interactive", "elicitation", "dns", "assistant", "problem", "help")),
             enabled=self.config['features'].get('basic_dns_assistant', False)
         )
         def dns_assistant() -> str:
-            """Interactive assistant that gathers information progressively from the user to help solve a DNS related problem."""
+            """Interactive assistant that gathers information progressively from the user
+            to help solve a DNS related problem.
+            """
             return "Help me solve a DNS related problem."
 
 async def main() -> None:
