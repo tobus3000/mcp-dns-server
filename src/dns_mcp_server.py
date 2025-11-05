@@ -1,63 +1,69 @@
 """MCP DNS Server - An MCP server for DNS name resolution and troubleshooting."""
+
 import asyncio
+import ipaddress
 import signal
 import sys
-import ipaddress
 from typing import Any, Dict
+
 import yaml
-from fastmcp import FastMCP, Context
+from fastmcp import Context, FastMCP
 from fastmcp.utilities.logging import get_logger
+
+from tools.mdns.browser import discover_mdns_services_impl
+
 try:
     # Try relative import first (when used as part of the package)
     from .knowledge_base.manager import KnowledgeBaseManager
-    from .typedefs import ToolResult
+    from .resolver import Resolver
     from .tools import (
-        simple_dns_lookup_impl,
         advanced_dns_lookup_impl,
-        reverse_dns_lookup_impl,
+        basic_dns_assistant_impl,
         check_dnssec_impl,
+        detect_dns_root_environment_impl,
+        dns_trace_impl,
         dns_troubleshooting_impl,
         lookalike_risk_impl,
-        dns_trace_impl,
         punycode_converter_impl,
-        scan_subnet_for_open_resolvers_impl,
-        scan_server_for_dns_spoofing_impl,
-        test_nameserver_role_impl,
-        detect_dns_root_environment_impl,
-        tld_check_impl,
-        basic_dns_assistant_impl,
+        reverse_dns_lookup_impl,
         run_comprehensive_tests_impl,
+        run_dns_cookie_tests_impl,
         run_edns_tests_impl,
         run_tcp_behavior_tests_impl,
-        run_dns_cookie_tests_impl
+        scan_server_for_dns_spoofing_impl,
+        scan_subnet_for_open_resolvers_impl,
+        simple_dns_lookup_impl,
+        test_nameserver_role_impl,
+        tld_check_impl,
     )
-    from .resolver import Resolver
+    from .typedefs import ToolResult
 except ImportError:
     # Fall back to absolute import (when running as script or standalone)
     from knowledge_base.manager import KnowledgeBaseManager
-    from typedefs import ToolResult
+    from resolver import Resolver
     from tools import (
-        simple_dns_lookup_impl,
         advanced_dns_lookup_impl,
-        reverse_dns_lookup_impl,
+        basic_dns_assistant_impl,
         check_dnssec_impl,
+        detect_dns_root_environment_impl,
+        dns_trace_impl,
         dns_troubleshooting_impl,
         lookalike_risk_impl,
-        dns_trace_impl,
         punycode_converter_impl,
-        scan_subnet_for_open_resolvers_impl,
-        scan_server_for_dns_spoofing_impl,
-        test_nameserver_role_impl,
-        detect_dns_root_environment_impl,
-        tld_check_impl,
-        basic_dns_assistant_impl,
+        reverse_dns_lookup_impl,
         run_comprehensive_tests_impl,
+        run_dns_cookie_tests_impl,
         run_edns_tests_impl,
         run_tcp_behavior_tests_impl,
-        run_dns_cookie_tests_impl
+        scan_server_for_dns_spoofing_impl,
+        scan_subnet_for_open_resolvers_impl,
+        simple_dns_lookup_impl,
+        test_nameserver_role_impl,
+        tld_check_impl,
     )
-    from resolver import Resolver
+    from typedefs import ToolResult
 logger = get_logger(__name__)
+
 
 class DNSMCPServer:
     """MCP Server implementation for DNS operations."""
@@ -73,20 +79,16 @@ class DNSMCPServer:
         self.server = FastMCP(
             name="DNS Resolver MCP Server",
             instructions=(
-                "An MCP server that provides DNS resolution and troubleshooting"
-                " capabilities."
+                "An MCP server that provides DNS resolution and troubleshooting" " capabilities."
             ),
-            log_level="DEBUG"
+            log_level="DEBUG",
         )
         self.logger = get_logger(__name__)
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with open(self.config_path, "r", encoding="utf-8") as f:
                 self.config = yaml.safe_load(f)
         except FileNotFoundError:
-            self.logger.info(
-                "Config file %s not found, using default settings",
-                self.config_path
-            )
+            self.logger.info("Config file %s not found, using default settings", self.config_path)
             self.config = {}
         except (yaml.YAMLError, OSError) as e:
             self.logger.error("Error loading config: %s", e)
@@ -97,7 +99,7 @@ class DNSMCPServer:
         self.register_tools_prompts()
         self.register_resolver_resources()
         # Register KB resources and prompts if enabled in config.
-        if self.config['features'].get('knowledge_base'):
+        if self.config["features"].get("knowledge_base"):
             self.register_knowledge_base_resources()
             self.register_knowledge_base_prompts()
 
@@ -105,64 +107,63 @@ class DNSMCPServer:
         """Initialize the knowledge base manager."""
         self.kb_manager = KnowledgeBaseManager()
         self.logger.info(
-            "Knowledge base initialized with %d articles",
-            len(self.kb_manager.get_all_articles())
+            "Knowledge base initialized with %d articles", len(self.kb_manager.get_all_articles())
         )
 
     def register_tools(self) -> None:
         """Register all DNS-related tools with the MCP server."""
 
-        @self.server.tool(name="simple_dns_lookup",
+        @self.server.tool(
+            name="simple_dns_lookup",
             description="Perform a simple DNS lookup for a hostname to get its IP address",
             tags=set(("dns", "query", "lookup", "a_record")),
-            enabled=True
+            enabled=True,
         )
         async def simple_dns_lookup(hostname: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Querying for A record of `{hostname}`.")
             return await simple_dns_lookup_impl(hostname.strip())
 
-        @self.server.tool(name="advanced_dns_lookup",
+        @self.server.tool(
+            name="advanced_dns_lookup",
             description="Perform an advanced DNS lookup supporting multiple record types",
             tags=set(("dns", "query", "lookup", "advanced")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         async def advanced_dns_lookup(hostname: str, record_type: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Querying for {record_type} record of `{hostname}`.")
-            return await advanced_dns_lookup_impl(
-                hostname.strip(),
-                record_type.strip().upper()
-            )
+            return await advanced_dns_lookup_impl(hostname.strip(), record_type.strip().upper())
 
-        @self.server.tool(name="reverse_dns_lookup",
+        @self.server.tool(
+            name="reverse_dns_lookup",
             description="Perform a reverse DNS lookup to get hostname from IP address",
             tags=set(("dns", "query", "lookup", "reverse")),
-            enabled=self.config['features'].get('reverse_lookup', False)
+            enabled=self.config["features"].get("reverse_lookup", False),
         )
         async def reverse_dns_lookup(ip_address: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Querying PTR record of `{ip_address}`.")
             return await reverse_dns_lookup_impl(ip_address.strip())
 
-        @self.server.tool(name="dns_domain_troubleshooting",
+        @self.server.tool(
+            name="dns_domain_troubleshooting",
             description="Perform comprehensive DNS troubleshooting for a given domain",
             tags=set(("dns", "troubleshooting", "diagnostics", "domain")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         async def dns_domain_troubleshooting(domain: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Performing troubleshooting tasks for domain `{domain}`.")
             return await dns_troubleshooting_impl(domain.strip())
 
-        @self.server.tool(name="dns_server_troubleshooting",
+        @self.server.tool(
+            name="dns_server_troubleshooting",
             description=(
                 "Perform comprehensive DNS server troubleshooting for a given"
                 " domain and nameserver"
             ),
             tags=set(("dns", "troubleshooting", "diagnostics", "server", "nameserver")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         async def dns_server_troubleshooting(
-            domain: str,
-            nameserver: str,
-            ctx: Context
+            domain: str, nameserver: str, ctx: Context
         ) -> ToolResult:
             await ctx.info(
                 f"Performing standard compliance tests against nameserver `{nameserver}` "
@@ -170,156 +171,182 @@ class DNSMCPServer:
             )
             return await run_comprehensive_tests_impl(domain, nameserver)
 
-        @self.server.tool(name="dns_trace",
+        @self.server.tool(
+            name="dns_trace",
             description="Perform a DNS trace to see the resolution path for a domain",
             tags=set(("dns", "query", "troubleshooting", "trace")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         async def dns_trace(domain: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Performing DNS trace for domain `{domain}`.")
             return await dns_trace_impl(domain)
 
-        @self.server.tool(name="dns_server_edns_test",
+        @self.server.tool(
+            name="dns_server_edns_test",
             description="Perform EDNS tests on a given domain and nameserver",
             tags=set(("dns", "edns", "troubleshooting", "diagnostics", "server", "nameserver")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         async def dns_server_edns_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
-            await ctx.info(f"Performing EDNS tests against nameserver `{nameserver}` "
-                           + f"using domain `{domain}` for testing.")
+            await ctx.info(
+                f"Performing EDNS tests against nameserver `{nameserver}` "
+                + f"using domain `{domain}` for testing."
+            )
             return await run_edns_tests_impl(domain, nameserver)
 
-        @self.server.tool(name="dns_udp_tcp_test",
+        @self.server.tool(
+            name="dns_udp_tcp_test",
             description="Perform UDP and TCP behavior tests on a given domain and nameserver.",
             tags=set(("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         async def dns_udp_tcp_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
-            await ctx.info(f"Performing UDP/TCP validation tests against nameserver {nameserver} "
-                           + f"using domain `{domain}` for testing.")
+            await ctx.info(
+                f"Performing UDP/TCP validation tests against nameserver {nameserver} "
+                + f"using domain `{domain}` for testing."
+            )
             return await run_tcp_behavior_tests_impl(domain, nameserver)
 
-        @self.server.tool(name="dns_cookie_test",
+        @self.server.tool(
+            name="dns_cookie_test",
             description="Perform a DNS Cookie behavior test on a given domain and nameserver.",
             tags=set(("dns", "cookie", "edns", "diagnostics", "troubleshooting")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         async def dns_cookie_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
-            await ctx.info(f"Performing DNS Cookie validation against nameserver {nameserver} "
-                           + f"using domain `{domain}` for testing.")
+            await ctx.info(
+                f"Performing DNS Cookie validation against nameserver {nameserver} "
+                + f"using domain `{domain}` for testing."
+            )
             return await run_dns_cookie_tests_impl(domain, nameserver)
 
-        @self.server.tool(name="check_dnssec",
+        @self.server.tool(
+            name="check_dnssec",
             description="Check DNSSEC validation for a given domain",
             tags=set(("dns", "security", "dnssec", "validation")),
-            enabled=self.config['features'].get('dnssec_validation', False)
+            enabled=self.config["features"].get("dnssec_validation", False),
         )
         async def check_dnssec(domain: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Performing DNSSEC verification tasks for domain `{domain}`.")
             return await check_dnssec_impl(domain)
 
-        @self.server.tool(name="lookalike_risk",
+        @self.server.tool(
+            name="lookalike_risk",
             description="Assess lookalike domain risk for a given domain",
             tags=set(("dns", "security", "lookalike", "typosquatting")),
-            enabled=self.config['features'].get('lookalike_risk_tool', False)
+            enabled=self.config["features"].get("lookalike_risk_tool", False),
         )
         async def lookalike_risk(domain: str, ctx: Context, check_dns: bool = False) -> ToolResult:
             await ctx.info(f"Performing lookalike risk verification tests for domain `{domain}`.")
             return await lookalike_risk_impl(domain, check_dns)
 
-        @self.server.tool(name="punycode_converter",
-            description=("Converts any given internationalized domain name (IDN) "
-                         "into punycode format."),
+        @self.server.tool(
+            name="punycode_converter",
+            description=(
+                "Converts any given internationalized domain name (IDN) " "into punycode format."
+            ),
             tags=set(("dns", "idn", "punycode", "converter")),
-            enabled=True
+            enabled=True,
         )
         async def punycode_converter(domain: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Performing punycode conversion for domain `{domain}`.")
             return await punycode_converter_impl(domain)
 
-        @self.server.tool(name="detect_open_resolvers",
+        @self.server.tool(
+            name="detect_open_resolvers",
             description="Scans a given subnet for open resolvers.",
             tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
-            enabled=self.config['features'].get('open_resolver_scan_tool', False)
+            enabled=self.config["features"].get("open_resolver_scan_tool", False),
         )
         async def detect_open_resolvers(cidr: str, domain: str, ctx: Context) -> ToolResult:
             network = ipaddress.ip_network(cidr, strict=False)
             if network.is_private:
                 await ctx.info(f"Performing open resolver scan on private subnet `{cidr}`.")
                 return await scan_subnet_for_open_resolvers_impl(cidr, domain)
-            await ctx.info("The tool is limited to only scan private networks. Provided network "
-                           + f"`{cidr}` is not a private network according to RFC1918.")
+            await ctx.info(
+                "The tool is limited to only scan private networks. Provided network "
+                + f"`{cidr}` is not a private network according to RFC1918."
+            )
             return ToolResult(
                 success=False,
-                error="Tool is limited to only scan private networks in the RFC1918 range."
+                error="Tool is limited to only scan private networks in the RFC1918 range.",
             )
 
-        @self.server.tool(name="detect_dns_spoofing",
+        @self.server.tool(
+            name="detect_dns_spoofing",
             description="Detect DNS interception/spoofing including MAC-level fingerprinting.",
             tags=set(("dns", "spoofing", "mac", "fingerprinting")),
-            enabled=self.config['features'].get('detect_dns_spoofing', False)
+            enabled=self.config["features"].get("detect_dns_spoofing", False),
         )
         async def detect_dns_spoofing(
-            ctx: Context,
-            nameserver: str,
-            domain: str,
-            router_mac: str | None
+            ctx: Context, nameserver: str, domain: str, router_mac: str | None
         ) -> ToolResult:
             await ctx.info(
                 f"Performing DNS spoofing detection against nameserver `{nameserver}` "
-                + f"using domain {domain}.")
+                + f"using domain {domain}."
+            )
             return await scan_server_for_dns_spoofing_impl(
-                nameserver=nameserver,
-                domain=domain,
-                router_mac=router_mac
+                nameserver=nameserver, domain=domain, router_mac=router_mac
             )
 
-        @self.server.tool(name="detect_nameserver_role",
+        @self.server.tool(
+            name="detect_nameserver_role",
             description=(
-                "Test whether a given DNS server is authoritative, "
-                "a resolver, or mixed-mode."),
+                "Test whether a given DNS server is authoritative, " "a resolver, or mixed-mode."
+            ),
             tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
-            enabled=self.config['features'].get('nameserver_role_test', False)
+            enabled=self.config["features"].get("nameserver_role_test", False),
         )
         async def detect_nameserver_role(
-            ctx: Context,
-            nameserver: str,
-            domain: str | None,
-            authority_test_domain: str | None
+            ctx: Context, nameserver: str, domain: str | None, authority_test_domain: str | None
         ) -> ToolResult:
             await ctx.info(
-                f"Performing role check for nameserver `{nameserver}` "
-                + f"using domain {domain}."
-                )
+                f"Performing role check for nameserver `{nameserver}` " + f"using domain {domain}."
+            )
             return await test_nameserver_role_impl(
-                nameserver=nameserver,
-                domain=domain,
-                authority_test_domain=authority_test_domain
+                nameserver=nameserver, domain=domain, authority_test_domain=authority_test_domain
             )
 
-        @self.server.tool(name="detect_dns_root_environment",
+        @self.server.tool(
+            name="detect_dns_root_environment",
             description="Detect the DNS root infrastructure that is used for name resolution.",
             tags=set(("dns", "authority", "root", "nameserver")),
-            enabled=self.config['features'].get('detect_dns_root_environment', False)
+            enabled=self.config["features"].get("detect_dns_root_environment", False),
         )
         async def detect_dns_root_environment(ctx: Context) -> ToolResult:
             await ctx.info("Performing root DNS infrastructure test.")
             return await detect_dns_root_environment_impl()
 
-        @self.server.tool(name="top_level_domain_verification",
+        @self.server.tool(
+            name="top_level_domain_verification",
             description="Verify the top-level domain part of a given domain name.",
             tags=set(("dns", "authority", "root", "TLD", "gTLD")),
-            enabled=self.config['features'].get('top_level_domain_verification', False)
+            enabled=self.config["features"].get("top_level_domain_verification", False),
         )
         async def top_level_domain_verification(ctx: Context, domain: str) -> ToolResult:
             await ctx.info("Performing top-level-domain check.")
             return await tld_check_impl(domain=domain)
 
-        @self.server.tool(name="dns_assistant",
-            description=("Basic DNS support assistant gathers information progressively "
-                         "to help finding a DNS related problem."),
+        @self.server.tool(
+            name="mdns_service_discovery",
+            description="Discover mDNS services on the local network.",
+            tags=set(("mdns", "discovery", "network")),
+            enabled=self.config["features"].get("mdns_service_discovery", False),
+        )
+        async def mdns_service_discovery(
+            ctx: Context, find_all: bool = False, timeout: float = 5.0, ipv6: bool = False
+        ) -> ToolResult:
+            await ctx.info("Starting mDNS service discovery.")
+            return await discover_mdns_services_impl(find_all=find_all, timeout=timeout, ipv6=ipv6)
+
+        @self.server.tool(
+            name="dns_assistant",
+            description=(
+                "Basic DNS support assistant gathers information progressively "
+                "to help finding a DNS related problem."
+            ),
             tags=set(("interactive", "elicitation", "dns", "assistant", "problem", "help")),
-            enabled=self.config['features'].get('basic_dns_assistant', False)
+            enabled=self.config["features"].get("basic_dns_assistant", False),
         )
         async def basic_dns_assistant(ctx: Context) -> ToolResult:
             """Interactive DNS support assistant that gathers additional
@@ -346,8 +373,7 @@ class DNSMCPServer:
         for sig in signals:
             try:
                 asyncio.get_running_loop().add_signal_handler(
-                    sig,
-                    lambda s=sig: asyncio.create_task(self._signal_handler(s))
+                    sig, lambda s=sig: asyncio.create_task(self._signal_handler(s))
                 )
             except NotImplementedError:
                 # Some systems might not support add_signal_handler
@@ -355,7 +381,7 @@ class DNSMCPServer:
 
     async def _signal_handler(self, sig: int) -> None:
         """Handle shutdown signals.
-        
+
         Args:
             sig: Signal number that triggered the handler
         """
@@ -365,7 +391,7 @@ class DNSMCPServer:
 
     async def start(self, host: str = "127.0.0.1", port: int = 3000) -> None:
         """Start the MCP server using HTTP transport.
-        
+
         Args:
             host: The host to bind to. Defaults to "127.0.0.1"
             port: The port to listen on. Defaults to 3000
@@ -386,7 +412,7 @@ class DNSMCPServer:
         """Stop the MCP server gracefully."""
         self.logger.info("Shutting down MCP DNS Server...")
         # Stop the FastMCP server
-        if hasattr(self, 'server'):
+        if hasattr(self, "server"):
             # Since FastMCP doesn't expose a stop() method, we'll clean up manually
             try:
                 # First cancel all running tasks except the current one
@@ -401,8 +427,7 @@ class DNSMCPServer:
                     # Wait for tasks to complete or timeout
                     try:
                         await asyncio.wait_for(
-                            asyncio.gather(*pending, return_exceptions=True),
-                            timeout=5.0
+                            asyncio.gather(*pending, return_exceptions=True), timeout=5.0
                         )
                     except asyncio.TimeoutError:
                         self.logger.warning("Timeout waiting for tasks to stop")
@@ -431,13 +456,10 @@ class DNSMCPServer:
         @self.server.resource(
             uri="resource://root_dns_servers",
             name="root_dns_servers",
-            description="The root servers used by this environment."
+            description="The root servers used by this environment.",
         )
         async def get_dns_root_servers() -> ToolResult:
-            return await advanced_dns_lookup_impl(
-                hostname=".",
-                record_type="NS"
-            )
+            return await advanced_dns_lookup_impl(hostname=".", record_type="NS")
 
     def register_knowledge_base_resources(self) -> None:
         """Register knowledge base articles as MCP resources."""
@@ -445,7 +467,7 @@ class DNSMCPServer:
         @self.server.resource(
             uri="kb://article/{article_id}",
             name="dns_knowledge_base_article",
-            description="Provides access to a specific DNS knowledge base article by ID"
+            description="Provides access to a specific DNS knowledge base article by ID",
         )
         async def get_knowledge_article(article_id: str) -> Dict[str, Any]:
             return await self._get_knowledge_article_impl(article_id)
@@ -453,7 +475,7 @@ class DNSMCPServer:
         @self.server.resource(
             uri="kb://search/{query}",
             name="dns_knowledge_base_search",
-            description="Search the DNS knowledge base for articles matching a query"
+            description="Search the DNS knowledge base for articles matching a query",
         )
         async def search_knowledge_articles(query: str) -> Dict[str, Any]:
             return await self._search_knowledge_articles_impl(query)
@@ -461,7 +483,7 @@ class DNSMCPServer:
         @self.server.resource(
             uri="kb://categories",
             name="dns_knowledge_base_categories",
-            description="Get all available categories in the DNS knowledge base"
+            description="Get all available categories in the DNS knowledge base",
         )
         async def get_knowledge_categories() -> Dict[str, Any]:
             return await self._get_knowledge_categories_impl()
@@ -469,7 +491,7 @@ class DNSMCPServer:
         @self.server.resource(
             uri="kb://category/{category}",
             name="dns_knowledge_base_by_category",
-            description="Get DNS knowledge base articles by category"
+            description="Get DNS knowledge base articles by category",
         )
         async def get_knowledge_by_category(category: str) -> Dict[str, Any]:
             return await self._get_knowledge_by_category_impl(category)
@@ -481,41 +503,30 @@ class DNSMCPServer:
             return article
         return {
             "error": f"Knowledge base article with ID '{article_id}' not found",
-            "available_articles": list(self.kb_manager.get_all_articles().keys())
+            "available_articles": list(self.kb_manager.get_all_articles().keys()),
         }
 
     async def _search_knowledge_articles_impl(self, query: str) -> Dict[str, Any]:
         """Implementation to search knowledge base articles by query."""
         results = self.kb_manager.search_articles(query)
-        return {
-            "query": query,
-            "results": results,
-            "count": len(results)
-        }
+        return {"query": query, "results": results, "count": len(results)}
 
     async def _get_knowledge_categories_impl(self) -> Dict[str, Any]:
         """Implementation to get all knowledge base categories."""
         categories = self.kb_manager.get_all_categories()
-        return {
-            "categories": categories,
-            "count": len(categories)
-        }
+        return {"categories": categories, "count": len(categories)}
 
     async def _get_knowledge_by_category_impl(self, category: str) -> Dict[str, Any]:
         """Implementation to get knowledge base articles by category."""
         articles = self.kb_manager.get_articles_by_category(category)
-        return {
-            "category": category,
-            "articles": articles,
-            "count": len(articles)
-        }
+        return {"category": category, "articles": articles, "count": len(articles)}
 
     def register_knowledge_base_prompts(self) -> None:
         """Register prompts to simplify interaction with the knowledge base."""
 
         @self.server.prompt(
             name="dns_troubleshooting_help",
-            description="Get help with DNS troubleshooting using the knowledge base"
+            description="Get help with DNS troubleshooting using the knowledge base",
         )
         def dns_troubleshooting_help() -> str:
             """Get help with DNS troubleshooting using the knowledge base."""
@@ -526,7 +537,7 @@ class DNSMCPServer:
 
         @self.server.prompt(
             name="dns_configuration_help",
-            description="Get help with DNS configuration using the knowledge base"
+            description="Get help with DNS configuration using the knowledge base",
         )
         def dns_configuration_help() -> str:
             """Get help with DNS configuration using the knowledge base."""
@@ -537,7 +548,7 @@ class DNSMCPServer:
 
         @self.server.prompt(
             name="dns_security_help",
-            description="Get help with DNS security best practices using the knowledge base"
+            description="Get help with DNS security best practices using the knowledge base",
         )
         def dns_security_help() -> str:
             """Get help with DNS security best practices using the knowledge base."""
@@ -548,10 +559,12 @@ class DNSMCPServer:
 
     def register_tools_prompts(self) -> None:
         """Register prompts for tools with the server."""
-        @self.server.prompt(name="resolve_hostname",
+
+        @self.server.prompt(
+            name="resolve_hostname",
             description="Resolve a hostname to its IP address.",
             tags=set(("dns", "query", "lookup", "a_record")),
-            enabled=True
+            enabled=True,
         )
         def resolve_hostname(hostname: str) -> str:
             """Resolve a hostname to its IP address."""
@@ -560,10 +573,11 @@ class DNSMCPServer:
                 " lookup tool provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="resolve_ip",
+        @self.server.prompt(
+            name="resolve_ip",
             description="Resolve an IP address to hostname using reverse DNS lookup.",
             tags=set(("dns", "query", "lookup", "reverse")),
-            enabled=self.config['features'].get('reverse_lookup', False)
+            enabled=self.config["features"].get("reverse_lookup", False),
         )
         def resolve_ip(ip: str) -> str:
             """Resolve an IP address to hostname using reverse DNS lookup."""
@@ -572,10 +586,11 @@ class DNSMCPServer:
                 " provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="advanced_lookup",
+        @self.server.prompt(
+            name="advanced_lookup",
             description="Perform an advanced DNS lookup supporting multiple record types",
             tags=set(("dns", "query", "lookup", "advanced")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         def advanced_lookup(hostname: str, record_type: str) -> str:
             """Perform an advanced DNS lookup for a hostname and record type."""
@@ -585,10 +600,11 @@ class DNSMCPServer:
                 " by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="dns_domain_troubleshoot",
+        @self.server.prompt(
+            name="dns_domain_troubleshoot",
             description="Perform comprehensive DNS troubleshooting for a given domain",
             tags=set(("dns", "troubleshooting", "diagnostics", "domain")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         def dns_domain_troubleshoot(domain: str) -> str:
             """Perform DNS troubleshooting for a domain."""
@@ -598,10 +614,11 @@ class DNSMCPServer:
                 " by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="dns_domain_on_server_troubleshoot",
+        @self.server.prompt(
+            name="dns_domain_on_server_troubleshoot",
             description="Perform comprehensive DNS troubleshooting for a given domain",
             tags=set(("dns", "troubleshooting", "diagnostics", "domain")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         def dns_domain_on_server_troubleshoot(domain: str, nameserver: str) -> str:
             """Perform DNS troubleshooting for a domain against a specific DNS server."""
@@ -611,13 +628,14 @@ class DNSMCPServer:
                 " by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="dns_server_troubleshoot",
+        @self.server.prompt(
+            name="dns_server_troubleshoot",
             description=(
                 "Perform comprehensive DNS server troubleshooting for a given"
                 " domain and nameserver"
             ),
             tags=set(("dns", "troubleshooting", "diagnostics", "server", "nameserver")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         def dns_server_troubleshoot(domain: str, nameserver: str) -> str:
             """Perform comprehensive DNS server troubleshooting."""
@@ -627,10 +645,11 @@ class DNSMCPServer:
                 " tool provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="dns_domain_trace",
+        @self.server.prompt(
+            name="dns_domain_trace",
             description="Perform a DNS trace to see the resolution path for a domain",
             tags=set(("dns", "query", "troubleshooting", "trace")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         def dns_domain_trace(domain: str) -> str:
             """Perform a DNS trace for a domain."""
@@ -639,10 +658,11 @@ class DNSMCPServer:
                 " tool provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="dns_edns_test",
+        @self.server.prompt(
+            name="dns_edns_test",
             description="Perform EDNS tests on a given domain and nameserver",
             tags=set(("dns", "edns", "troubleshooting", "diagnostics", "server", "nameserver")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         def dns_edns_test(domain: str, nameserver: str) -> str:
             """Perform EDNS tests for a nameserver."""
@@ -652,10 +672,11 @@ class DNSMCPServer:
                 " tool provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="dns_udp_tcp_test",
+        @self.server.prompt(
+            name="dns_udp_tcp_test",
             description="Perform UDP and TCP behavior tests on a given domain and nameserver",
             tags=set(("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         def dns_udp_tcp_test(domain: str, nameserver: str) -> str:
             """Perform UDP and TCP behavior tests for a nameserver."""
@@ -665,10 +686,11 @@ class DNSMCPServer:
                 " provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="check_dns_cookie",
+        @self.server.prompt(
+            name="check_dns_cookie",
             description="Perform DNS Cookie behavior test on a given domain and nameserver",
             tags=set(("dns", "troubleshooting", "diagnostics", "cookie", "edns", "dnscookie")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         def dns_cookie_test(domain: str, nameserver: str) -> str:
             """Perform DNS Cookie test against a nameserver."""
@@ -677,22 +699,24 @@ class DNSMCPServer:
                 "using the dns cookie test tool provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="check_dnssec",
+        @self.server.prompt(
+            name="check_dnssec",
             description="Check DNSSEC validation for a given domain",
             tags=set(("dns", "security", "dnssec", "validation")),
-            enabled=self.config['features'].get('dnssec_validation', False)
+            enabled=self.config["features"].get("dnssec_validation", False),
         )
         def check_dnssec(domain: str) -> str:
             """Get DNSSEC status of a domain."""
             return (
                 f"Get DNSSEC status of domain {domain} using the check_dnssec"
                 " tool provided by the DNS MCP Server."
-        )
+            )
 
-        @self.server.prompt(name="lookalike_risk",
+        @self.server.prompt(
+            name="lookalike_risk",
             description="Assess lookalike domain risk for a given domain",
             tags=set(("dns", "security", "lookalike", "typosquatting")),
-            enabled=self.config['features'].get('lookalike_risk_tool', False)
+            enabled=self.config["features"].get("lookalike_risk_tool", False),
         )
         def lookalike_risk(domain: str, check_dns: bool = False) -> str:
             """Assess lookalike domain risk."""
@@ -701,11 +725,14 @@ class DNSMCPServer:
                 " lookalike_risk tool provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="lookalike_risk_check_dns",
-            description=("Assess lookalike domain risk for a given domain and "
-                         "resolve all possible variants"),
+        @self.server.prompt(
+            name="lookalike_risk_check_dns",
+            description=(
+                "Assess lookalike domain risk for a given domain and "
+                "resolve all possible variants"
+            ),
             tags=set(("dns", "security", "lookalike", "typosquatting")),
-            enabled=self.config['features'].get('lookalike_risk_tool', False)
+            enabled=self.config["features"].get("lookalike_risk_tool", False),
         )
         def lookalike_risk_check_dns(domain: str, check_dns: bool = True) -> str:
             """Assess lookalike domain risk and resolve all variants."""
@@ -714,42 +741,47 @@ class DNSMCPServer:
                 " lookalike_risk tool provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="supported_record_types",
-            description=("Return the DNS resource record types that are "
-                         "supported by this MCP server."),
+        @self.server.prompt(
+            name="supported_record_types",
+            description=(
+                "Return the DNS resource record types that are " "supported by this MCP server."
+            ),
             tags=set(("dns", "record_types")),
-            enabled=self.config['features'].get('advanced_troubleshooting', False)
+            enabled=self.config["features"].get("advanced_troubleshooting", False),
         )
         def supported_record_types() -> str:
             """Get supported DNS record types."""
-            types = ', '.join(sorted(Resolver.allowed_record_types))
+            types = ", ".join(sorted(Resolver.allowed_record_types))
             return (
                 f"The supported DNS record types are: {types}. Use these types with the"
                 " advanced dns lookup tool provided by the DNS MCP Server."
             )
 
-        @self.server.prompt(name="punycode_converter",
+        @self.server.prompt(
+            name="punycode_converter",
             description="Return the punycode version of an internationalized domain name (IDN).",
             tags=set(("dns", "idn", "punycode", "converter")),
-            enabled=True
+            enabled=True,
         )
         def punycode_converter(domain: str) -> str:
             """Convert IDN domain name to punycode."""
             return f"Convert the domain {domain} to punycode format."
 
-        @self.server.prompt(name="detect_open_resolvers",
+        @self.server.prompt(
+            name="detect_open_resolvers",
             description="Scan a subnet in CIDR notation for open DNS resolvers.",
             tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
-            enabled=self.config['features'].get('open_resolver_scan_tool', False)
+            enabled=self.config["features"].get("open_resolver_scan_tool", False),
         )
         def detect_open_resolvers(cidr: str, domain: str) -> str:
             """Scan a subnet in CIDR notation for open DNS resolvers."""
             return f"Scan for open resolvers in subnet {cidr} using domain {domain}."
 
-        @self.server.prompt(name="detect_dns_spoofing",
+        @self.server.prompt(
+            name="detect_dns_spoofing",
             description="Detect DNS interception/spoofing.",
             tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
-            enabled=self.config['features'].get('open_resolver_scan_tool', False)
+            enabled=self.config["features"].get("open_resolver_scan_tool", False),
         )
         def detect_dns_spoofing(nameserver: str, domain: str) -> str:
             """Detect DNS interception/spoofing including MAC-level fingerprinting."""
@@ -758,15 +790,14 @@ class DNSMCPServer:
                 f"IP using domain {domain}."
             )
 
-        @self.server.prompt(name="detect_dns_spoofing_with_router_mac",
+        @self.server.prompt(
+            name="detect_dns_spoofing_with_router_mac",
             description="Detect DNS interception/spoofing including MAC-level fingerprinting.",
             tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
-            enabled=self.config['features'].get('open_resolver_scan_tool', False)
+            enabled=self.config["features"].get("open_resolver_scan_tool", False),
         )
         def detect_dns_spoofing_with_router_mac(
-            nameserver: str,
-            domain: str,
-            router_mac: str
+            nameserver: str, domain: str, router_mac: str
         ) -> str:
             """Detect DNS interception/spoofing including MAC-level fingerprinting."""
             return (
@@ -774,11 +805,13 @@ class DNSMCPServer:
                 + f"and nameserver IP {nameserver} using domain {domain}."
             )
 
-        @self.server.prompt(name="detect_nameserver_role",
-            description=("Test whether a given DNS server is authoritative, "
-                         "a resolver, or mixed-mode."),
+        @self.server.prompt(
+            name="detect_nameserver_role",
+            description=(
+                "Test whether a given DNS server is authoritative, " "a resolver, or mixed-mode."
+            ),
             tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
-            enabled=self.config['features'].get('nameserver_role_test', False)
+            enabled=self.config["features"].get("nameserver_role_test", False),
         )
         def detect_nameserver_role(nameserver: str) -> str:
             """Test whether a given DNS server is authoritative, a resolver, or mixed-mode."""
@@ -787,15 +820,16 @@ class DNSMCPServer:
                 + "a resolver, or in mixed-mode."
             )
 
-        @self.server.prompt(name="detect_nameserver_role_with_auth_domain",
-            description=("Test whether a given DNS server is authoritative, "
-                         "a resolver, or mixed-mode."),
+        @self.server.prompt(
+            name="detect_nameserver_role_with_auth_domain",
+            description=(
+                "Test whether a given DNS server is authoritative, " "a resolver, or mixed-mode."
+            ),
             tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
-            enabled=self.config['features'].get('nameserver_role_test', False)
+            enabled=self.config["features"].get("nameserver_role_test", False),
         )
         def detect_nameserver_role_with_auth_domain(
-            nameserver: str,
-            authority_test_domain: str
+            nameserver: str, authority_test_domain: str
         ) -> str:
             """Test whether a given DNS server is authoritative, a resolver,
             or mixed-mode by testing for the known authoritative domain.
@@ -805,11 +839,14 @@ class DNSMCPServer:
                 + f"mixed-mode by testing for the authoritative domain {authority_test_domain}."
             )
 
-        @self.server.prompt(name="detect_dns_root_environment",
-            description=("Helps to detect the DNS root server infrastructure that is used "
-                         "for name resolution by the resolver."),
+        @self.server.prompt(
+            name="detect_dns_root_environment",
+            description=(
+                "Helps to detect the DNS root server infrastructure that is used "
+                "for name resolution by the resolver."
+            ),
             tags=set(("dns", "authority", "root", "nameserver")),
-            enabled=self.config['features'].get('detect_dns_root_environment', False)
+            enabled=self.config["features"].get("detect_dns_root_environment", False),
         )
         def detect_dns_root_environment() -> str:
             """Test whether a given DNS server is authoritative, a resolver,
@@ -817,26 +854,46 @@ class DNSMCPServer:
             """
             return "Detect the DNS root server infrastructure that is used for name resolution."
 
-        @self.server.prompt(name="top_level_domain_verification",
+        @self.server.prompt(
+            name="top_level_domain_verification",
             description="Check if the top-level domain of a given domain is valid.",
             tags=set(("dns", "authority", "root", "TLD", "gTLD")),
-            enabled=self.config['features'].get('top_level_domain_verification', False)
+            enabled=self.config["features"].get("top_level_domain_verification", False),
         )
         def top_level_domain_verification(domain: str) -> str:
             """Check if the top-level domain of a given domain is valid."""
             return f"Check if the top-level domain of domain {domain} is valid."
 
-        @self.server.prompt(name="dns_assistant",
-            description=("Interactive assistant that gathers information progressively from the "
-                         "user to help solve a DNS related problem."),
+        @self.server.prompt(
+            name="mdns_service_discovery",
+            description="Discover mDNS services on the local network.",
+            tags=set(("mdns", "discovery", "network")),
+            enabled=self.config["features"].get("mdns_service_discovery", False),
+        )
+        def mdns_service_discovery(
+            find_all: bool = False, timeout: float = 5.0, ipv6: bool = False
+        ) -> str:
+            """Discover mDNS services on the local network."""
+            return (
+                f"Discover mDNS services on the local network with find_all={find_all}, "
+                + f"timeout={timeout}, ipv6={ipv6}."
+            )
+
+        @self.server.prompt(
+            name="dns_assistant",
+            description=(
+                "Interactive assistant that gathers information progressively from the "
+                "user to help solve a DNS related problem."
+            ),
             tags=set(("interactive", "elicitation", "dns", "assistant", "problem", "help")),
-            enabled=self.config['features'].get('basic_dns_assistant', False)
+            enabled=self.config["features"].get("basic_dns_assistant", False),
         )
         def dns_assistant() -> str:
             """Interactive assistant that gathers information progressively from the user
             to help solve a DNS related problem.
             """
             return "Help me solve a DNS related problem."
+
 
 async def main() -> None:
     """Main entry point."""

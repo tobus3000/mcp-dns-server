@@ -1,7 +1,10 @@
-import dns.flags
 from typing import Optional
-from typedefs import ToolResult
+
+import dns.flags
+
 from resolver import Resolver
+from typedefs import ToolResult
+
 
 async def test_nameserver_role(
     nameserver: str,
@@ -36,9 +39,7 @@ async def test_nameserver_role(
 
     if authority_test_domain:
         soa_result = await resolver.async_resolve(
-            authority_test_domain,
-            "SOA",
-            nameserver=nameserver
+            authority_test_domain, "SOA", nameserver=nameserver
         )
         if soa_result.success and soa_result.response:
             if soa_result.response.flags & dns.flags.AA:
@@ -46,14 +47,10 @@ async def test_nameserver_role(
 
     # --- 3. Evaluate and report ---
     if results["authoritative"] and not results["recursive"]:
-        return ToolResult(
-            success=True,
-            output=f"{nameserver} is an *authoritative* nameserver."
-        )
+        return ToolResult(success=True, output=f"{nameserver} is an *authoritative* nameserver.")
     if results["recursive"] and not results["authoritative"]:
         return ToolResult(
-            success=True,
-            output=f"{nameserver} is a *DNS resolver* (recursive server)."
+            success=True, output=f"{nameserver} is a *DNS resolver* (recursive server)."
         )
     if results["authoritative"] and results["recursive"]:
         return ToolResult(
@@ -61,15 +58,18 @@ async def test_nameserver_role(
             output=f"{nameserver} appears to operate in *mixed mode* "
             f"(both authoritative and recursive).\n"
             f"Recommendation: Split authoritative and caching roles "
-            f"onto separate servers or IP addresses for better security and performance."
+            f"onto separate servers or IP addresses for better security and performance.",
         )
     return ToolResult(
         success=False,
-        error="Could not determine {nameserver}'s role — the server may be " 
-        + "unreachable or misconfigured."
+        error="Could not determine {nameserver}'s role — the server may be "
+        + "unreachable or misconfigured.",
     )
 
-async def test_nameserver_role_impl(nameserver: str, domain: str | None, authority_test_domain: str | None) -> ToolResult:
+
+async def test_nameserver_role_impl(
+    nameserver: str, domain: str | None, authority_test_domain: str | None
+) -> ToolResult:
     """Test whether a given DNS server is authoritative, a resolver, or mixed-mode.
 
     Args:
@@ -84,10 +84,9 @@ async def test_nameserver_role_impl(nameserver: str, domain: str | None, authori
     if not domain:
         domain = "example.com"
     return await test_nameserver_role(
-                nameserver=nameserver,
-                domain=domain,
-                authority_test_domain=authority_test_domain
+        nameserver=nameserver, domain=domain, authority_test_domain=authority_test_domain
     )
+
 
 # Example usage
 if __name__ == "__main__":

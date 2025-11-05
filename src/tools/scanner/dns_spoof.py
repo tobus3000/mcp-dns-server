@@ -1,7 +1,10 @@
 import asyncio
 import time
-from scapy.all import IP, UDP, DNS, DNSQR, sr1, AsyncSniffer, ICMP, Ether
+
+from scapy.all import DNS, DNSQR, ICMP, IP, UDP, AsyncSniffer, Ether, sr1
+
 from typedefs import ToolResult
+
 
 async def detect_dns_spoof_async(
     target_dns_ip: str,
@@ -9,11 +12,11 @@ async def detect_dns_spoof_async(
     router_mac: str | None = None,
     expected_answer: str | None = None,
     timeout: int = 2,
-    iface: str | None = None
+    iface: str | None = None,
 ) -> ToolResult:
     """
     Detect DNS interception/spoofing including MAC-level fingerprinting.
-    
+
     Args:
         target_dns_ip: IP of DNS server we intend to query (possibly in another VLAN)
         router_mac: MAC address of UDM Pro or local router to detect spoofing
@@ -53,11 +56,7 @@ async def detect_dns_spoof_async(
 
     resp = response_container.get("packet")
     if not resp:
-        return ToolResult(
-            success=False,
-            error="No DNS response received.",
-            details={}
-        )
+        return ToolResult(success=False, error="No DNS response received.", details={})
 
     observed_server = resp[IP].src
     observed_ttl = resp[IP].ttl
@@ -100,33 +99,35 @@ async def detect_dns_spoof_async(
         output={
             "observed_server": observed_server,
             "tampered": tampered,
-            "notes": " ".join(notes) if notes else "No anomalies detected."
+            "notes": " ".join(notes) if notes else "No anomalies detected.",
         },
         details={
             "domain": domain,
             "observed_mac": observed_mac,
             "answer": str(answer),
             "ttl": observed_ttl,
-            "rtt_ms": round(rtt, 2)
-        }
+            "rtt_ms": round(rtt, 2),
+        },
     )
 
-async def scan_server_for_dns_spoofing_impl(nameserver: str, domain: str, router_mac: str | None = None) -> ToolResult:
+
+async def scan_server_for_dns_spoofing_impl(
+    nameserver: str, domain: str, router_mac: str | None = None
+) -> ToolResult:
     """Detect DNS interception/spoofing including MAC-level fingerprinting.
-    
+
     Args:
         nameserver (str): The nameserver IP to be tested.
         domain (str): The domain to use for the spoofing detection.
         router_mac (str): The MAC address of the default gateway (or L3 router).
-        
+
     Returns:
         ToolResult: Complete report of the spoofing detection operation.
     """
     return await detect_dns_spoof_async(
-        target_dns_ip=nameserver,
-        domain=domain,
-        router_mac=router_mac        
+        target_dns_ip=nameserver, domain=domain, router_mac=router_mac
     )
+
 
 if __name__ == "__main__":
     import argparse

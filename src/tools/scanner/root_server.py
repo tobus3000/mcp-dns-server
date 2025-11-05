@@ -1,7 +1,9 @@
 import asyncio
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from resolver import Resolver
 from typedefs import ToolResult
+
 
 class RootServerDetector:
     """Asynchronous detector for identifying which DNS root infrastructure is in use."""
@@ -79,8 +81,9 @@ class RootServerDetector:
                 ip = str(addr_result.response.answer[0][0])
                 loop = asyncio.get_event_loop()
                 try:
-                    fut = loop.create_datagram_endpoint(lambda: asyncio.DatagramProtocol(),
-                                                        remote_addr=(ip, 53))
+                    fut = loop.create_datagram_endpoint(
+                        lambda: asyncio.DatagramProtocol(), remote_addr=(ip, 53)
+                    )
                     transport, _ = await asyncio.wait_for(fut, timeout=timeout)
                     transport.close()
                     return True
@@ -130,16 +133,15 @@ class RootServerDetector:
                 details={
                     "is_official_roots": root_info.get("is_official"),
                     "environment": access_info.get("environment"),
-                    "reachable_root_count": len(access_info.get("reachable_servers", []))
-                }
+                    "reachable_root_count": len(access_info.get("reachable_servers", [])),
+                },
             )
 
         except Exception as e:
             return ToolResult(
-                success=False,
-                error=str(e),
-                details={"exception_type": type(e).__name__}
+                success=False, error=str(e), details={"exception_type": type(e).__name__}
             )
+
 
 async def detect_dns_root_environment_impl() -> ToolResult:
     """Test what DNS root infrastructure is being used by the resolver.
@@ -150,8 +152,10 @@ async def detect_dns_root_environment_impl() -> ToolResult:
     detector = RootServerDetector()
     return await detector.detect_environment()
 
+
 # Example usage
 if __name__ == "__main__":
+
     async def main():
         detector = RootServerDetector()
         result = await detector.detect_environment()

@@ -1,12 +1,12 @@
 import asyncio
 import ipaddress
+
 from resolver import Resolver
-from typedefs import ToolResult, OpenResolver
+from typedefs import OpenResolver, ToolResult
+
 
 async def check_open_resolver(
-    target: str,
-    domain: str = "example.com",
-    timeout: float = 2.0
+    target: str, domain: str = "example.com", timeout: float = 2.0
 ) -> OpenResolver:
     """
     Probe a single target IP to determine if it behaves as an open resolver.
@@ -43,16 +43,10 @@ async def check_open_resolver(
             rcode=result.rcode,
             rcode_text=result.rcode_text,
             duration=duration,
-            details={
-                "recursive answer": has_ra,
-                "answer_count": answer_count,
-                "note": note
-            }
+            details={"recursive answer": has_ra, "answer_count": answer_count, "note": note},
         )
-    return OpenResolver(
-        success=success,
-        ip=target
-    )
+    return OpenResolver(success=success, ip=target)
+
 
 async def detect_open_resolvers_in_subnet(
     cidr: str,
@@ -68,14 +62,11 @@ async def detect_open_resolvers_in_subnet(
     sem = asyncio.Semaphore(concurrency)
     open_res = []
     open_res_details = []
+
     async def worker(ip: str):
         async with sem:
             try:
-                scan_result = await check_open_resolver(
-                    ip,
-                    domain=domain,
-                    timeout=timeout
-                )
+                scan_result = await check_open_resolver(ip, domain=domain, timeout=timeout)
                 if scan_result.success:
                     open_res.append(ip)
                     open_res_details.append(scan_result)
@@ -92,11 +83,11 @@ async def detect_open_resolvers_in_subnet(
         rating = "very high"
     if cnt > 85:
         rating = "abnormaly high"
-    percent = "%.2f" % float((100/network.num_addresses)*cnt)
+    percent = "%.2f" % float((100 / network.num_addresses) * cnt)
     note = [
         f"A {rating} count of {cnt} open DNS resolvers has been "
         + f"found in network {network.exploded}.",
-        f"{percent}% of hosts in the network are open resolvers."
+        f"{percent}% of hosts in the network are open resolvers.",
     ]
     if cnt > 2:
         note.append(
@@ -116,12 +107,11 @@ async def detect_open_resolvers_in_subnet(
             "network": network.exploded,
             "total_addresses": network.num_addresses,
             "open_resolver_count": cnt,
-            "open_resolver_ip_list": open_res
+            "open_resolver_ip_list": open_res,
         },
-        details={
-            "open_resolver_details": open_res_details
-        }
+        details={"open_resolver_details": open_res_details},
     )
+
 
 async def scan_subnet_for_open_resolvers_impl(cidr: str, domain: str) -> ToolResult:
     """Perform a subnet wide scan for open resolvers.
@@ -134,11 +124,9 @@ async def scan_subnet_for_open_resolvers_impl(cidr: str, domain: str) -> ToolRes
         ToolResult: Complete list of discovered open resolvers and more details.
     """
     return await detect_open_resolvers_in_subnet(
-        cidr=cidr,
-        domain=domain,
-        timeout=2.0,
-        concurrency=200
+        cidr=cidr, domain=domain, timeout=2.0, concurrency=200
     )
+
 
 # Example CLI runner
 if __name__ == "__main__":

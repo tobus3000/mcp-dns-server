@@ -1,9 +1,12 @@
 """Knowledge Base Manager for DNS MCP Server."""
-import os
+
 import glob
-from typing import Dict, List, Optional
+import os
 from pathlib import Path
+from typing import Dict, List, Optional
+
 import yaml
+
 
 class KnowledgeBaseManager:
     """Manages DNS knowledge base articles."""
@@ -12,12 +15,12 @@ class KnowledgeBaseManager:
         """Initialize the knowledge base manager.
 
         Args:
-            kb_dir: Directory containing knowledge base articles. 
+            kb_dir: Directory containing knowledge base articles.
                    If None, defaults to the package's data directory.
         """
         if kb_dir is None:
             # Get the directory where this module is located
-            kb_dir = os.path.join(os.path.dirname(__file__), 'data')
+            kb_dir = os.path.join(os.path.dirname(__file__), "data")
 
         self.kb_dir = kb_dir
         self._ensure_kb_directory()
@@ -29,7 +32,7 @@ class KnowledgeBaseManager:
 
     def _load_all_articles(self) -> Dict[str, Dict]:
         """Load all knowledge base articles from the directory.
-        
+
         Returns:
             Dictionary mapping article IDs to article content
         """
@@ -41,10 +44,10 @@ class KnowledgeBaseManager:
 
         for file_path in yaml_files:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     article_data = yaml.safe_load(f)
-                    if article_data and 'id' in article_data:
-                        articles[article_data['id']] = article_data
+                    if article_data and "id" in article_data:
+                        articles[article_data["id"]] = article_data
             except Exception as e:
                 print(f"Error loading knowledge base article {file_path}: {e}")
 
@@ -52,10 +55,10 @@ class KnowledgeBaseManager:
 
     def get_article_by_id(self, article_id: str) -> Optional[Dict]:
         """Get a knowledge base article by its ID.
-        
+
         Args:
             article_id: The ID of the article to retrieve
-            
+
         Returns:
             The article content if found, None otherwise
         """
@@ -63,24 +66,25 @@ class KnowledgeBaseManager:
 
     def get_articles_by_category(self, category: str) -> List[Dict]:
         """Get all articles in a specific category.
-        
+
         Args:
             category: The category to filter by
-            
+
         Returns:
             List of articles in the specified category
         """
         return [
-            article for article in self.articles.values()
-            if article.get('category', '').lower() == category.lower()
+            article
+            for article in self.articles.values()
+            if article.get("category", "").lower() == category.lower()
         ]
 
     def search_articles(self, query: str) -> List[Dict]:
         """Search for articles containing the query string.
-        
+
         Args:
             query: String to search for in article titles, content, or tags
-            
+
         Returns:
             List of matching articles
         """
@@ -89,9 +93,9 @@ class KnowledgeBaseManager:
 
         for article in self.articles.values():
             # Search in title, content, and tags
-            title_match = query_lower in article.get('title', '').lower()
-            content_match = query_lower in article.get('content', '').lower()
-            tags_match = any(query_lower in tag.lower() for tag in article.get('tags', []))
+            title_match = query_lower in article.get("title", "").lower()
+            content_match = query_lower in article.get("content", "").lower()
+            tags_match = any(query_lower in tag.lower() for tag in article.get("tags", []))
 
             if title_match or content_match or tags_match:
                 matching_articles.append(article)
@@ -100,20 +104,20 @@ class KnowledgeBaseManager:
 
     def get_all_categories(self) -> List[str]:
         """Get all unique categories in the knowledge base.
-        
+
         Returns:
             List of all categories
         """
         categories = set()
         for article in self.articles.values():
-            category = article.get('category')
+            category = article.get("category")
             if category:
                 categories.add(category)
         return sorted(list(categories))
 
     def get_all_articles(self) -> Dict[str, Dict]:
         """Get all articles.
-        
+
         Returns:
             Dictionary of all articles
         """
@@ -121,22 +125,22 @@ class KnowledgeBaseManager:
 
     def add_article(self, article_data: Dict) -> bool:
         """Add a new article to the knowledge base.
-        
+
         Args:
             article_data: Dictionary containing article data
-            
+
         Returns:
             True if successfully added, False otherwise
         """
-        if 'id' not in article_data:
+        if "id" not in article_data:
             print("Error: Article must have an 'id' field")
             return False
 
-        article_id = article_data['id']
+        article_id = article_data["id"]
         file_path = os.path.join(self.kb_dir, f"{article_id}.yaml")
 
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 yaml.dump(article_data, f, default_flow_style=False, allow_unicode=True)
 
             # Reload articles to include the new one

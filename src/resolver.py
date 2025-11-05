@@ -4,28 +4,31 @@ This module provides a Resolver class that encapsulates DNS resolution functiona
 including DNSSEC-related record fetching and domain name manipulation. It uses
 dnspython as the underlying DNS resolution engine.
 """
-import socket
+
 import asyncio
+import socket
 import time
-from typing import Tuple, Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
+
+import dns.asyncquery
 import dns.exception
+import dns.flags
+import dns.message
 import dns.name
+import dns.query
+import dns.rcode
+import dns.rdataclass
+import dns.rdatatype
+import dns.rdtypes.ANY.SOA
 import dns.resolver
 import dns.reversename
-import dns.rdtypes.ANY.SOA
 import dns.rrset
-import dns.rcode
-import dns.message
-import dns.rdatatype
-import dns.rdataclass
-import dns.flags
-import dns.asyncquery
-import dns.query
 import dns.zone
+
 try:
-    from .typedefs import QueryResult, AXFRResult
+    from .typedefs import AXFRResult, QueryResult
 except ImportError:
-    from typedefs import QueryResult, AXFRResult
+    from typedefs import AXFRResult, QueryResult
 
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA
@@ -34,6 +37,7 @@ Message = dns.message.Message
 
 DEFAULT_TIMEOUT = 5.0
 DEFAULT_EDNS_SIZE = 1232  # Conservative EDNS buffer size
+
 
 class Resolver:
     """DNS resolver class providing high-level DNS resolution functionality.
@@ -45,18 +49,39 @@ class Resolver:
         default_timeout (float): Default timeout for DNS queries in seconds.
         resolver (dns.resolver.Resolver): Underlying dnspython resolver instance.
     """
+
     allowed_record_types = [
-        "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "PTR", "SRV",
-        "DNSKEY", "DS", "RRSIG", "NSEC", "NSEC3", "NSEC3PARAM", "CAA", "SPF", "LOC",
-        "HINFO", "RP", "AFSDB", "CERT", "DNAME", "SSHFP", "TLSA", "URI", "SMIMEA",
-        "OPENPGPKEY"
+        "A",
+        "AAAA",
+        "CNAME",
+        "MX",
+        "TXT",
+        "NS",
+        "SOA",
+        "PTR",
+        "SRV",
+        "DNSKEY",
+        "DS",
+        "RRSIG",
+        "NSEC",
+        "NSEC3",
+        "NSEC3PARAM",
+        "CAA",
+        "SPF",
+        "LOC",
+        "HINFO",
+        "RP",
+        "AFSDB",
+        "CERT",
+        "DNAME",
+        "SSHFP",
+        "TLSA",
+        "URI",
+        "SMIMEA",
+        "OPENPGPKEY",
     ]
 
-    def __init__(
-        self,
-        nameservers: Optional[List[str]] = None,
-        timeout: float = DEFAULT_TIMEOUT
-    ):
+    def __init__(self, nameservers: Optional[List[str]] = None, timeout: float = DEFAULT_TIMEOUT):
         """Initialize the resolver with optional nameservers and timeout.
 
         Args:
@@ -67,7 +92,7 @@ class Resolver:
         self.resolver = dns.resolver.Resolver(configure=True)
         self.resolver.lifetime = timeout
         if nameservers:
-            #TODO: Check if nameservers is list of IPs. Convert to IP if FQDNs.
+            # TODO: Check if nameservers is list of IPs. Convert to IP if FQDNs.
             self.resolver.nameservers = nameservers
 
     async def async_resolve(
@@ -81,7 +106,7 @@ class Resolver:
         payload_size: int = DEFAULT_EDNS_SIZE,
         flags: int = 0,
         options: list | None = None,
-        timeout: float = DEFAULT_TIMEOUT
+        timeout: float = DEFAULT_TIMEOUT,
     ) -> QueryResult:
         """Asynchronously resolve a single RRset using the configured resolver.
 
@@ -106,58 +131,34 @@ class Resolver:
 
             # Create the query message
             query = dns.message.make_query(
-                qname,
-                rdtype_obj,
-                rdclass=rdclass_obj,
-                want_dnssec=bool(flags & dns.flags.DO)
+                qname, rdtype_obj, rdclass=rdclass_obj, want_dnssec=bool(flags & dns.flags.DO)
             )
 
             # Add EDNS if requested
             if use_edns:
                 query.use_edns(
-                    0,  # EDNS version 0
-                    flags,
-                    payload_size,
-                    options=options if options else []
+                    0, flags, payload_size, options=options if options else []  # EDNS version 0
                 )
             if nameserver is None:
                 if not self.resolver.nameservers:
                     return QueryResult(
-                        success=False,
-                        error="No nameservers configured in resolver",
-                        details={}
+                        success=False, error="No nameservers configured in resolver", details={}
                     )
                 nameserver = str(self.resolver.nameservers[0])
 
             start_time = time.time()
             # Send query
             if use_tcp:
-                response = await dns.asyncquery.tcp(
-                    query,
-                    nameserver,
-                    timeout=timeout
-                )
+                response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
             else:
                 try:
-                    response = await dns.asyncquery.udp(
-                        query,
-                        nameserver,
-                        timeout=timeout
-                    )
+                    response = await dns.asyncquery.udp(query, nameserver, timeout=timeout)
                     if response.flags & dns.flags.TC:  # Truncated, retry with TCP
-                        response = await dns.asyncquery.tcp(
-                            query,
-                            nameserver,
-                            timeout=timeout
-                        )
+                        response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
                 except Exception as e:
                     if "Message too big" in str(e):
                         # UDP message too large, retry with TCP
-                        response = await dns.asyncquery.tcp(
-                            query,
-                            nameserver,
-                            timeout=timeout
-                        )
+                        response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
                     else:
                         raise
 
@@ -170,34 +171,28 @@ class Resolver:
                 rcode=response.rcode(),
                 rcode_text=dns.rcode.to_text(response.rcode()),
                 details={
-                    'flags': response.flags,
-                    'answer_count': len(response.answer),
-                    'authority_count': len(response.authority),
-                    'additional_count': len(response.additional),
-                    'has_edns': response.edns >= 0,
-                    'is_truncated': bool(response.flags & dns.flags.TC)
-                }
+                    "flags": response.flags,
+                    "answer_count": len(response.answer),
+                    "authority_count": len(response.authority),
+                    "additional_count": len(response.additional),
+                    "has_edns": response.edns >= 0,
+                    "is_truncated": bool(response.flags & dns.flags.TC),
+                },
             )
 
         except (dns.exception.DNSException, socket.error, asyncio.TimeoutError) as e:
             return QueryResult(
-                success=False,
-                error=str(e),
-                details={'exception_type': type(e).__name__}
+                success=False, error=str(e), details={"exception_type": type(e).__name__}
             )
         except Exception as e:
             return QueryResult(
                 success=False,
                 error=f"Unexpected error: {str(e)}",
-                details={'exception_type': type(e).__name__}
+                details={"exception_type": type(e).__name__},
             )
 
     async def async_axfr(
-        self,
-        zone_name: str,
-        nameserver: str,
-        port: int = 53,
-        timeout: float = DEFAULT_TIMEOUT
+        self, zone_name: str, nameserver: str, port: int = 53, timeout: float = DEFAULT_TIMEOUT
     ) -> AXFRResult:
         """Attempt an asynchronous AXFR zone transfer.
 
@@ -214,11 +209,7 @@ class Resolver:
             start_time = time.time()
             # dns.query.xfr is blocking; run it in a thread
             axfr_iter = await asyncio.to_thread(
-                dns.query.xfr,
-                nameserver,
-                zone_name,
-                lifetime=timeout,
-                port=port
+                dns.query.xfr, nameserver, zone_name, lifetime=timeout, port=port
             )
             first_msg = next(axfr_iter)
             rcode = first_msg.rcode()
@@ -233,9 +224,7 @@ class Resolver:
                 rcode=rcode,
                 rcode_text=dns.rcode.to_text(rcode),
                 duration=time.time() - start_time,
-                details={
-                    'names': z.nodes.items()
-                }
+                details={"names": z.nodes.items()},
             )
 
         except (dns.exception.FormError, dns.exception.Timeout, ConnectionRefusedError) as e:
@@ -244,16 +233,15 @@ class Resolver:
                 nameserver=nameserver,
                 success=False,
                 error=str(e),
-                details={'exception_type': type(e).__name__}
+                details={"exception_type": type(e).__name__},
             )
-
 
     def resolve(
         self,
         qname: str,
         rdtype: str,
         nameserver: Optional[str] = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
     ) -> Tuple[Optional[RRset], Optional[Message]]:
         """Resolve a single RRset using the configured resolver.
 
@@ -281,15 +269,15 @@ class Resolver:
             self.resolver.nameservers = [nameserver]
 
         try:
-            answer = self.resolver.resolve(
-                qname,
-                rdtype,
-                raise_on_no_answer=False
-            )
+            answer = self.resolver.resolve(qname, rdtype, raise_on_no_answer=False)
             result = (answer.rrset, answer.response)
-        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN,
-                dns.resolver.NoNameservers, dns.exception.Timeout) as e:
-            result = (None, getattr(e, 'response', None))
+        except (
+            dns.resolver.NoAnswer,
+            dns.resolver.NXDOMAIN,
+            dns.resolver.NoNameservers,
+            dns.exception.Timeout,
+        ) as e:
+            result = (None, getattr(e, "response", None))
 
         # Restore original settings
         if nameserver and original_ns is not None:
@@ -297,14 +285,10 @@ class Resolver:
         if timeout is not None:
             self.resolver.lifetime = self.default_timeout
 
-
         return result
 
     def fetch_dnskey(
-        self,
-        qname: str,
-        nameserver: Optional[str] = None,
-        timeout: Optional[float] = None
+        self, qname: str, nameserver: Optional[str] = None, timeout: Optional[float] = None
     ) -> Tuple[Optional[RRset], Optional[Message]]:
         """Fetch DNSKEY records for the specified domain.
 
@@ -316,13 +300,10 @@ class Resolver:
         Returns:
             Tuple of (DNSKEY RRset, DNS message) or (None, None) if not found.
         """
-        return self.resolve(qname, 'DNSKEY', nameserver, timeout)
+        return self.resolve(qname, "DNSKEY", nameserver, timeout)
 
     def fetch_ds(
-        self,
-        qname: str,
-        nameserver: Optional[str] = None,
-        timeout: Optional[float] = None
+        self, qname: str, nameserver: Optional[str] = None, timeout: Optional[float] = None
     ) -> Tuple[Optional[RRset], Optional[Message]]:
         """Fetch DS records for the specified domain.
 
@@ -334,13 +315,10 @@ class Resolver:
         Returns:
             Tuple of (DS RRset, DNS message) or (None, None) if not found.
         """
-        return self.resolve(qname, 'DS', nameserver, timeout)
+        return self.resolve(qname, "DS", nameserver, timeout)
 
     def get_soa_serial(
-        self,
-        zone_name: str,
-        nameserver: str,
-        timeout: Optional[float] = None
+        self, zone_name: str, nameserver: str, timeout: Optional[float] = None
     ) -> Optional[int]:
         """Get the SOA serial number for a zone from a specific nameserver.
 
@@ -352,7 +330,7 @@ class Resolver:
         Returns:
             SOA serial number as integer, or None if not found/error.
         """
-        rrset, _ = self.resolve(zone_name, 'SOA', nameserver, timeout)
+        rrset, _ = self.resolve(zone_name, "SOA", nameserver, timeout)
         if rrset and len(rrset) > 0:
             soa_record = rrset[0]
             if isinstance(soa_record, SOARecord):
@@ -374,10 +352,7 @@ class Resolver:
             QueryResult: Result of the DNS query operation.
         """
         return await self.async_resolve(
-            domain="version.bind",
-            rdtype="TXT",
-            rdclass="CH",
-            nameserver=nameserver
+            domain="version.bind", rdtype="TXT", rdclass="CH", nameserver=nameserver
         )
 
     async def query_hostname_bind(
@@ -395,10 +370,7 @@ class Resolver:
             QueryResult: Result of the DNS query operation.
         """
         return await self.async_resolve(
-            domain="hostname.bind",
-            rdtype="TXT",
-            rdclass="CH",
-            nameserver=nameserver
+            domain="hostname.bind", rdtype="TXT", rdclass="CH", nameserver=nameserver
         )
 
     async def query_authors_bind(
@@ -416,10 +388,7 @@ class Resolver:
             QueryResult: Result of the DNS query operation.
         """
         return await self.async_resolve(
-            domain="authors.bind",
-            rdtype="TXT",
-            rdclass="CH",
-            nameserver=nameserver
+            domain="authors.bind", rdtype="TXT", rdclass="CH", nameserver=nameserver
         )
 
     async def query_id_server(
@@ -437,12 +406,8 @@ class Resolver:
             QueryResult: Result of the DNS query operation.
         """
         return await self.async_resolve(
-            domain="id.server",
-            rdtype="TXT",
-            rdclass="CH",
-            nameserver=nameserver
+            domain="id.server", rdtype="TXT", rdclass="CH", nameserver=nameserver
         )
-
 
     # STATIC METHODS
     @staticmethod
@@ -457,11 +422,11 @@ class Resolver:
         """
         name = dns.name.from_text(qname)
         if len(name) == 1:
-            return '.'
+            return "."
         parent = name.parent()
         # Strip trailing dot except for root zone
         parent_text = parent.to_text()
-        return parent_text if parent_text == '.' else parent_text.rstrip('.')
+        return parent_text if parent_text == "." else parent_text.rstrip(".")
 
     @staticmethod
     def get_reverse_name(ip_address: str) -> Optional[str] | None:
@@ -469,23 +434,23 @@ class Resolver:
 
         Args:
             ip_address: The IP address to convert to a reverse DNS name.
-        
+
         Returns:
             The reverse DNS name as a string, or None if the IP is invalid.
         """
         try:
             rev_name = dns.reversename.from_address(ip_address)
-            return rev_name.to_text().rstrip('.')
+            return rev_name.to_text().rstrip(".")
         except dns.exception.SyntaxError:
             return None
 
     @staticmethod
     def get_records_from_rrset(rrset: RRset) -> List[Dict[str, Any]]:
         """Extracts the records from a given RRset.
-        
+
         Args:
             rrset: The RRset from which we extract the records.
-            
+
         Returns:
             A list of dict/str or empty list when no records are found.
         """
@@ -493,158 +458,159 @@ class Resolver:
         records = []
         for rdata in rrset:
             if rdtype in ["A", "AAAA"]:
-                records.append({
-                    "address": str(rdata),
-                    "ttl": rrset.ttl
-                })
+                records.append({"address": str(rdata), "ttl": rrset.ttl})
             elif rdtype in ["CNAME", "NS", "PTR"]:
-                records.append({
-                    "target": str(rdata),
-                    "ttl": rrset.ttl
-                })
+                records.append({"target": str(rdata), "ttl": rrset.ttl})
             elif rdtype in ["TXT", "SPF"]:
-                records.append({
-                    "strings": str(rdata),
-                    "ttl": rrset.ttl
-                })
+                records.append({"strings": str(rdata), "ttl": rrset.ttl})
             elif rdtype == "MX":
-                records.append({
-                    "preference": rdata.preference,
-                    "exchange": str(rdata.exchange),
-                    "ttl": rrset.ttl,
-                })
+                records.append(
+                    {
+                        "preference": rdata.preference,
+                        "exchange": str(rdata.exchange),
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "SRV":
-                records.append({
-                    "priority": rdata.priority,
-                    "weight": rdata.weight,
-                    "port": rdata.port,
-                    "target": str(rdata.target),
-                    "ttl": rrset.ttl,
-                })
+                records.append(
+                    {
+                        "priority": rdata.priority,
+                        "weight": rdata.weight,
+                        "port": rdata.port,
+                        "target": str(rdata.target),
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "SOA":
-                records.append({
-                    "mname": str(rdata.mname),
-                    "rname": str(rdata.rname),
-                    "serial": rdata.serial,
-                    "refresh": rdata.refresh,
-                    "retry": rdata.retry,
-                    "expire": rdata.expire,
-                    "minimum": rdata.minimum,
-                    "ttl": rrset.ttl,
-                })
+                records.append(
+                    {
+                        "mname": str(rdata.mname),
+                        "rname": str(rdata.rname),
+                        "serial": rdata.serial,
+                        "refresh": rdata.refresh,
+                        "retry": rdata.retry,
+                        "expire": rdata.expire,
+                        "minimum": rdata.minimum,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "DS":
-                records.append({
-                    "key_tag": rdata.key_tag,
-                    "algorithm": rdata.algorithm,
-                    "digest_type": rdata.digest_type,
-                    "digest": rdata.digest,
-                    "ttl": rrset.ttl,
-                })
+                records.append(
+                    {
+                        "key_tag": rdata.key_tag,
+                        "algorithm": rdata.algorithm,
+                        "digest_type": rdata.digest_type,
+                        "digest": rdata.digest,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "RRSIG":
-                records.append({
-                    "type_covered": rdata.type_covered,
-                    "algorithm": rdata.algorithm,
-                    "labels": rdata.labels,
-                    "original_ttl": rdata.original_ttl,
-                    "expiration": rdata.expiration,
-                    "inception": rdata.inception,
-                    "key_tag": rdata.key_tag,
-                    "signer": rdata.signer,
-                    "signature": rdata.signature,
-                    "ttl": rrset.ttl,
-                })
+                records.append(
+                    {
+                        "type_covered": rdata.type_covered,
+                        "algorithm": rdata.algorithm,
+                        "labels": rdata.labels,
+                        "original_ttl": rdata.original_ttl,
+                        "expiration": rdata.expiration,
+                        "inception": rdata.inception,
+                        "key_tag": rdata.key_tag,
+                        "signer": rdata.signer,
+                        "signature": rdata.signature,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "DNSKEY":
-                records.append({
-                    "flags": rdata.flags,
-                    "protocol": rdata.protocol,
-                    "algorithm": rdata.algorithm,
-                    "key": rdata.key,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {
+                        "flags": rdata.flags,
+                        "protocol": rdata.protocol,
+                        "algorithm": rdata.algorithm,
+                        "key": rdata.key,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "NSEC":
-                records.append({
-                    "next": rdata.next,
-                    "windows": rdata.windows,
-                    "ttl": rrset.ttl
-                })
+                records.append({"next": rdata.next, "windows": rdata.windows, "ttl": rrset.ttl})
             elif rdtype == "NSEC3":
-                records.append({
-                    "next": rdata.next,
-                    "windows": rdata.windows,
-                    "algorithm": rdata.algorithm,
-                    "flags": rdata.flags,
-                    "iterations": rdata.iterations,
-                    "salt": rdata.salt,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {
+                        "next": rdata.next,
+                        "windows": rdata.windows,
+                        "algorithm": rdata.algorithm,
+                        "flags": rdata.flags,
+                        "iterations": rdata.iterations,
+                        "salt": rdata.salt,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "NAPTR":
-                records.append({
-                    "order": rdata.order,
-                    "preference": rdata.preference,
-                    "flags": rdata.flags,
-                    "service": rdata.service,
-                    "regexp": rdata.regexp,
-                    "replacement": rdata.replacement,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {
+                        "order": rdata.order,
+                        "preference": rdata.preference,
+                        "flags": rdata.flags,
+                        "service": rdata.service,
+                        "regexp": rdata.regexp,
+                        "replacement": rdata.replacement,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "OPT":
-                records.append({
-                    "options": rdata.options,
-                    "ttl": rrset.ttl
-                })
+                records.append({"options": rdata.options, "ttl": rrset.ttl})
             elif rdtype == "AFSDB":
-                records.append({
-                    "subtype": rdata.subtype,
-                    "hostname": rdata.hostname,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {"subtype": rdata.subtype, "hostname": rdata.hostname, "ttl": rrset.ttl}
+                )
             elif rdtype == "CERT":
-                records.append({
-                    "certificate_type": rdata.certificate_type,
-                    "key_tag": rdata.key_tag,
-                    "algorithm": rdata.algorithm,
-                    "certificate": rdata.certificate,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {
+                        "certificate_type": rdata.certificate_type,
+                        "key_tag": rdata.key_tag,
+                        "algorithm": rdata.algorithm,
+                        "certificate": rdata.certificate,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "LOC":
-                records.append({
-                    "version": rdata.version,
-                    "size": rdata.size,
-                    "hprecision": rdata.hprecision,
-                    "vprecision": rdata.vprecision,
-                    "latitude": rdata.latitude,
-                    "longitude": rdata.longitude,
-                    "altitude": rdata.altitude,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {
+                        "version": rdata.version,
+                        "size": rdata.size,
+                        "hprecision": rdata.hprecision,
+                        "vprecision": rdata.vprecision,
+                        "latitude": rdata.latitude,
+                        "longitude": rdata.longitude,
+                        "altitude": rdata.altitude,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "SSHFP":
-                records.append({
-                    "algorithm": rdata.algorithm,
-                    "fp_type": rdata.fp_type,
-                    "fingerprint": rdata.fingerprint,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {
+                        "algorithm": rdata.algorithm,
+                        "fp_type": rdata.fp_type,
+                        "fingerprint": rdata.fingerprint,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "TLSA":
-                records.append({
-                    "usage": rdata.usage,
-                    "selector": rdata.selector,
-                    "mtype": rdata.mtype,
-                    "cert": rdata.cert,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {
+                        "usage": rdata.usage,
+                        "selector": rdata.selector,
+                        "mtype": rdata.mtype,
+                        "cert": rdata.cert,
+                        "ttl": rrset.ttl,
+                    }
+                )
             elif rdtype == "CAA":
-                records.append({
-                    "flags": rdata.flags,
-                    "tag": rdata.tag,
-                    "value": rdata.value,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {"flags": rdata.flags, "tag": rdata.tag, "value": rdata.value, "ttl": rrset.ttl}
+                )
             elif rdtype in ["SVCB", "HTTPS"]:
-                records.append({
-                    "priority": rdata.priority,
-                    "target": rdata.target,
-                    "ttl": rrset.ttl
-                })
+                records.append(
+                    {"priority": rdata.priority, "target": rdata.target, "ttl": rrset.ttl}
+                )
             else:
                 records.append(str(rdata))
         return records
@@ -652,10 +618,10 @@ class Resolver:
     @staticmethod
     def convert_idn_to_punnycode(domain: str) -> str:
         """Convert Internationalized Domain Name (IDN) to ASCII-compatible Punycode.
-        
+
         Args:
             domain (str): Domain name that may contain Unicode characters.
-        
+
         Returns:
             str: ASCII-compatible domain name (Punycode if needed)
         """
@@ -663,7 +629,7 @@ class Resolver:
             # Check if domain contains non-ASCII characters.
             if any(ord(char) > 127 for char in domain):
                 # Convert Unicode domain to Punycode.
-                punycode_domain = domain.encode('idna').decode('ascii')
+                punycode_domain = domain.encode("idna").decode("ascii")
                 return punycode_domain
             return domain
         except (UnicodeError, UnicodeDecodeError, UnicodeEncodeError) as _:

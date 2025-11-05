@@ -15,18 +15,14 @@ Note: TypedDict classes are used instead of regular dictionaries to provide bett
 type checking and IDE support while maintaining runtime flexibility.
 """
 
-from typing import (
-    Dict,
-    Any,
-    List,
-    Optional,
-    TypedDict
-)
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, TypedDict
+
 import dns.message
 import dns.name
 import dns.rdatatype
 import dns.zone
+
 
 @dataclass
 class QueryResult:
@@ -39,6 +35,7 @@ class QueryResult:
         'has_edns': response.edns >= 0,
         'is_truncated': bool(response.flags & dns.flags.TC)
     """
+
     success: bool
     qname: Optional[dns.name.Name] = None
     rdtype: Optional[dns.rdatatype.RdataType] = None
@@ -49,9 +46,11 @@ class QueryResult:
     duration: Optional[float] = None
     details: Dict[str, Any] = field(default_factory=dict)
 
+
 @dataclass
 class AXFRResult:
     """Stores the result of a AXFR zone transfer operation."""
+
     success: bool
     zone_name: str
     nameserver: str
@@ -62,23 +61,28 @@ class AXFRResult:
     duration: Optional[float] = None
     details: Dict[str, Any] = field(default_factory=dict)
 
+
 @dataclass
 class ToolResult:
     """Stores the result of a DNS tool operation."""
+
     success: bool
-    output: Optional[str|List[str]|Dict[str, Any]|List[Dict[str, Any]]] = None
+    output: Optional[str | List[str] | Dict[str, Any] | List[Dict[str, Any]]] = None
     error: Optional[str] = None
     details: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class OpenResolver:
     """Stores the details of a Open Resolver."""
+
     success: bool
     ip: str
     rcode: Optional[int] = None
     rcode_text: Optional[str] = None
     duration: Optional[float] = None
     details: Dict[str, Any] = field(default_factory=dict)
+
 
 # Type definitions for result dictionaries
 class ValidationResult(TypedDict, total=False):
@@ -96,6 +100,7 @@ class ValidationResult(TypedDict, total=False):
         chain (List[Dict[str, Any]]): Validation chain details (e.g., NSEC/NSEC3 chain).
         validation (Dict[str, Any]): Additional validation-specific details and metadata.
     """
+
     valid: bool
     error: str  # Single error string
     errors: List[str]  # List of errors
@@ -103,6 +108,7 @@ class ValidationResult(TypedDict, total=False):
     parameters: Optional[Dict[str, Any]]
     chain: List[Dict[str, Any]]
     validation: Dict[str, Any]
+
 
 class TestResult(TypedDict):
     """A TypedDict representing the result of a DNS robustness or security test.
@@ -116,12 +122,15 @@ class TestResult(TypedDict):
         passed (bool): Whether the test passed successfully.
         error (Optional[str]): Error message if the test failed, None otherwise.
     """
+
     name: str
     description: str
     passed: bool
     error: Optional[str]
 
+
 @dataclass
 class UserDecision:
     """Used in elicit workflow where a user needs to provide consent."""
+
     answer: str

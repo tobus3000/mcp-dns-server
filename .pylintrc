@@ -1,0 +1,134 @@
+[MASTER]
+# Python path adjustments
+init-hook='import sys; sys.path.extend(["src", ".", "tests"])'
+
+# Basic settings
+recursive=yes
+persistent=yes
+
+# Files or directories to be skipped. They should be base names, not paths.
+ignore=.git,CVS,.svn,_build,build,dist,__pycache__
+
+# Files or directories matching the regex patterns are skipped
+ignore-patterns=^\.#
+
+# List of plugins (as comma separated values of python modules names) to load,
+# usually to register additional checkers.
+load-plugins=
+
+# Use multiple processes to speed up Pylint.
+jobs=4
+
+# Allow loading of arbitrary C extensions
+unsafe-load-any-extension=no
+
+# Maximum number of lines in a module
+max-module-lines=2000
+
+# Allow optimization for modules
+optimize-ast=yes
+
+[MESSAGES CONTROL]
+# Only show warnings with the listed confidence levels
+confidence=
+
+# Enable all warnings except listed ones
+disable=C0111,   # Missing docstring
+        C0103,   # Invalid name
+        C0302,   # Too many lines in module
+        C0413,   # Import location (needed for lazy imports)
+        C0415,   # Import outside toplevel
+        C1803,   # Use implicit boolean check
+        R0801,   # Similar lines
+        R0902,   # Too many instance attributes
+        R0903,   # Too few public methods
+        R0911,   # Too many return statements
+        R0912,   # Too many branches
+        R0913,   # Too many arguments
+        R0914,   # Too many local variables
+        R0915,   # Too many statements
+        R1702,   # Too many nested blocks
+        R1705,   # Unnecessary else
+        R1710,   # Either all return with value or none
+        R1722,   # Consider using contextlib.suppress
+        R1732,   # Consider using with
+        W0107,   # Unnecessary pass
+        W0201,   # Attribute defined outside __init__
+        W0212,   # Protected member access
+        W0511,   # FIXME/TODO
+        W0603,   # Using globals
+        W0611,   # Unused imports (let isort handle this)
+        W0613,   # Unused argument
+        W1309,   # F-string without vars
+        E0401,   # Unable to import (handled by install)
+        E1101    # No member (dynamic attrs)
+
+[FORMAT]
+# Maximum number of characters on a single line.
+max-line-length=100
+
+# Maximum number of lines in a module
+max-module-lines=2000
+
+# String used as indentation unit.
+indent-string='    '
+
+[BASIC]
+# Variable name style
+variable-naming-style=any
+
+# Regular expression which should only match function or class names
+function-rgx=[a-z_][a-z0-9_]{2,50}$
+
+# Regular expression which should only match correct method names
+method-rgx=[a-z_][a-z0-9_]{2,50}$
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=10
+
+# Maximum number of locals for function / method
+max-locals=25
+
+# Maximum number of return / yield for function / method
+max-returns=10
+
+# Maximum number of branch for function / method
+max-branches=25
+
+# Maximum number of statements in function / method
+max-statements=100
+
+# Maximum number of parents for a class (see R0901).
+max-parents=7
+
+# Maximum number of attributes for a class (see R0902).
+max-attributes=10
+
+# Minimum number of public methods for a class (see R0903).
+min-public-methods=0
+
+# Maximum number of public methods for a class (see R0904).
+max-public-methods=50
+
+[TYPECHECK]
+# List of module names for which member attributes should not be checked
+ignored-modules=numpy,torch,tensorflow,cv2,dns,scapy,fastmcp,yaml,zeroconf,aiohttp
+
+# List of classes names for which member attributes should not be checked
+ignored-classes=numpy,torch,tensorflow,cv2,dns,scapy,fastmcp,yaml,zeroconf,aiohttp
+
+[IMPORTS]
+# List of modules that can be imported at any level
+allow-any-import-level=src,tests
+
+# Allow wildcard imports from modules that define __all__
+allow-wildcard-with-all=no
+
+[CLASSES]
+# List of interface methods
+interface-rgx=^[A-Z][a-zA-Z0-9]*$
+
+[EXCEPTIONS]
+# Exceptions that will emit a warning when being caught.
+overgeneral-exceptions=builtins.Exception

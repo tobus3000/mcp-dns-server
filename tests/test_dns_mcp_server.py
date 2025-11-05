@@ -1,9 +1,12 @@
 """Unit tests for the DNS MCP Server."""
+
 import asyncio
-import tempfile
 import os
+import tempfile
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+
 from src.dns_mcp_server import DNSMCPServer
 
 
@@ -13,8 +16,9 @@ class TestDNSMCPServer:
     def setup_method(self):
         """Set up test fixtures before each test method."""
         # Create a temporary config file for testing
-        self.temp_config = tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False)
-        self.temp_config.write("""
+        self.temp_config = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
+        self.temp_config.write(
+            """
 server:
   host: "127.0.0.1"
   port: 3000
@@ -24,7 +28,8 @@ dns:
 
 features:
   advanced_troubleshooting: true
-""")
+"""
+        )
         self.temp_config.close()
 
     def teardown_method(self):
@@ -37,20 +42,22 @@ features:
 
         assert server is not None
         assert server.resolver is not None
-        assert hasattr(server, 'kb_manager')
+        assert hasattr(server, "kb_manager")
         assert server.kb_manager is not None
 
     def test_configure_resolver_with_custom_settings(self):
         """Test configuring resolver with custom settings."""
         # Create a config with custom DNS servers
-        temp_config = tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False)
-        temp_config.write("""
+        temp_config = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
+        temp_config.write(
+            """
 dns:
   dns_servers:
     - "8.8.8.8"
     - "8.8.4.4"
   timeout: 10
-""")
+"""
+        )
         temp_config.close()
 
         server = DNSMCPServer(config_path=temp_config.name)
@@ -64,7 +71,7 @@ dns:
     def test_configure_resolver_with_invalid_config(self):
         """Test handling of invalid config file."""
         # Create an invalid config file
-        temp_config = tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False)
+        temp_config = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
         temp_config.write("invalid: yaml: content:::")
         temp_config.close()
 
@@ -82,9 +89,9 @@ dns:
         server = DNSMCPServer(config_path=self.temp_config.name)
 
         # Mock the resolver to return a fixed result instead of making real DNS queries
-        with patch.object(server.resolver, 'resolve') as mock_resolve:
+        with patch.object(server.resolver, "resolve") as mock_resolve:
             mock_result = MagicMock()
-            mock_result.__iter__ = Mock(return_value=iter(['93.184.216.34']))
+            mock_result.__iter__ = Mock(return_value=iter(["93.184.216.34"]))
             mock_resolve.return_value = mock_result
 
             result = await server._simple_dns_lookup_impl("example.com")
@@ -101,7 +108,7 @@ dns:
         server = DNSMCPServer(config_path=self.temp_config.name)
 
         # Mock the resolver to raise NXDOMAIN exception
-        with patch.object(server.resolver, 'resolve', side_effect=dns.resolver.NXDOMAIN):
+        with patch.object(server.resolver, "resolve", side_effect=dns.resolver.NXDOMAIN):
             result = await server._simple_dns_lookup_impl("nonexistent-domain-12345.com")
 
             assert result["status"] == "error"
@@ -115,7 +122,7 @@ dns:
         server = DNSMCPServer(config_path=self.temp_config.name)
 
         # Mock the resolver to raise NoAnswer exception
-        with patch.object(server.resolver, 'resolve', side_effect=dns.resolver.NoAnswer):
+        with patch.object(server.resolver, "resolve", side_effect=dns.resolver.NoAnswer):
             result = await server._simple_dns_lookup_impl("example.com")
 
             assert result["status"] == "error"
@@ -131,7 +138,7 @@ dns:
         mock_rdata.preference = 10
         mock_rdata.exchange = "mail.example.com."
 
-        with patch.object(server.resolver, 'resolve') as mock_resolve:
+        with patch.object(server.resolver, "resolve") as mock_resolve:
             mock_result = MagicMock()
             mock_result.__iter__ = Mock(return_value=iter([mock_rdata]))
             mock_resolve.return_value = mock_result
@@ -150,7 +157,7 @@ dns:
 
         server = DNSMCPServer(config_path=self.temp_config.name)
 
-        with patch.object(server.resolver, 'resolve', side_effect=dns.resolver.NXDOMAIN):
+        with patch.object(server.resolver, "resolve", side_effect=dns.resolver.NXDOMAIN):
             result = await server._advanced_dns_lookup_impl("nonexistent.com", "A")
 
             assert result["status"] == "error"
@@ -169,8 +176,8 @@ dns:
         mock_rdata = Mock()
         mock_rdata.__str__ = Mock(return_value="example.com.")
 
-        with patch.object(dns.reversename, 'from_address', return_value=mock_rev_name):
-            with patch.object(server.resolver, 'resolve') as mock_resolve:
+        with patch.object(dns.reversename, "from_address", return_value=mock_rev_name):
+            with patch.object(server.resolver, "resolve") as mock_resolve:
                 mock_result = MagicMock()
                 mock_result.__iter__ = Mock(return_value=iter([mock_rdata]))
                 mock_resolve.return_value = mock_result
@@ -202,8 +209,8 @@ dns:
         # Mock the reverse name and resolver to raise NXDOMAIN
         mock_rev_name = Mock()
 
-        with patch.object(dns.reversename, 'from_address', return_value=mock_rev_name):
-            with patch.object(server.resolver, 'resolve', side_effect=dns.resolver.NXDOMAIN):
+        with patch.object(dns.reversename, "from_address", return_value=mock_rev_name):
+            with patch.object(server.resolver, "resolve", side_effect=dns.resolver.NXDOMAIN):
                 result = await server._reverse_dns_lookup_impl("8.8.8.8")
 
                 assert result["status"] == "error"
@@ -216,10 +223,10 @@ dns:
 
         # Mock different types of DNS records
         mock_a_result = Mock()
-        mock_a_result.__iter__ = Mock(return_value=iter(['93.184.216.34']))
+        mock_a_result.__iter__ = Mock(return_value=iter(["93.184.216.34"]))
 
         mock_aaaa_result = Mock()
-        mock_aaaa_result.__iter__ = Mock(return_value=iter(['2606:2800:220:1:248:1893:25c8:1946']))
+        mock_aaaa_result.__iter__ = Mock(return_value=iter(["2606:2800:220:1:248:1893:25c8:1946"]))
 
         mock_cname_result = Mock()
         mock_cname_result.__str__ = Mock(return_value="www.example.com.")
@@ -236,26 +243,26 @@ dns:
 
         # Create a mock resolver that returns different results for different record types
         def mock_resolve(hostname, record_type):
-            if record_type == 'A':
+            if record_type == "A":
                 return mock_a_result
-            elif record_type == 'AAAA':
+            elif record_type == "AAAA":
                 return mock_aaaa_result
-            elif record_type == 'CNAME':
+            elif record_type == "CNAME":
                 # CNAME result should be iterable for the [str(rdata) for rdata in cname_result] line
                 cname_iterable = Mock()
                 cname_iterable.__iter__ = Mock(return_value=iter([mock_cname_result]))
                 return cname_iterable
-            elif record_type == 'MX':
+            elif record_type == "MX":
                 # MX result should be iterable for the list comprehension
                 mx_iterable = Mock()
                 mx_iterable.__iter__ = Mock(return_value=iter([mock_mx_result]))
                 return mx_iterable
-            elif record_type == 'NS':
+            elif record_type == "NS":
                 # NS result should be iterable
                 ns_iterable = Mock()
                 ns_iterable.__iter__ = Mock(return_value=iter([mock_ns_result]))
                 return ns_iterable
-            elif record_type == 'TXT':
+            elif record_type == "TXT":
                 # TXT result should be iterable
                 txt_iterable = Mock()
                 txt_iterable.__iter__ = Mock(return_value=iter([mock_txt_result]))
@@ -266,7 +273,7 @@ dns:
                 empty_result.__iter__ = Mock(return_value=iter([]))
                 return empty_result
 
-        with patch.object(server.resolver, 'resolve', side_effect=mock_resolve):
+        with patch.object(server.resolver, "resolve", side_effect=mock_resolve):
             result = await server._dns_troubleshooting_impl("example.com")
 
             assert result["status"] == "success"
@@ -283,7 +290,7 @@ dns:
         """Test starting and stopping the server."""
         server = DNSMCPServer(config_path=self.temp_config.name)
         # Mock the server run_async method to prevent actual network operations
-        with patch.object(server.server, 'run_async') as mock_run_async:
+        with patch.object(server.server, "run_async") as mock_run_async:
             # The start method should call run_async with HTTP transport
             try:
                 # We'll simulate a quick return to avoid blocking
@@ -302,4 +309,4 @@ dns:
 
         # Check that knowledge base manager is initialized
         assert server.kb_manager is not None
-        assert hasattr(server.kb_manager, 'get_all_articles')
+        assert hasattr(server.kb_manager, "get_all_articles")

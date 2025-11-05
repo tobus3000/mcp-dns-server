@@ -1,12 +1,16 @@
 """DNS Trace tool that mimics 'dig +trace' behavior.
 #TODO: Fix trace function. Stops on 2nd (wrong) hop...
 """
+
 from typing import Any, Dict, List, Optional, Tuple
+
 import dns.name
 import dns.rdatatype
 from dns.rrset import RRset
+
 from resolver import Resolver
 from typedefs import ToolResult
+
 
 class Trace:
     """
@@ -17,28 +21,28 @@ class Trace:
     def __init__(self, follow_cname=True):
         """
         Initializes the Trace object with an internal Resolver.
-        
+
         Args:
             follow_cname: Whether to follow CNAME chains to final A/AAAA records.
         """
         self.resolver = Resolver()
-        self.trace_steps = []       # stores each hop with full DNS message
+        self.trace_steps = []  # stores each hop with full DNS message
         self.follow_cname = follow_cname
 
     def fetch_root_servers(self):
         """Discover root servers dynamically via DNS.
-        
+
         Returns:
             List of root server IP addresses.
         """
-        rrset, _ = self.resolver.resolve(".", 'NS')
+        rrset, _ = self.resolver.resolve(".", "NS")
         if not rrset:
             return []
 
-        ns_names = [str(rr.target).rstrip('.') for rr in rrset]
+        ns_names = [str(rr.target).rstrip(".") for rr in rrset]
         root_ips = []
         for ns in ns_names:
-            for rtype in ('A', 'AAAA'):
+            for rtype in ("A", "AAAA"):
                 a_rrset, _ = self.resolver.resolve(ns, rtype)
                 if a_rrset:
                     for rdata in a_rrset:
@@ -49,10 +53,10 @@ class Trace:
         """
         Perform an iterative DNS trace for the given domain.
         Stores all hops in self.trace_steps.
-        
+
         Args:
             domain: The domain name to trace.
-        
+
         Returns:
             A dictionary with the trace results, including hops and final answer.
         """
@@ -72,15 +76,11 @@ class Trace:
 
         final_rrset = self._resolve_final_answer(response)
 
-        return {
-            "domain": domain,
-            "hops": self.trace_steps,
-            "final_answer": final_rrset
-        }
+        return {"domain": domain, "hops": self.trace_steps, "final_answer": final_rrset}
 
     def get_dig_style(self) -> str:
         """Return the trace in dig +trace style as a string with hop counts.
-        
+
         Returns:
             Formatted string representing the trace output.
         """
@@ -126,33 +126,27 @@ class Trace:
         return "\n".join(output_lines)
 
     def _query_hierarchy_level(
-        self,
-        subdomain,
-        servers
+        self, subdomain, servers
     ) -> Tuple[Optional[RRset | None], Optional[Any]]:
         """Query a set of servers for a subdomain, return RRset and response.
-        
+
         Args:
             subdomain: dns.name.Name object for the current subdomain to query.
             servers: List of server IPs to query.
-        
+
         Returns:
             Tuple of (RRset or None, DNS message or None)
         """
         for server in servers:
-            rrset, response = self.resolver.resolve(
-                str(subdomain),
-                'NS',
-                nameserver=server
-            )
+            rrset, response = self.resolver.resolve(str(subdomain), "NS", nameserver=server)
             if not response:
                 continue
 
             hop_info = {
                 "server": server,
                 "qname": str(subdomain),
-                "qtype": 'NS',
-                "response": response
+                "qtype": "NS",
+                "response": response,
             }
             self.trace_steps.append(hop_info)
 
@@ -160,8 +154,8 @@ class Trace:
                 final_hop = {
                     "server": server,
                     "qname": str(subdomain),
-                    "qtype": 'FINAL',
-                    "response": response
+                    "qtype": "FINAL",
+                    "response": response,
                 }
                 self.trace_steps.append(final_hop)
                 return rrset, response
@@ -174,10 +168,10 @@ class Trace:
 
     def _extract_next_servers(self, response) -> List[str]:
         """Extract next authoritative servers from additional or authority sections.
-        
+
         Args:
             response: The DNS message from the current server.
-        
+
         Returns:
             List of IP addresses of next authoritative servers.
         """
@@ -194,7 +188,7 @@ class Trace:
                 if rr.rdtype == dns.rdatatype.NS:
                     ns_names.extend(str(r.target) for r in rr)
             for ns in ns_names:
-                a_rrset, _ = self.resolver.resolve(ns, 'A')
+                a_rrset, _ = self.resolver.resolve(ns, "A")
                 if a_rrset:
                     for rdata in a_rrset:
                         next_servers.append(rdata.address)
@@ -203,10 +197,10 @@ class Trace:
 
     def _format_rrset(self, rrsets) -> List[Dict[str, Any]]:
         """Convert RRset(s) into list of dicts with name, ttl, type, value.
-        
+
         Args:
             rrsets: A single RRset or list of RRsets
-        
+
         Returns:
             List of dicts representing the records
         """
@@ -215,20 +209,22 @@ class Trace:
         result = []
         for rrset in rrsets:
             for rdata in rrset:
-                result.append({
-                    "name": str(rrset.name),
-                    "ttl": rrset.ttl,
-                    "type": dns.rdatatype.to_text(rrset.rdtype),
-                    "value": str(rdata)
-                })
+                result.append(
+                    {
+                        "name": str(rrset.name),
+                        "ttl": rrset.ttl,
+                        "type": dns.rdatatype.to_text(rrset.rdtype),
+                        "value": str(rdata),
+                    }
+                )
         return result
 
     def _resolve_final_answer(self, response) -> List[Dict[str, Any]]:
         """Follow CNAME chain if enabled, otherwise return A/AAAA from the last response.
-        
+
         Args:
             response: The DNS message from the last authoritative server.
-            
+
         Returns:
             List of final A/AAAA records as dicts.
         """
@@ -248,12 +244,14 @@ class Trace:
                     if rtype == "CNAME":
                         cname_target = str(rdata.target)
                     elif rtype in ("A", "AAAA"):
-                        final_records.append({
-                            "name": str(rrset.name),
-                            "ttl": rrset.ttl,
-                            "type": rtype,
-                            "value": str(rdata)
-                        })
+                        final_records.append(
+                            {
+                                "name": str(rrset.name),
+                                "ttl": rrset.ttl,
+                                "type": rtype,
+                                "value": str(rdata),
+                            }
+                        )
             if not cname_target:
                 break
             if cname_target in visited:
@@ -270,6 +268,7 @@ class Trace:
 
         return final_records
 
+
 async def dns_trace_impl(domain: str) -> ToolResult:
     """Perform a DNS trace for the given domain.
 
@@ -281,10 +280,4 @@ async def dns_trace_impl(domain: str) -> ToolResult:
     """
     tracer = Trace(follow_cname=True)
     tracer.perform_trace(domain.strip())
-    return ToolResult(
-        success=True,
-        output={
-            "domain": domain,
-            "dns_trace": tracer.get_dig_style()
-        }
-    )
+    return ToolResult(success=True, output={"domain": domain, "dns_trace": tracer.get_dig_style()})

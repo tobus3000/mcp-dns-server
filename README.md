@@ -12,7 +12,7 @@ An MCP (Model Context Protocol) server designed to assist with DNS name resoluti
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.11+
 - Install using pip with pyproject.toml
 
 ## Installation

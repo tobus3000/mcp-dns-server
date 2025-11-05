@@ -8,20 +8,20 @@ dns:
   # dns_servers:
   #   - "8.8.8.8"
   #   - "8.8.4.4"
-  
+
   # Timeout for DNS queries in seconds
   timeout: 5
-  
+
   # Number of retries for failed DNS queries
   retries: 2
-  
+
 features:
   # Enable Knowledge Base resources
   knowledge_base: true
-  
+
   # Enable advanced DNS troubleshooting
   advanced_troubleshooting: true
-  
+
   # Enable reverse DNS lookups
   reverse_lookup: true
 
@@ -45,6 +45,9 @@ features:
 
   # Enable top-level-domain verification
   top_level_domain_verification: true
+
+  # Enable mDNS service discovery tool
+  mdns_service_discovery: true
 
   # Enable the basic DNS assistant (requires clients to support elicitation)
   basic_dns_assistant: true

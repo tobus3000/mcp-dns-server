@@ -1,17 +1,16 @@
-
-from .trace import dns_trace_impl
 from .basic_dns import (
-    simple_dns_lookup_impl,
     advanced_dns_lookup_impl,
+    dns_troubleshooting_impl,
     reverse_dns_lookup_impl,
-    dns_troubleshooting_impl
+    simple_dns_lookup_impl,
 )
 from .ns_tests import (
     run_comprehensive_tests_impl,
+    run_dns_cookie_tests_impl,
     run_edns_tests_impl,
     run_tcp_behavior_tests_impl,
-    run_dns_cookie_tests_impl
 )
+from .trace import dns_trace_impl
 
 __ALL__ = [
     dns_trace_impl,
@@ -22,5 +21,5 @@ __ALL__ = [
     run_comprehensive_tests_impl,
     run_edns_tests_impl,
     run_tcp_behavior_tests_impl,
-    run_dns_cookie_tests_impl
+    run_dns_cookie_tests_impl,
 ]

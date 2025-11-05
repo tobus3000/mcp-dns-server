@@ -18,8 +18,10 @@ import dns.exception
 import dns.name
 import dns.resolver
 
+
 class ValidationError(Exception):
     """Base exception for DNSSEC validation errors."""
+
 
 def handle_dns_error(error: Exception) -> str:
     """Convert DNS-related exceptions to descriptive error messages."""
@@ -36,7 +38,7 @@ def handle_dns_error(error: Exception) -> str:
         err_str = "Invalid characters in domain name"
     if isinstance(error, dns.exception.Timeout):
         err_str = "DNS query timed out"
-    if str(error.__class__).endswith('ValidationFailure'):
+    if str(error.__class__).endswith("ValidationFailure"):
         err_str = f"DNSSEC validation failed: {str(error)}"
     if isinstance(error, dns.exception.DNSException):
         err_str = f"DNS error: {str(error)}"

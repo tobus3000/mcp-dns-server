@@ -59,17 +59,17 @@ dns:
   # dns_servers:
   #   - "8.8.8.8"
   #   - "8.8.4.4"
-  
+
   # Timeout for DNS queries in seconds
   timeout: 5
-  
+
   # Number of retries for failed DNS queries
   retries: 2
 
 features:
   # Enable advanced DNS troubleshooting
   advanced_troubleshooting: true
-  
+
   # Enable reverse DNS lookups
   reverse_lookup: true
 ```

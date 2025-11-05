@@ -1,17 +1,14 @@
-"""Multicast DNS browser taken from `python-zeroconf` examples.
+"""Multicast DNS browser for discovering network services.
 
-The default is HTTP and HAP; use --find to search for all available services in the network
-
-#TODO: Convert return values to `ToolResult`.
-#TODO: Expose mcp tools..
+This module provides an async interface for discovering mDNS/Bonjour services on the local network.
+It is integrated with the MCP server's async architecture and returns structured results.
 """
 
 from __future__ import annotations
 
-import argparse
 import asyncio
-import logging
-from typing import Any, cast
+from dataclasses import dataclass
+from typing import Any, Optional, cast
 
 from zeroconf import IPVersion, ServiceStateChange, Zeroconf
 from zeroconf.asyncio import (
@@ -31,98 +28,139 @@ except ImportError:
 _PENDING_TASKS: set[asyncio.Task] = set()
 
 
-def async_on_service_state_change(
-    zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange
-) -> None:
-    print(f"Service {name} of type {service_type} state changed: {state_change}")
-    if state_change is not ServiceStateChange.Added:
-        return
-    task = asyncio.ensure_future(async_display_service_info(zeroconf, service_type, name))
-    _PENDING_TASKS.add(task)
-    task.add_done_callback(_PENDING_TASKS.discard)
+async def discover_mdns_services_impl(
+    find_all: bool = False, timeout: float = 5.0, ipv6: bool = False
+) -> ToolResult:
+    """Discover mDNS/Bonjour services on the local network.
 
+    Args:
+        find_all (bool): Whether to search for all available services or just HTTP/HAP.
+        timeout (float): How long to browse for services in seconds.
+        ipv6 (bool): Whether to include IPv6 addresses in discovery.
 
-async def async_display_service_info(zeroconf: Zeroconf, service_type: str, name: str) -> None:
-    info = AsyncServiceInfo(service_type, name)
-    await info.async_request(zeroconf, 3000)
-    print(f"Info from zeroconf.get_service_info: {info!r}")
-    if info:
-        addresses = [f"{addr}:{cast(int, info.port)}" for addr in info.parsed_scoped_addresses()]
-        meta = SERVICE_MAP.get(
-            service_type,
-            {"category": "Unknown", "description": "Unrecognized mDNS service type"}
+    Returns:
+        ToolResult: Complete report of discovered mDNS services.
+            success: Whether the discovery operation succeeded
+            output: List of discovered services with their details
+            error: Error message if discovery failed
+            details: Additional metadata including service types discovered
+    """
+    runner = AsyncRunner(find_all=find_all, ip_version=IPVersion.All if ipv6 else IPVersion.V4Only)
+
+    try:
+        success, error, services, service_types = await runner.start_browsing(timeout=timeout)
+
+        if not success:
+            return ToolResult(success=False, error=error)
+
+        return ToolResult(
+            success=True,
+            output=services,
+            details={
+                "service_types": service_types,
+                "scan_duration": timeout,
+                "ipv6_enabled": ipv6,
+            },
         )
-        print(f"  Name: {name}")
-        print(f"  Type: {service_type}")
-        print(f"  Category: {meta.get('category')}")
-        print(f"  Description: {meta.get('description')}")
-        print(f"  Addresses: {', '.join(addresses)}")
-        print(f"  Weight: {info.weight}, priority: {info.priority}")
-        print(f"  Server: {info.server}")
-        if info.properties:
-            print("  Properties are:")
-            for key, value in info.properties.items():
-                print(f"    {key!r}: {value!r}")
-        else:
-            print("  No properties")
-    else:
-        print("  No info")
-    print("\n")
+
+    except Exception as e:
+        return ToolResult(success=False, error=f"mDNS service discovery failed: {str(e)}")
+
+    finally:
+        await runner.stop_browsing()
+
+
+class MDNSServiceDiscoveryError(Exception):
+    """Exception raised for errors during mDNS service discovery."""
+
+    pass
 
 
 class AsyncRunner:
-    def __init__(self, args: Any) -> None:
-        self.args = args
+    def __init__(self, find_all: bool = False, ip_version: IPVersion = IPVersion.V4Only) -> None:
+        self.find_all = find_all
+        self.ip_version = ip_version
         self.aiobrowser: AsyncServiceBrowser | None = None
         self.aiozc: AsyncZeroconf | None = None
-        self.ip_version = IPVersion.V4Only
-        if args.v6:
-            self.ip_version = IPVersion.All
-        elif args.v6_only:
-            self.ip_version = IPVersion.V6Only
+        self._discovered_services: list[dict[str, Any]] = []
+        self._discovered_service_types: list[str] = []
 
-    async def async_run(self) -> None:
-        self.aiozc = AsyncZeroconf(ip_version=self.ip_version)
+    def _service_callback(
+        self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange
+    ) -> None:
+        if state_change is ServiceStateChange.Added:
+            task = asyncio.ensure_future(self._process_service_info(zeroconf, service_type, name))
+            _PENDING_TASKS.add(task)
+            task.add_done_callback(_PENDING_TASKS.discard)
 
-        services = ["_http._tcp.local.", "_hap._tcp.local."]
-        if self.args.find:
-            services = list(
-                await AsyncZeroconfServiceTypes.async_find(
-                    aiozc=self.aiozc,
-                    ip_version=self.ip_version
-                )
+    async def _process_service_info(self, zeroconf: Zeroconf, service_type: str, name: str) -> None:
+        info = AsyncServiceInfo(service_type, name)
+        await info.async_request(zeroconf, 3000)
+
+        if info:
+            addresses = [
+                f"{addr}:{cast(int, info.port)}" for addr in info.parsed_scoped_addresses()
+            ]
+            meta = SERVICE_MAP.get(
+                service_type,
+                {"category": "Unknown", "description": "Unrecognized mDNS service type"},
             )
 
-        print(f"\nBrowsing {services} service(s), press Ctrl-C to exit...\n")
-        self.aiobrowser = AsyncServiceBrowser(
-            self.aiozc.zeroconf, services, handlers=[async_on_service_state_change]
-        )
-        await asyncio.Event().wait()
+            service_data = {
+                "name": name,
+                "type": service_type,
+                "category": meta.get("category"),
+                "description": meta.get("description"),
+                "addresses": addresses,
+                "weight": info.weight,
+                "priority": info.priority,
+                "server": info.server,
+                "properties": dict(info.properties) if info.properties else {},
+            }
 
-    async def async_close(self) -> None:
-        assert self.aiozc is not None
-        assert self.aiobrowser is not None
-        await self.aiobrowser.async_cancel()
-        await self.aiozc.async_close()
+            self._discovered_services.append(service_data)
 
+    async def start_browsing(
+        self, timeout: float = 5.0
+    ) -> tuple[bool, Optional[str], list[dict[str, Any]], list[str]]:
+        """Start browsing for mDNS services.
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+        Args:
+            timeout: How long to browse for services in seconds
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--find", action="store_true", help="Browse all available services")
-    version_group = parser.add_mutually_exclusive_group()
-    version_group.add_argument("--v6", action="store_true")
-    version_group.add_argument("--v6-only", action="store_true")
-    cli_args = parser.parse_args()
+        Returns:
+            Tuple containing:
+                bool: Success flag
+                Optional[str]: Error message if failed
+                list[dict[str, Any]]: Discovered services
+                list[str]: Service types found
+        """
+        try:
+            self.aiozc = AsyncZeroconf(ip_version=self.ip_version)
 
-    if cli_args.debug:
-        logging.getLogger("zeroconf").setLevel(logging.DEBUG)
+            services = ["_http._tcp.local.", "_hap._tcp.local."]
+            if self.find_all:
+                services = list(
+                    await AsyncZeroconfServiceTypes.async_find(
+                        aiozc=self.aiozc, ip_version=self.ip_version
+                    )
+                )
 
-    loop = asyncio.get_event_loop()
-    runner = AsyncRunner(cli_args)
-    try:
-        loop.run_until_complete(runner.async_run())
-    except KeyboardInterrupt:
-        loop.run_until_complete(runner.async_close())
+            self._discovered_service_types = services
+            self.aiobrowser = AsyncServiceBrowser(
+                self.aiozc.zeroconf, services, handlers=[self._service_callback]
+            )
+
+            await asyncio.sleep(timeout)
+
+            return True, None, self._discovered_services, self._discovered_service_types
+
+        except Exception as e:
+            return False, str(e), [], []
+
+    async def stop_browsing(self) -> None:
+        """Stop browsing and cleanup resources."""
+        if self.aiobrowser:
+            await self.aiobrowser.async_cancel()
+        if self.aiozc:
+            await self.aiozc.async_close()
