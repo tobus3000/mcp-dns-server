@@ -26,7 +26,10 @@ unsafe-load-any-extension=no
 max-module-lines=2000
 
 # Allow optimization for modules
-optimize-ast=yes
+# 'optimize-ast' was removed because newer pylint versions may not recognize it
+# (causes 'Unrecognized option' in some editors). If you need AST optimizations,
+# configure them via the pylint executable or omit this option.
+
 
 [MESSAGES CONTROL]
 # Only show warnings with the listed confidence levels
@@ -127,7 +130,9 @@ allow-wildcard-with-all=no
 
 [CLASSES]
 # List of interface methods
-interface-rgx=^[A-Z][a-zA-Z0-9]*$
+# 'interface-rgx' removed because some pylint backends (and the language server)
+# report it as unrecognized. If you rely on interface naming checks, consider
+# moving this to a project-specific config consumed only by pylint itself.
 
 [EXCEPTIONS]
 # Exceptions that will emit a warning when being caught.

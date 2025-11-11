@@ -1,4 +1,6 @@
-"""MCP DNS Server - An MCP server for DNS name resolution and troubleshooting."""
+"""
+MCP DNS Server - An MCP server for DNS name resolution and troubleshooting.
+"""
 
 import asyncio
 import ipaddress
