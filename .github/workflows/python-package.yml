@@ -26,16 +26,10 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        # Prefer installing from pyproject.toml (PEP 517/518). If the project
-        # exposes dev extras, install them with editable mode. Fall back to
-        # requirements.txt if pyproject.toml is not present or pip install fails.
-        if [ -f pyproject.toml ]; then \
-          python -m pip install -e ".[dev]" || python -m pip install -r requirements.txt; \
-        else \
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi; \
-        fi
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install flake8 pytest pytest-asyncio pytest-cov
+        # Install the project in editable mode with dev dependencies
+        python -m pip install -e ".[dev]"
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
