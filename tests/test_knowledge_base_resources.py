@@ -90,14 +90,3 @@ content: "This is a test article."
         # The prompts should be added during initialization
         # Verify that the registration method was called during init
         # (This is tested implicitly by the fact that the server was created successfully)
-
-    def test_register_knowledge_base_prompts(self):
-        """Test that knowledge base prompts are registered."""
-        server = DNSMCPServer(config_path=self.temp_config.name)
-
-        # Check that the method to register prompts exists
-        assert hasattr(server, "register_knowledge_base_prompts")
-
-        # The prompts should be added during initialization
-        # We verify this by checking that the add_prompt method was called
-        # (though in the actual implementation, this is handled by the MCPServer)

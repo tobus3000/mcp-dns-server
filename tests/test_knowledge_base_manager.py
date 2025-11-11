@@ -3,8 +3,6 @@
 import os
 import tempfile
 
-import pytest
-
 from src.knowledge_base.manager import KnowledgeBaseManager
 
 
