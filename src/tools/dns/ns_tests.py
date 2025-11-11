@@ -467,15 +467,20 @@ async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
 
     # Test ANY query behavior with different configurations
     test_cases = [
-        ("any_basic", {"use_edns": False, "use_tcp": False}),
-        ("any_edns", {"use_edns": True, "use_tcp": False}),
-        ("any_tcp", {"use_edns": False, "use_tcp": True}),
-        ("any_edns_tcp", {"use_edns": True, "use_tcp": True}),
+        ("any_basic", False, False),
+        ("any_edns", True, False),
+        ("any_tcp", False, True),
+        ("any_edns_tcp", True, True),
     ]
     resolver = Resolver()
-    for test_name, params in test_cases:
+    for test_name, use_edns, use_tcp in test_cases:
         result = await resolver.async_resolve(
-            domain, rdtype="ANY", rdclass="IN", nameserver=nameserver, **params
+            domain,
+            rdtype="ANY",
+            rdclass="IN",
+            nameserver=nameserver,
+            use_edns=use_edns,
+            use_tcp=use_tcp,
         )
         results["tests"][test_name] = {
             "success": result.success,

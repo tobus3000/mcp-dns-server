@@ -24,9 +24,9 @@ from dns.rdtypes.ANY.NSEC import NSEC
 from dns.rdtypes.ANY.NSEC3 import NSEC3
 from dns.rdtypes.ANY.RRSIG import RRSIG
 
-from exceptions import ValidationError, handle_dns_error
+from exceptions import handle_dns_error
 from resolver import Resolver
-from typedefs import TestResult, ToolResult, ValidationResult
+from typedefs import ToolResult, ValidationResult
 
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA
@@ -669,7 +669,7 @@ def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[s
     return key_results
 
 
-def test_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
+def check_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
     """Test DNS server's robustness to various edge cases.
 
     Tests various edge cases and potential attack vectors:
@@ -1035,7 +1035,7 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
     report["algorithms"] = {"algorithm_numbers": sorted(list(algs))}
 
     # 9) Robustness Testing
-    report["robustness"] = test_robustness(zone_name, timeout)
+    report["robustness"] = check_robustness(zone_name, timeout)
 
     return report
 

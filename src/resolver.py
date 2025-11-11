@@ -6,6 +6,7 @@ dnspython as the underlying DNS resolution engine.
 """
 
 import asyncio
+import ipaddress
 import socket
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -92,8 +93,81 @@ class Resolver:
         self.resolver = dns.resolver.Resolver(configure=True)
         self.resolver.lifetime = timeout
         if nameservers:
-            # TODO: Check if nameservers is list of IPs. Convert to IP if FQDNs.
-            self.resolver.nameservers = nameservers
+            # Validate and convert FQDNs to IP addresses if needed
+            validated_ns = self._validate_and_convert_nameservers(nameservers)
+            if validated_ns:
+                self.resolver.nameservers = validated_ns
+
+    def _validate_and_convert_nameservers(self, nameservers: List[str]) -> List[str]:
+        """Validate nameservers and convert FQDNs to IP addresses.
+
+        Args:
+            nameservers: List of nameserver addresses (can be IPs or FQDNs).
+
+        Returns:
+            List of validated IP addresses. FQDNs are resolved to their IPs.
+            Returns empty list if no valid nameservers found.
+        """
+        validated = []
+        for ns in nameservers:
+            ns = ns.strip()
+            if not ns:
+                continue
+
+            # Check if it's already an IP address (IPv4 or IPv6)
+            if self._is_valid_ip(ns):
+                validated.append(ns)
+            else:
+                # It's likely a FQDN, try to resolve it
+                resolved_ips = self._resolve_nameserver_fqdn(ns)
+                validated.extend(resolved_ips)
+
+        return validated
+
+    @staticmethod
+    def _is_valid_ip(address: str) -> bool:
+        """Check if a string is a valid IPv4 or IPv6 address.
+
+        Args:
+            address: The address string to validate.
+
+        Returns:
+            True if valid IP address, False otherwise.
+        """
+        try:
+            ipaddress.ip_address(address)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _resolve_nameserver_fqdn(fqdn: str) -> List[str]:
+        """Resolve a nameserver FQDN to its IP address(es).
+
+        Args:
+            fqdn: The fully qualified domain name to resolve.
+
+        Returns:
+            List of IP addresses. Empty list if resolution fails.
+        """
+        try:
+            # Use socket.getaddrinfo to resolve the FQDN
+            # This handles both IPv4 and IPv6 resolution
+            addr_info = socket.getaddrinfo(fqdn, 53, socket.AF_UNSPEC, socket.SOCK_DGRAM)
+            ips = []
+            seen = set()  # Avoid duplicates
+
+            for _family, _socktype, _proto, _canonname, sockaddr in addr_info:
+                ip = sockaddr[0]
+                if ip not in seen:
+                    ips.append(ip)
+                    seen.add(ip)
+
+            return ips
+        except (socket.gaierror, socket.error, OSError):
+            # Resolution failed; return empty list
+            # Could be a misconfigured FQDN or network issue
+            return []
 
     async def async_resolve(
         self,
@@ -155,12 +229,26 @@ class Resolver:
                     response = await dns.asyncquery.udp(query, nameserver, timeout=timeout)
                     if response.flags & dns.flags.TC:  # Truncated, retry with TCP
                         response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
-                except Exception as e:
+                except dns.exception.DNSException as e:
                     if "Message too big" in str(e):
                         # UDP message too large, retry with TCP
                         response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
                     else:
-                        raise
+                        return QueryResult(
+                            success=False,
+                            error=str(e),
+                            details={"exception_type": type(e).__name__},
+                        )
+                except (socket.error, asyncio.TimeoutError) as e:
+                    return QueryResult(
+                        success=False, error=str(e), details={"exception_type": type(e).__name__}
+                    )
+                except Exception as e:
+                    return QueryResult(
+                        success=False,
+                        error=f"Unexpected error: {str(e)}",
+                        details={"exception_type": type(e).__name__},
+                    )
 
             return QueryResult(
                 success=True,
@@ -180,7 +268,11 @@ class Resolver:
                 },
             )
 
-        except (dns.exception.DNSException, socket.error, asyncio.TimeoutError) as e:
+        except dns.exception.DNSException as e:
+            return QueryResult(
+                success=False, error=str(e), details={"exception_type": type(e).__name__}
+            )
+        except (socket.error, asyncio.TimeoutError) as e:
             return QueryResult(
                 success=False, error=str(e), details={"exception_type": type(e).__name__}
             )
