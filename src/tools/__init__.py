@@ -22,8 +22,8 @@ from .scanner import (
 from .validator import (
     check_dnssec_impl,
     lookalike_risk_impl,
-    test_nameserver_role_impl,
     tld_check_impl,
+    verify_nameserver_role_impl,
 )
 
 __ALL__ = [
@@ -39,7 +39,7 @@ __ALL__ = [
     scan_server_for_dns_spoofing_impl,
     basic_dns_assistant_impl,
     tld_check_impl,
-    test_nameserver_role_impl,
+    verify_nameserver_role_impl,
     detect_dns_root_environment_impl,
     run_comprehensive_tests_impl,
     run_edns_tests_impl,

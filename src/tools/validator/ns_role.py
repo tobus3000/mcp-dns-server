@@ -6,7 +6,7 @@ from resolver import Resolver
 from typedefs import ToolResult
 
 
-async def test_nameserver_role(
+async def verify_nameserver_role(
     nameserver: str,
     domain: str = "example.com",
     authority_test_domain: Optional[str] = None,
@@ -67,7 +67,7 @@ async def test_nameserver_role(
     )
 
 
-async def test_nameserver_role_impl(
+async def verify_nameserver_role_impl(
     nameserver: str, domain: str | None, authority_test_domain: str | None
 ) -> ToolResult:
     """Test whether a given DNS server is authoritative, a resolver, or mixed-mode.
@@ -83,7 +83,7 @@ async def test_nameserver_role_impl(
     """
     if not domain:
         domain = "example.com"
-    return await test_nameserver_role(
+    return await verify_nameserver_role(
         nameserver=nameserver, domain=domain, authority_test_domain=authority_test_domain
     )
 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     async def main():
         for ns in ["192.168.200.1", "192.168.200.4"]:
-            result = await test_nameserver_role(ns)
+            result = await verify_nameserver_role(ns)
             print(result)
 
     asyncio.run(main())

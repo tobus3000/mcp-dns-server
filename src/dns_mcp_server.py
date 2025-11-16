@@ -35,8 +35,8 @@ try:
         scan_server_for_dns_spoofing_impl,
         scan_subnet_for_open_resolvers_impl,
         simple_dns_lookup_impl,
-        test_nameserver_role_impl,
         tld_check_impl,
+        verify_nameserver_role_impl,
     )
     from .typedefs import ToolResult
 except ImportError:
@@ -60,8 +60,8 @@ except ImportError:
         scan_server_for_dns_spoofing_impl,
         scan_subnet_for_open_resolvers_impl,
         simple_dns_lookup_impl,
-        test_nameserver_role_impl,
         tld_check_impl,
+        verify_nameserver_role_impl,
     )
     from typedefs import ToolResult
 logger = get_logger(__name__)
@@ -305,7 +305,7 @@ class DNSMCPServer:
             await ctx.info(
                 f"Performing role check for nameserver `{nameserver}` " + f"using domain {domain}."
             )
-            return await test_nameserver_role_impl(
+            return await verify_nameserver_role_impl(
                 nameserver=nameserver, domain=domain, authority_test_domain=authority_test_domain
             )
 
