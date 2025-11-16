@@ -580,6 +580,7 @@ def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[s
 
     if dnskey_rrset is None:
         key_results["critical"].append("No DNSKEY records found")
+        key_results["algorithms"] = []  # Convert set to list for JSON serialization
         return key_results
 
     for r in dnskey_rrset:
