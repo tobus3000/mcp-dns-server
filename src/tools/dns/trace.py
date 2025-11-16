@@ -1,12 +1,12 @@
 """DNS Trace tool that mimics 'dig +trace' behavior.
-#TODO: Fix trace function. Stops on 2nd (wrong) hop...
+Performs iterative DNS resolution from root servers down to the target domain,
+optionally following CNAME chains to final A/AAAA records.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import dns.name
 import dns.rdatatype
-from dns.rrset import RRset
 
 from resolver import Resolver
 from typedefs import ToolResult
@@ -67,11 +67,18 @@ class Trace:
         if not servers:
             return {"domain": domain, "hops": [], "error": "No root servers found."}
 
-        rrset, response = None, None
+        response = None
+        # Iterate through each level of the domain hierarchy, from root down
+        # For "example.com", labels are ['example', 'com', '']
+        # We iterate backwards: [''] (root), ['com'], ['example', 'com']
         for i in range(len(domain_name.labels) - 1, -1, -1):
             subdomain = dns.name.Name(domain_name.labels[i:])
-            rrset, response = self._query_hierarchy_level(subdomain, servers)
-            if rrset or response:
+            response = self._query_hierarchy_level(subdomain, servers)
+
+            # Extract next servers for the next iteration
+            servers = self._extract_next_servers(response)
+            if not servers:
+                # No more servers to query, we've reached the end
                 break
 
         final_rrset = self._resolve_final_answer(response)
@@ -125,20 +132,18 @@ class Trace:
 
         return "\n".join(output_lines)
 
-    def _query_hierarchy_level(
-        self, subdomain, servers
-    ) -> Tuple[Optional[RRset | None], Optional[Any]]:
-        """Query a set of servers for a subdomain, return RRset and response.
+    def _query_hierarchy_level(self, subdomain, servers) -> Optional[Any]:
+        """Query a set of servers for a subdomain, return the response.
 
         Args:
             subdomain: dns.name.Name object for the current subdomain to query.
             servers: List of server IPs to query.
 
         Returns:
-            Tuple of (RRset or None, DNS message or None)
+            DNS message response or None
         """
         for server in servers:
-            rrset, response = self.resolver.resolve(str(subdomain), "NS", nameserver=server)
+            _, response = self.resolver.resolve(str(subdomain), "NS", nameserver=server)
             if not response:
                 continue
 
@@ -150,24 +155,14 @@ class Trace:
             }
             self.trace_steps.append(hop_info)
 
-            if response.answer:
-                final_hop = {
-                    "server": server,
-                    "qname": str(subdomain),
-                    "qtype": "FINAL",
-                    "response": response,
-                }
-                self.trace_steps.append(final_hop)
-                return rrset, response
+            # Return the response after recording this hop
+            # The caller will extract next servers from this response
+            return response
 
-            next_servers = self._extract_next_servers(response)
-            if next_servers:
-                return self._query_hierarchy_level(subdomain, next_servers)
-
-        return None, None
+        return None
 
     def _extract_next_servers(self, response) -> List[str]:
-        """Extract next authoritative servers from additional or authority sections.
+        """Extract next authoritative servers from additional, authority, or answer sections.
 
         Args:
             response: The DNS message from the current server.
@@ -175,16 +170,33 @@ class Trace:
         Returns:
             List of IP addresses of next authoritative servers.
         """
+        if not response:
+            return []
+
         next_servers = []
 
+        # First, try to get IPs from additional section
         for rr in response.additional:
             if rr.rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
                 for r in rr:
                     next_servers.append(r.address)
 
+        # If no additional records, look in authority section
         if not next_servers:
             ns_names = []
             for rr in response.authority:
+                if rr.rdtype == dns.rdatatype.NS:
+                    ns_names.extend(str(r.target) for r in rr)
+            for ns in ns_names:
+                a_rrset, _ = self.resolver.resolve(ns, "A")
+                if a_rrset:
+                    for rdata in a_rrset:
+                        next_servers.append(rdata.address)
+
+        # If still no servers, try the answer section (for cases like root query)
+        if not next_servers:
+            ns_names = []
+            for rr in response.answer:
                 if rr.rdtype == dns.rdatatype.NS:
                     ns_names.extend(str(r.target) for r in rr)
             for ns in ns_names:

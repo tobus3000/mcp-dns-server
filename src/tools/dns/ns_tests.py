@@ -39,7 +39,7 @@ DEFAULT_EDNS_SIZE = 1232  # Conservative EDNS buffer size
 COMMON_RECORD_TYPES = ["A", "AAAA", "MX", "NS", "TXT", "SOA", "CNAME"]
 
 
-async def test_basic_records(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_basic_records(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test basic DNS record types and their correctness."""
     results = {
         "domain": domain,
@@ -84,7 +84,7 @@ async def test_basic_records(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test handling of various QNAME formats and edge cases."""
     results = {
         "domain": domain,
@@ -152,7 +152,7 @@ async def test_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_edns_support(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_edns_support(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test EDNS(0) support and behavior."""
     results = {
         "domain": domain,
@@ -214,7 +214,7 @@ async def test_edns_support(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test DNS-over-TCP behavior and handling."""
     results = {
         "domain": domain,
@@ -310,7 +310,7 @@ async def test_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_performance(
+async def performance_test(
     domain: str, nameserver: str, num_queries: int = 100, concurrent: int = 10
 ) -> Dict[str, Any]:
     """
@@ -393,7 +393,7 @@ async def test_performance(
     return results
 
 
-async def test_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test delegation correctness and glue record handling."""
     results = {
         "domain": domain,
@@ -456,7 +456,7 @@ async def test_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test server behavior for ANY queries according to RFC 8482."""
     results = {
         "domain": domain,
@@ -578,7 +578,7 @@ async def test_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_zone_transfer(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_zone_transfer(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test if server allows a zone transfer.
 
     Args:
@@ -625,7 +625,7 @@ async def test_zone_transfer(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_chaos_records(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_chaos_records(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test if a nameserver responds to version.bind and others in CHAOS rdclass.
 
     Args:
@@ -744,7 +744,7 @@ async def test_chaos_records(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test if nameserver behaves like an open resolver.
 
     An open resolver will:
@@ -834,7 +834,7 @@ async def test_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test nameserver's handling of edge cases and malformed queries."""
     results = {
         "domain": domain,
@@ -911,7 +911,7 @@ async def test_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def test_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
     """Test DNS Cookie (RFC 7873) support and behavior for a given nameserver."""
 
     results = {
@@ -1026,18 +1026,18 @@ async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any
 
     # Run all test suites
     test_suites = {
-        "basic_records": test_basic_records,
-        "qname_handling": test_qname_handling,
-        "edns_support": test_edns_support,
-        "tcp_behavior": test_tcp_behavior,
-        "any_queries": test_any_queries,
-        "delegation": test_delegation,
-        "robustness": test_robustness,
-        "performance": test_performance,
-        "open_resolver": test_open_resolver,
-        "dns_cookie": test_dns_cookie,
-        "zone_transfer": test_zone_transfer,
-        "chaos_records": test_chaos_records,
+        "basic_records": verify_basic_records,
+        "qname_handling": verify_qname_handling,
+        "edns_support": verify_edns_support,
+        "tcp_behavior": verify_tcp_behavior,
+        "any_queries": verify_any_queries,
+        "delegation": verify_delegation,
+        "robustness": verify_robustness,
+        "performance": performance_test,
+        "open_resolver": verify_open_resolver,
+        "dns_cookie": verify_dns_cookie,
+        "zone_transfer": verify_zone_transfer,
+        "chaos_records": verify_chaos_records,
     }
 
     # Run all test suites concurrently
@@ -1266,7 +1266,7 @@ async def run_edns_tests_impl(domain: str, nameserver: str) -> ToolResult:
     Returns:
         ToolResult: A standard result to be in-line with our other tools.
     """
-    report = await test_edns_support(domain, nameserver)
+    report = await verify_edns_support(domain, nameserver)
     report["interpretation"] = interpret_test_results(report)
     return ToolResult(
         success=True,
@@ -1289,7 +1289,7 @@ async def run_tcp_behavior_tests_impl(domain: str, nameserver: str) -> ToolResul
     Returns:
         ToolResult: A standard result to be in-line with our other tools.
     """
-    report = await test_tcp_behavior(domain, nameserver)
+    report = await verify_tcp_behavior(domain, nameserver)
     report["interpretation"] = interpret_test_results(report)
     return ToolResult(
         success=True,
@@ -1312,7 +1312,7 @@ async def run_dns_cookie_tests_impl(domain: str, nameserver: str) -> ToolResult:
     Returns:
         ToolResult: A standard result to be in-line with our other tools.
     """
-    report = await test_dns_cookie(domain, nameserver)
+    report = await verify_dns_cookie(domain, nameserver)
     report["interpretation"] = interpret_test_results(report)
     return ToolResult(
         success=True,

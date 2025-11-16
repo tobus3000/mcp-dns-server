@@ -1,3 +1,20 @@
+"""Nameserver role detection module.
+
+This module provides functionality to test whether a DNS server is authoritative,
+a recursive resolver, or operates in mixed mode.
+
+Example usage:
+    import asyncio
+    from ns_role import verify_nameserver_role
+
+    async def main():
+        for ns in ["192.168.200.1", "192.168.200.4"]:
+            result = await verify_nameserver_role(ns)
+            print(result)
+
+    asyncio.run(main())
+"""
+
 from typing import Optional
 
 import dns.flags
@@ -86,15 +103,3 @@ async def verify_nameserver_role_impl(
     return await verify_nameserver_role(
         nameserver=nameserver, domain=domain, authority_test_domain=authority_test_domain
     )
-
-
-# Example usage
-if __name__ == "__main__":
-    import asyncio
-
-    async def main():
-        for ns in ["192.168.200.1", "192.168.200.4"]:
-            result = await verify_nameserver_role(ns)
-            print(result)
-
-    asyncio.run(main())
