@@ -224,7 +224,10 @@ class DNSMCPServer:
 
         @self.server.tool(
             name="check_dnssec",
-            description="Check DNSSEC validation for a given domain",
+            description=(
+                "Check DNSSEC validation for a given domain and return an in-depth "
+                "report that highlights any issues found."
+            ),
             tags=set(("dns", "security", "dnssec", "validation")),
             enabled=self.config["features"].get("dnssec_validation", False),
         )

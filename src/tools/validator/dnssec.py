@@ -285,6 +285,44 @@ def validate_denial_proof(resp: Message, _target: str) -> Dict[str, Any]:
     return result
 
 
+def extract_expired_signatures(rrsig_rrset: Optional[dns.rrset.RRset]) -> List[Dict[str, Any]]:
+    """Extract and report expired RRSIG records with details."""
+    expired = []
+    if rrsig_rrset is None:
+        return expired
+
+    now = int(time.time())
+    for rdata in rrsig_rrset:
+        try:
+            key_id = (
+                rdata.key_tag
+                if hasattr(rdata, "key_tag")
+                else rdata.key_id if hasattr(rdata, "key_id") else 0
+            )
+            inception = rdata.inception
+            expiration = rdata.expiration
+
+            if expiration < now:
+                expired.append(
+                    {
+                        "rrsig_id": key_id,
+                        "type_covered": (
+                            dns.rdatatype.to_text(rdata.type_covered)
+                            if hasattr(rdata, "type_covered")
+                            else "unknown"
+                        ),
+                        "inception": inception,
+                        "expiration": expiration,
+                        "expired_for_seconds": now - expiration,
+                        "status": "expired",
+                    }
+                )
+        except (AttributeError, ValueError, TypeError):
+            continue
+
+    return expired
+
+
 def check_rrset_signature(
     target: str,
     rdtype: str,
@@ -305,6 +343,13 @@ def check_rrset_signature(
 
     rrsig = extract_rrsig_for_rrset(resp, rdtype)
     result["rrsig_present"] = rrsig is not None
+
+    # Check for expired signatures
+    if rrsig is not None:
+        expired_sigs = extract_expired_signatures(rrsig)
+        if expired_sigs:
+            result["expired_signatures"] = expired_sigs
+
     if rrsig is None:
         result["valid"] = False
         result["error"] = "no RRSIG present"
@@ -314,6 +359,32 @@ def check_rrset_signature(
     result["valid"] = valid
     if not valid:
         result["error"] = message
+        # Even if signature validation fails, report signature details
+        sig_details = []
+        for rdata in rrsig:
+            try:
+                inception = rdata.inception
+                expiration = rdata.expiration
+                now = int(time.time())
+                key_id = (
+                    rdata.key_tag
+                    if hasattr(rdata, "key_tag")
+                    else rdata.key_id if hasattr(rdata, "key_id") else 0
+                )
+                sig_details.append(
+                    {
+                        "rrsig_id": key_id,
+                        "inception": inception,
+                        "expiration": expiration,
+                        "now": now,
+                        "valid_timeframe": inception <= now <= expiration,
+                        "expired": expiration < now,
+                    }
+                )
+            except (AttributeError, ValueError, TypeError):
+                continue
+        if sig_details:
+            result["signature_details"] = sig_details
     else:
         # check signature time bounds
         sig_ok_times = []
@@ -323,8 +394,14 @@ def check_rrset_signature(
                 inception = rdata.inception
                 expiration = rdata.expiration
                 now = int(time.time())
+                key_id = (
+                    rdata.key_tag
+                    if hasattr(rdata, "key_tag")
+                    else rdata.key_id if hasattr(rdata, "key_id") else 0
+                )
                 sig_ok_times.append(
                     {
+                        "rrsig_id": key_id,
                         "inception": inception,
                         "expiration": expiration,
                         "now": now,
@@ -347,20 +424,41 @@ def check_parent_ds(
         "parent": parent,
         "parent_ds_present": ds_rrset is not None,
         "denied_keys": [],
+        "dnskey_validation": {
+            "total_dnssec_keys": 0,
+            "validated_keys": 0,
+            "failed_validations": [],
+        },
     }
     # compute DS from the child DNSKEY
     if dnskey_rrset is None:
         result["child_dnskey_present"] = False
         return result
     result["child_dnskey_present"] = True
+
+    # Track total DNSSEC keys (with SEP flag)
+    result["dnskey_validation"]["total_dnssec_keys"] = sum(
+        1 for r in dnskey_rrset if bool(r.flags & 0x0100)
+    )
+
     computed_sha256, denied_sha256 = compute_ds_from_dnskey(zone_name, dnskey_rrset, "SHA256")
     computed_sha1, denied_sha1 = compute_ds_from_dnskey(zone_name, dnskey_rrset, "SHA1")
     # Track all denied keys
     result["denied_keys"].extend(denied_sha256)
     result["denied_keys"].extend(denied_sha1)
     result["computed_ds"] = {"SHA256": computed_sha256, "SHA1": computed_sha1}
+
     if ds_rrset is None:
+        # No DS records found - all DNSKEYs fail validation
+        if result["dnskey_validation"]["total_dnssec_keys"] > 0:
+            result["dnskey_validation"]["failed_validations"].append(
+                {
+                    "error": "No DS records found in parent zone",
+                    "affected_keys": result["dnskey_validation"]["total_dnssec_keys"],
+                }
+            )
         return result
+
     # Compare textual forms
     parent_ds_texts = [str(r) for r in ds_rrset]
     result["parent_ds_texts"] = parent_ds_texts
@@ -372,10 +470,42 @@ def check_parent_ds(
             "algorithms": list(set(k["algorithm_name"] for k in result["denied_keys"])),
             "flags": list(set(k["flags"] for k in result["denied_keys"])),
         }
+
+    all_computed_ds = computed_sha256 + computed_sha1
+    validated_ds = set()
+
     for ds in parent_ds_texts:
-        for cds in computed_sha256 + computed_sha1:
-            if ds.split()[-1] == cds.split()[-1] or ds == cds:
+        ds_hash = ds.split()[-1] if ds.split() else ""
+        matched = False
+        for i, cds in enumerate(all_computed_ds):
+            cds_hash = cds.split()[-1] if cds.split() else ""
+            if ds_hash == cds_hash or ds == cds:
                 matches.append({"parent_ds": ds, "matches_computed": cds})
+                validated_ds.add(i)
+                matched = True
+
+        if not matched:
+            result["dnskey_validation"]["failed_validations"].append(
+                {"parent_ds": ds, "error": "No computed DS matches parent DS record"}
+            )
+
+    # Count validated keys
+    result["dnskey_validation"]["validated_keys"] = len(validated_ds)
+
+    # Report DNSKEYs that couldn't be validated
+    unvalidated_count = (
+        result["dnskey_validation"]["total_dnssec_keys"]
+        - result["dnskey_validation"]["validated_keys"]
+    )
+    if unvalidated_count > 0:
+        result["dnskey_validation"]["failed_validations"].insert(
+            0,
+            {
+                "error": f"None of the {result['dnskey_validation']['total_dnssec_keys']} DNSKEY records could be validated by any of the {len(parent_ds_texts)} DS records",
+                "severity": "error",
+            },
+        )
+
     result["matches"] = matches
     return result
 
@@ -653,8 +783,15 @@ def inspect_keys_and_rollover(dnskey_rrset: Optional[dns.rrset.RRset]) -> Dict[s
     # Check for critical issues
     if sep_count == 0:
         key_results["critical"].append("No KSK (SEP) keys found")
-    if zsk_count == 0:
-        key_results["critical"].append("No ZSK keys found")
+    # Missing ZSK is only critical if no KSK exists.
+    # A zone can be validly signed with a single key acting as both KSK and ZSK.
+    if zsk_count == 0 and sep_count > 0:
+        key_results["warnings"].append(
+            "No dedicated Zone Signing Keys (ZSK) found. This zone uses a single key for both signing and delegation. "
+            "This is valid but less flexible than using separate KSK and ZSK for easier key rollover."
+        )
+    elif zsk_count == 0:
+        key_results["critical"].append("No ZSK keys found and no KSK present")
     if sep_count > 2:
         key_results["warnings"].append(f"Unusually high number of KSK keys: {sep_count}")
 
@@ -983,15 +1120,56 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
         _, resp = _resolver.fetch_dnskey(zone_name)
         rrsig = extract_rrsig_for_rrset(resp, "DNSKEY") if resp else None
         report["dnskey_signature"].update(
-            {"present": rrsig is not None, "valid": False, "error": None}
+            {"present": rrsig is not None, "valid": False, "error": None, "rrsig_count": 0}
         )
+
+        # Capture RRSIG details including expiration
         if rrsig is not None:
+            report["dnskey_signature"]["rrsig_count"] = len(rrsig)
+            expired_rrsigs = extract_expired_signatures(rrsig)
+            if expired_rrsigs:
+                report["dnskey_signature"]["expired_signatures"] = expired_rrsigs
+
+            # Capture signature details for validation failures
+            sig_details = []
+            for rdata in rrsig:
+                try:
+                    key_id = (
+                        rdata.key_tag
+                        if hasattr(rdata, "key_tag")
+                        else rdata.key_id if hasattr(rdata, "key_id") else 0
+                    )
+                    inception = rdata.inception
+                    expiration = rdata.expiration
+                    now = int(time.time())
+                    sig_details.append(
+                        {
+                            "rrsig_id": key_id,
+                            "inception": inception,
+                            "expiration": expiration,
+                            "now": now,
+                            "expired": expiration < now,
+                        }
+                    )
+                except (AttributeError, ValueError, TypeError):
+                    continue
+
+            if sig_details:
+                report["dnskey_signature"]["rrsig_details"] = sig_details
+
             valid, message = validate_rrset_with_dnskey(
                 dnskey_rrset, rrsig, dnskey_rrset, zone_name
             )
             report["dnskey_signature"].update(
                 {"valid": valid, "error": message if not valid else None}
             )
+
+            # If validation fails, add a comprehensive error message
+            if not valid:
+                report["dnskey_signature"]["validation_error"] = (
+                    f"None of the {len(rrsig)} RRSIG and {len(dnskey_rrset)} DNSKEY records "
+                    f"validate the DNSKEY RRset: {message}"
+                )
 
     # 4) Check common RRsets
     rrtypes = ["SOA", "NS", "A", "AAAA", "MX", "TXT"]
@@ -1075,12 +1253,28 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
     # Key Configuration Analysis
     if report["dnskey"]["present"]:
         key_info = report["keys"]
+
+        # Format key counts with context
+        ksk_status = f"Found {key_info['sep_count']} Key Signing Key(s) (KSK)"
+        if key_info["zsk_count"] > 0:
+            zsk_status = f"and {key_info['zsk_count']} Zone Signing Key(s) (ZSK)"
+        else:
+            zsk_status = "and no dedicated ZSK (using combined signing model)"
+
         interpretation["key_configuration"]["status"].extend(
             [
-                f"Found {key_info['sep_count']} Key Signing Keys (KSK) and {key_info['zsk_count']} Zone Signing Keys (ZSK)",
+                f"{ksk_status} {zsk_status}",
                 f"Using algorithms: {', '.join(dns.dnssec.algorithm_to_text(alg) for alg in report['algorithms']['algorithm_numbers'])}",
             ]
         )
+
+        # Add information about single-key setup when applicable
+        if key_info["sep_count"] > 0 and key_info["zsk_count"] == 0:
+            interpretation["key_configuration"]["status"].append(
+                "Single-key signing model: One key serves as both KSK and ZSK. This is operationally valid but "
+                "less flexible for key rollover compared to separate KSK/ZSK model."
+            )
+
         if key_info.get("critical"):
             interpretation["key_configuration"]["status"].extend(key_info["critical"])
         if key_info.get("warnings"):
@@ -1091,6 +1285,13 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
     # Trust Chain Analysis
     parent_ds = report["parent_ds"]
     if parent_ds.get("parent_ds_present"):
+        # Check DNSKEY validation against DS
+        dnskey_val = parent_ds.get("dnskey_validation", {})
+        if dnskey_val.get("failed_validations"):
+            for failure in dnskey_val["failed_validations"]:
+                if "error" in failure:
+                    interpretation["trust_chain"]["status"].append(f"ERROR: {failure['error']}")
+
         if parent_ds.get("matches"):
             interpretation["trust_chain"]["status"].append(
                 f"Secure delegation found from parent zone {parent_ds['parent']}"
@@ -1104,9 +1305,32 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
             f"No DS record found in parent zone {parent_ds.get('parent', 'unknown')}"
         )
 
+    # DNSKEY Signature Validation Analysis
+    dnskey_sig = report.get("dnskey_signature", {})
+    if dnskey_sig.get("present"):
+        # Check for expired signatures
+        if dnskey_sig.get("expired_signatures"):
+            for exp_sig in dnskey_sig["expired_signatures"]:
+                expired_days = int(exp_sig.get("expired_for_seconds", 0) / 86400)
+                interpretation["trust_chain"]["status"].append(
+                    f"WARNING: RRSIG={exp_sig.get('rrsig_id')} is expired (for {expired_days} days)"
+                )
+
+        # Check validation status
+        if not dnskey_sig.get("valid"):
+            error = dnskey_sig.get("validation_error") or dnskey_sig.get("error", "Unknown error")
+            interpretation["trust_chain"]["status"].append(f"ERROR: {error}")
+
     # Record Validation Details
     for rr_type, result in report["rrsets"].items():
         if result.get("present"):
+            # Check for expired signatures in RRsets
+            if result.get("expired_signatures"):
+                for exp_sig in result["expired_signatures"]:
+                    interpretation["validation_details"]["status"].append(
+                        f"WARNING: RRSIG={exp_sig.get('rrsig_id')} for {rr_type} is expired"
+                    )
+
             status = "valid" if result.get("valid") else "invalid"
             reason = f" ({result.get('error')})" if result.get("error") else ""
             interpretation["validation_details"]["status"].append(

@@ -75,6 +75,10 @@ async def detect_open_resolvers_in_subnet(
 
     tasks = [asyncio.create_task(worker(ip)) for ip in hosts]
     await asyncio.gather(*tasks)
+
+    # Determine if network is private (RFC1918) or public
+    is_private = network.is_private
+
     rating = "normal"
     cnt = len(open_res)
     if cnt > 2:
@@ -89,11 +93,33 @@ async def detect_open_resolvers_in_subnet(
         + f"found in network {network.exploded}.",
         f"{percent}% of hosts in the network are open resolvers.",
     ]
-    if cnt > 2:
+
+    # Add network type context and risk assessment
+    if is_private:
         note.append(
-            "Make sure to implement DNS filtering and/or appropriate firewall "
-            + "rules to prevent these devices from accessing the Internet."
+            f"This network is in the RFC1918 private range ({network.exploded}). "
+            + "The risk of these open resolvers being abused for amplification attacks is small, "
+            + "as they are not directly accessible from the public internet."
         )
+    else:
+        note.append(
+            f"This network is publicly routed ({network.exploded}). "
+            + "The risk of these open resolvers being abused for DNS amplification attacks is HIGH, "
+            + "as they are directly accessible from the public internet and could be used in large-scale DDoS attacks."
+        )
+
+    if cnt > 2:
+        if is_private:
+            note.append(
+                "Although the risk of external abuse is low, it is still recommended to implement "
+                + "DNS filtering and/or appropriate firewall rules to prevent internal unauthorized access."
+            )
+        else:
+            note.append(
+                "Make sure to implement DNS filtering and/or appropriate firewall "
+                + "rules to prevent these devices from being abused for amplification attacks. "
+                + "Consider restricting recursive queries to authorized clients only."
+            )
     if cnt > 85:
         note.append(
             "Such a high number of open resolvers in a network can be a sign that "
@@ -105,6 +131,7 @@ async def detect_open_resolvers_in_subnet(
         output={
             "summary": note,
             "network": network.exploded,
+            "is_private": is_private,
             "total_addresses": network.num_addresses,
             "open_resolver_count": cnt,
             "open_resolver_ip_list": open_res,
