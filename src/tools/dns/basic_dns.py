@@ -9,6 +9,16 @@ from resolver import Resolver
 from typedefs import ToolResult
 
 
+async def available_rdatatypes_impl() -> ToolResult:
+    """Retrieve a list of all available DNS record types.
+
+    Returns:
+        ToolResult: Result object containing the list of DNS record types.
+    """
+    rdatatypes = [dns.rdatatype.to_text(rdtype) for rdtype in dns.rdatatype.RdataType]
+    return ToolResult(success=True, output=rdatatypes)
+
+
 async def simple_dns_lookup_impl(hostname: str) -> ToolResult:
     """Resolve the A record of a given hostname.
 
@@ -56,6 +66,13 @@ async def advanced_dns_lookup_impl(hostname: str, record_type: str) -> ToolResul
     """
     auth_nameservers = []
     resolver = Resolver(timeout=5.0)
+    supported_types = [dns.rdatatype.to_text(rdtype) for rdtype in dns.rdatatype.RdataType]
+    if record_type.upper() not in supported_types:
+        return ToolResult(
+            success=False,
+            error=f"Unsupported record type: {record_type}",
+            details={"supported_record_types": supported_types},
+        )
     if not record_type == "NS":
         ns_res = await resolver.async_resolve(hostname, "NS")
         if ns_res.success and ns_res.response and ns_res.qname and ns_res.rdtype:

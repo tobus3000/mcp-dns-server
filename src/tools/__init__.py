@@ -4,6 +4,7 @@ from .assistant import basic_dns_assistant_impl
 from .converter import punycode_converter_impl
 from .dns import (
     advanced_dns_lookup_impl,
+    available_rdatatypes_impl,
     dns_trace_impl,
     dns_troubleshooting_impl,
     reverse_dns_lookup_impl,
@@ -23,6 +24,7 @@ from .validator import (
     check_dnssec_impl,
     lookalike_risk_impl,
     tld_check_impl,
+    validate_fqdn,
     verify_nameserver_role_impl,
 )
 
@@ -46,4 +48,5 @@ __ALL__ = [
     run_tcp_behavior_tests_impl,
     run_dns_cookie_tests_impl,
     discover_mdns_services_impl,
+    validate_fqdn,
 ]

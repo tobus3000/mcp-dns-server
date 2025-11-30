@@ -4,56 +4,7 @@ Prompt Mixin classes for DNSMCPServer to separate concerns.
 
 from typing import Any, Dict
 
-try:
-    # Try relative import first (when used as part of the package)
-    from .resolver import Resolver
-    from .tools import (
-        advanced_dns_lookup_impl,
-        basic_dns_assistant_impl,
-        check_dnssec_impl,
-        detect_dns_root_environment_impl,
-        dns_trace_impl,
-        dns_troubleshooting_impl,
-        lookalike_risk_impl,
-        punycode_converter_impl,
-        reverse_dns_lookup_impl,
-        run_comprehensive_tests_impl,
-        run_dns_cookie_tests_impl,
-        run_edns_tests_impl,
-        run_tcp_behavior_tests_impl,
-        scan_server_for_dns_spoofing_impl,
-        scan_subnet_for_open_resolvers_impl,
-        simple_dns_lookup_impl,
-        tld_check_impl,
-        verify_nameserver_role_impl,
-    )
-    from .tools.mdns.browser import discover_mdns_services_impl
-    from .typedefs import ToolResult
-except ImportError:
-    # Fall back to absolute import (when running as script or standalone)
-    from resolver import Resolver
-    from tools import (
-        advanced_dns_lookup_impl,
-        basic_dns_assistant_impl,
-        check_dnssec_impl,
-        detect_dns_root_environment_impl,
-        dns_trace_impl,
-        dns_troubleshooting_impl,
-        lookalike_risk_impl,
-        punycode_converter_impl,
-        reverse_dns_lookup_impl,
-        run_comprehensive_tests_impl,
-        run_dns_cookie_tests_impl,
-        run_edns_tests_impl,
-        run_tcp_behavior_tests_impl,
-        scan_server_for_dns_spoofing_impl,
-        scan_subnet_for_open_resolvers_impl,
-        simple_dns_lookup_impl,
-        tld_check_impl,
-        verify_nameserver_role_impl,
-    )
-    from tools.mdns.browser import discover_mdns_services_impl
-    from typedefs import ToolResult
+from resolver import Resolver
 
 
 class PromptRegistrationMixin:
@@ -401,6 +352,17 @@ class PromptRegistrationMixin:
             to help solve a DNS related problem.
             """
             return "Help me solve a DNS related problem."
+
+        @self.server.prompt(
+            name="validate_dns_fqdn",
+            description="Validate a Fully Qualified Domain Name (FQDN) according to DNS RFC rules.",
+        )
+        def validate_dns_fqdn(domain: str) -> str:
+            """Validate a Fully Qualified Domain Name (FQDN) according to DNS RFC rules."""
+            return (
+                f"Validate the FQDN: {domain} according to DNS RFC rules using the "
+                "DNS MCP tool `validate_dns_fqdn`."
+            )
 
     def register_knowledge_base_prompts(self) -> None:
         """Register prompts to simplify interaction with the knowledge base."""

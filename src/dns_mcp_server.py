@@ -44,7 +44,7 @@ class DNSMCPServer(
         self.server = FastMCP(
             name="DNS Resolver MCP Server",
             instructions=(
-                "An MCP server that provides DNS resolution and troubleshooting" " capabilities."
+                "An MCP server that provides DNS resolution and troubleshooting capabilities."
             ),
             log_level="DEBUG",
         )

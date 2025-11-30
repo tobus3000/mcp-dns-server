@@ -7,54 +7,29 @@ from typing import Any, Dict
 
 from fastmcp import Context
 
-try:
-    # Try relative import first (when used as part of the package)
-    from .tools import (
-        advanced_dns_lookup_impl,
-        basic_dns_assistant_impl,
-        check_dnssec_impl,
-        detect_dns_root_environment_impl,
-        dns_trace_impl,
-        dns_troubleshooting_impl,
-        lookalike_risk_impl,
-        punycode_converter_impl,
-        reverse_dns_lookup_impl,
-        run_comprehensive_tests_impl,
-        run_dns_cookie_tests_impl,
-        run_edns_tests_impl,
-        run_tcp_behavior_tests_impl,
-        scan_server_for_dns_spoofing_impl,
-        scan_subnet_for_open_resolvers_impl,
-        simple_dns_lookup_impl,
-        tld_check_impl,
-        verify_nameserver_role_impl,
-    )
-    from .tools.mdns.browser import discover_mdns_services_impl
-    from .typedefs import ToolResult
-except ImportError:
-    # Fall back to absolute import (when running as script or standalone)
-    from tools import (
-        advanced_dns_lookup_impl,
-        basic_dns_assistant_impl,
-        check_dnssec_impl,
-        detect_dns_root_environment_impl,
-        dns_trace_impl,
-        dns_troubleshooting_impl,
-        lookalike_risk_impl,
-        punycode_converter_impl,
-        reverse_dns_lookup_impl,
-        run_comprehensive_tests_impl,
-        run_dns_cookie_tests_impl,
-        run_edns_tests_impl,
-        run_tcp_behavior_tests_impl,
-        scan_server_for_dns_spoofing_impl,
-        scan_subnet_for_open_resolvers_impl,
-        simple_dns_lookup_impl,
-        tld_check_impl,
-        verify_nameserver_role_impl,
-    )
-    from tools.mdns.browser import discover_mdns_services_impl
-    from typedefs import ToolResult
+from tools import (
+    advanced_dns_lookup_impl,
+    basic_dns_assistant_impl,
+    check_dnssec_impl,
+    detect_dns_root_environment_impl,
+    dns_trace_impl,
+    dns_troubleshooting_impl,
+    lookalike_risk_impl,
+    punycode_converter_impl,
+    reverse_dns_lookup_impl,
+    run_comprehensive_tests_impl,
+    run_dns_cookie_tests_impl,
+    run_edns_tests_impl,
+    run_tcp_behavior_tests_impl,
+    scan_server_for_dns_spoofing_impl,
+    scan_subnet_for_open_resolvers_impl,
+    simple_dns_lookup_impl,
+    tld_check_impl,
+    validate_fqdn,
+    verify_nameserver_role_impl,
+)
+from tools.mdns.browser import discover_mdns_services_impl
+from typedefs import ToolResult
 
 
 class ToolRegistrationMixin:
@@ -73,8 +48,11 @@ class ToolRegistrationMixin:
 
         @self.server.tool(
             name="simple_dns_lookup",
-            description="Perform a simple DNS lookup for a hostname to get its IP address",
-            tags=set(("dns", "query", "lookup", "a_record")),
+            description=(
+                "Use this tool to perform a forward DNS lookup that resolves "
+                "a hostname to its IP address"
+            ),
+            tags=set(("dns", "forward", "query", "lookup", "a_record")),
             enabled=True,
         )
         async def simple_dns_lookup(hostname: str, ctx: Context) -> ToolResult:
@@ -83,7 +61,11 @@ class ToolRegistrationMixin:
 
         @self.server.tool(
             name="advanced_dns_lookup",
-            description="Perform an advanced DNS lookup supporting multiple record types",
+            description=(
+                "Use this tool to perform an advanced DNS lookup using any of "
+                "the supported DNS record types. Get the list of supported record "
+                "types from the `supported_dns_record_types` resource."
+            ),
             tags=set(("dns", "query", "lookup", "advanced")),
             enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
         )
@@ -93,7 +75,10 @@ class ToolRegistrationMixin:
 
         @self.server.tool(
             name="reverse_dns_lookup",
-            description="Perform a reverse DNS lookup to get hostname from IP address",
+            description=(
+                "Use this tool to perform a DNS reverse lookup to get "
+                "a hostname from an IP address"
+            ),
             tags=set(("dns", "query", "lookup", "reverse")),
             enabled=self.config.get("features", {}).get("reverse_lookup", False),
         )
@@ -124,10 +109,10 @@ class ToolRegistrationMixin:
             domain: str, nameserver: str, ctx: Context
         ) -> ToolResult:
             await ctx.info(
-                f"Performing standard compliance tests against nameserver `{nameserver}` "
-                + f"using domain `{domain}`."
+                f"Performing standard compliance tests against nameserver `{nameserver.strip()}` "
+                + f"using domain `{domain.strip()}`."
             )
-            return await run_comprehensive_tests_impl(domain, nameserver)
+            return await run_comprehensive_tests_impl(domain.strip(), nameserver.strip())
 
         @self.server.tool(
             name="dns_trace",
@@ -154,7 +139,10 @@ class ToolRegistrationMixin:
 
         @self.server.tool(
             name="dns_udp_tcp_test",
-            description="Perform UDP and TCP behavior tests on a given domain and nameserver.",
+            description=(
+                "Use this tool to test that the given nameserver answers UDP and TCP "
+                "queries by using the specified domain."
+            ),
             tags=set(("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")),
             enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
         )
@@ -181,8 +169,8 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="check_dnssec",
             description=(
-                "Check DNSSEC validation for a given domain and return an in-depth "
-                "report that highlights any issues found."
+                "Use this tool to check the DNSSEC validation of a given domain "
+                "and return an in-depth report that highlights any issues found."
             ),
             tags=set(("dns", "security", "dnssec", "validation")),
             enabled=self.config.get("features", {}).get("dnssec_validation", False),
@@ -193,7 +181,7 @@ class ToolRegistrationMixin:
 
         @self.server.tool(
             name="lookalike_risk",
-            description="Assess lookalike domain risk for a given domain",
+            description="Use this tool to assess the lookalike domain risk for a given domain.",
             tags=set(("dns", "security", "lookalike", "typosquatting")),
             enabled=self.config.get("features", {}).get("lookalike_risk_tool", False),
         )
@@ -204,7 +192,8 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="punycode_converter",
             description=(
-                "Converts any given internationalized domain name (IDN) into punycode format."
+                "Use this tool to convert the specified internationalized domain name (IDN) "
+                "into punycode format."
             ),
             tags=set(("dns", "idn", "punycode", "converter")),
             enabled=True,
@@ -215,7 +204,7 @@ class ToolRegistrationMixin:
 
         @self.server.tool(
             name="detect_open_resolvers",
-            description="Scans a given subnet for open resolvers.",
+            description="Use this tool to scan a given subnet for open DNS resolvers.",
             tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
             enabled=self.config.get("features", {}).get("open_resolver_scan_tool", False),
         )
@@ -235,7 +224,10 @@ class ToolRegistrationMixin:
 
         @self.server.tool(
             name="detect_dns_spoofing",
-            description="Detect DNS interception/spoofing including MAC-level fingerprinting.",
+            description=(
+                "Use this tool to detect DNS interception/spoofing including MAC-level "
+                "fingerprinting."
+            ),
             tags=set(("dns", "spoofing", "mac", "fingerprinting")),
             enabled=self.config.get("features", {}).get("detect_dns_spoofing", False),
         )
@@ -253,7 +245,8 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="detect_nameserver_role",
             description=(
-                "Test whether a given DNS server is authoritative, a resolver, or mixed-mode."
+                "Use this tool to test whether a given DNS server is authoritative, a resolver, "
+                "or operates in mixed-mode."
             ),
             tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
             enabled=self.config.get("features", {}).get("nameserver_role_test", False),
@@ -280,7 +273,10 @@ class ToolRegistrationMixin:
 
         @self.server.tool(
             name="top_level_domain_verification",
-            description="Verify the top-level domain part of a given domain name.",
+            description=(
+                "Use this tool to verify that the top-level domain of a specified domain "
+                "name is a valid global top-level domain (gTLD)."
+            ),
             tags=set(("dns", "authority", "root", "TLD", "gTLD")),
             enabled=self.config.get("features", {}).get("top_level_domain_verification", False),
         )
@@ -290,7 +286,7 @@ class ToolRegistrationMixin:
 
         @self.server.tool(
             name="mdns_service_discovery",
-            description="Discover mDNS services on the local network.",
+            description="Use this tool to discover mDNS services on the local network.",
             tags=set(("mdns", "discovery", "network")),
             enabled=self.config.get("features", {}).get("mdns_service_discovery", False),
         )
@@ -301,10 +297,27 @@ class ToolRegistrationMixin:
             return await discover_mdns_services_impl(find_all=find_all, timeout=timeout, ipv6=ipv6)
 
         @self.server.tool(
+            name="validate_dns_fqdn",
+            description=(
+                "Use this tool to validate a Fully Qualified Domain Name (FQDN) "
+                "according to DNS RFC rules."
+            ),
+            tags=set(("dns", "validation", "FQDN")),
+            enabled=True,
+        )
+        async def validate_dns_fqdn(ctx: Context, domain: str) -> ToolResult:
+            await ctx.info(f"Validating FQDN: {domain}")
+            result, message = await validate_fqdn(domain=domain)
+            if result:
+                return ToolResult(success=True, output=f"`{domain}` is a syntactically valid FQDN.")
+            else:
+                return ToolResult(success=False, error=f"`{domain}` is not a valid FQDN: {message}")
+
+        @self.server.tool(
             name="dns_assistant",
             description=(
-                "Basic DNS support assistant gathers information progressively "
-                "to help finding a DNS related problem."
+                "Use this tool to start a DNS support assistant that gathers information "
+                "progressively to help find a DNS-related problem."
             ),
             tags=set(("interactive", "elicitation", "dns", "assistant", "problem", "help")),
             enabled=self.config.get("features", {}).get("basic_dns_assistant", False),
