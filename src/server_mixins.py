@@ -8,33 +8,68 @@ from typing import Any, Dict
 
 from fastmcp import Context
 
-from resolver import Resolver
-from tools import (
-    advanced_dns_lookup_impl,
-    basic_dns_assistant_impl,
-    check_dnssec_impl,
-    detect_dns_root_environment_impl,
-    dns_trace_impl,
-    dns_troubleshooting_impl,
-    lookalike_risk_impl,
-    punycode_converter_impl,
-    reverse_dns_lookup_impl,
-    run_comprehensive_tests_impl,
-    run_dns_cookie_tests_impl,
-    run_edns_tests_impl,
-    run_tcp_behavior_tests_impl,
-    scan_server_for_dns_spoofing_impl,
-    scan_subnet_for_open_resolvers_impl,
-    simple_dns_lookup_impl,
-    tld_check_impl,
-    verify_nameserver_role_impl,
-)
-from tools.mdns.browser import discover_mdns_services_impl
-from typedefs import ToolResult
+try:
+    # Try relative import first (when used as part of the package)
+    from .resolver import Resolver
+    from .tools import (
+        advanced_dns_lookup_impl,
+        basic_dns_assistant_impl,
+        check_dnssec_impl,
+        detect_dns_root_environment_impl,
+        dns_trace_impl,
+        dns_troubleshooting_impl,
+        lookalike_risk_impl,
+        punycode_converter_impl,
+        reverse_dns_lookup_impl,
+        run_comprehensive_tests_impl,
+        run_dns_cookie_tests_impl,
+        run_edns_tests_impl,
+        run_tcp_behavior_tests_impl,
+        scan_server_for_dns_spoofing_impl,
+        scan_subnet_for_open_resolvers_impl,
+        simple_dns_lookup_impl,
+        tld_check_impl,
+        verify_nameserver_role_impl,
+    )
+    from .tools.mdns.browser import discover_mdns_services_impl
+    from .typedefs import ToolResult
+except ImportError:
+    # Fall back to absolute import (when running as script or standalone)
+    from resolver import Resolver
+    from tools import (
+        advanced_dns_lookup_impl,
+        basic_dns_assistant_impl,
+        check_dnssec_impl,
+        detect_dns_root_environment_impl,
+        dns_trace_impl,
+        dns_troubleshooting_impl,
+        lookalike_risk_impl,
+        punycode_converter_impl,
+        reverse_dns_lookup_impl,
+        run_comprehensive_tests_impl,
+        run_dns_cookie_tests_impl,
+        run_edns_tests_impl,
+        run_tcp_behavior_tests_impl,
+        scan_server_for_dns_spoofing_impl,
+        scan_subnet_for_open_resolvers_impl,
+        simple_dns_lookup_impl,
+        tld_check_impl,
+        verify_nameserver_role_impl,
+    )
+    from tools.mdns.browser import discover_mdns_services_impl
+    from typedefs import ToolResult
 
 
 class ToolRegistrationMixin:
-    """Mixin for registering DNS tools with the MCP server."""
+    """Mixin for registering DNS tools with the MCP server.
+
+    Note: This mixin assumes the class has 'server' (FastMCP) and 'config' (dict)
+    attributes available when register_tools() is called.
+    """
+
+    # Type hints for attributes provided by the host class
+    server: Any  # FastMCP instance
+    config: Dict[str, Any]  # Configuration dictionary
 
     def register_tools(self) -> None:
         """Register all DNS-related tools with the MCP server."""
@@ -292,7 +327,15 @@ class ToolRegistrationMixin:
 
 
 class PromptRegistrationMixin:
-    """Mixin for registering prompts with the MCP server."""
+    """Mixin for registering prompts with the MCP server.
+
+    Note: This mixin assumes the class has 'server' (FastMCP) and 'config' (dict)
+    attributes available when register_tools_prompts() is called.
+    """
+
+    # Type hints for attributes provided by the host class
+    server: Any  # FastMCP instance
+    config: Dict[str, Any]  # Configuration dictionary
 
     def register_tools_prompts(self) -> None:
         """Register prompts for tools with the server."""
@@ -667,7 +710,16 @@ class PromptRegistrationMixin:
 
 
 class ResourceRegistrationMixin:
-    """Mixin for registering resources with the MCP server."""
+    """Mixin for registering resources with the MCP server.
+
+    Note: This mixin assumes the class has 'server' (FastMCP), 'config' (dict),
+    and 'kb_manager' attributes available when registration methods are called.
+    """
+
+    # Type hints for attributes provided by the host class
+    server: Any  # FastMCP instance
+    config: Dict[str, Any]  # Configuration dictionary
+    kb_manager: Any  # KnowledgeBaseManager instance
 
     def register_resolver_resources(self) -> None:
         """Register DNS Resolver resources such as root servers, etc."""
@@ -742,7 +794,15 @@ class ResourceRegistrationMixin:
 
 
 class ServerLifecycleMixin:
-    """Mixin for server lifecycle management (signals, startup, shutdown)."""
+    """Mixin for server lifecycle management (signals, startup, shutdown).
+
+    Note: This mixin assumes the class has 'server' (FastMCP) and 'logger' attributes
+    available when lifecycle methods are called.
+    """
+
+    # Type hints for attributes provided by the host class
+    server: Any  # FastMCP instance
+    logger: Any  # Logger instance
 
     def setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""

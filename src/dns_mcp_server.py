@@ -3,39 +3,20 @@ MCP DNS Server - An MCP server for DNS name resolution and troubleshooting.
 """
 
 import asyncio
-import ipaddress
-import signal
 import sys
-from typing import Any, Dict
 
 import yaml
-from fastmcp import Context, FastMCP
+from fastmcp import FastMCP
 from fastmcp.utilities.logging import get_logger
 
-from tools.mdns.browser import discover_mdns_services_impl
+from knowledge_base.manager import KnowledgeBaseManager
+from server_mixins import (
+    PromptRegistrationMixin,
+    ResourceRegistrationMixin,
+    ServerLifecycleMixin,
+    ToolRegistrationMixin,
+)
 
-try:
-    # Try relative import first (when used as part of the package)
-    from .knowledge_base.manager import KnowledgeBaseManager
-    from .resolver import Resolver
-    from .server_mixins import (
-        PromptRegistrationMixin,
-        ResourceRegistrationMixin,
-        ServerLifecycleMixin,
-        ToolRegistrationMixin,
-    )
-    from .typedefs import ToolResult
-except ImportError:
-    # Fall back to absolute import (when running as script or standalone)
-    from knowledge_base.manager import KnowledgeBaseManager
-    from resolver import Resolver
-    from server_mixins import (
-        PromptRegistrationMixin,
-        ResourceRegistrationMixin,
-        ServerLifecycleMixin,
-        ToolRegistrationMixin,
-    )
-    from typedefs import ToolResult
 logger = get_logger(__name__)
 
 
@@ -80,14 +61,12 @@ class DNSMCPServer(
             self.logger.error("Error loading config: %s", e)
             self.config = {}
 
+        # Initialize knowledge base before registering resources
         self.initialize_knowledge_base()
-        self.register_tools()
-        self.register_tools_prompts()
-        self.register_resolver_resources()
-        # Register KB resources and prompts if enabled in config.
-        if self.config["features"].get("knowledge_base"):
-            self.register_knowledge_base_resources()
-            self.register_knowledge_base_prompts()
+
+        # Register all server components (tools, prompts, resources)
+        # These must be called after self.server and self.config are initialized
+        self._register_all_components()
 
     def initialize_knowledge_base(self) -> None:
         """Initialize the knowledge base manager."""
@@ -95,6 +74,20 @@ class DNSMCPServer(
         self.logger.info(
             "Knowledge base initialized with %d articles", len(self.kb_manager.get_all_articles())
         )
+
+    def _register_all_components(self) -> None:
+        """Register all tools, prompts, and resources with the server.
+
+        This method coordinates registration across all mixins.
+        Must be called after self.server and self.config are initialized.
+        """
+        self.register_tools()
+        self.register_tools_prompts()
+        self.register_resolver_resources()
+        # Register KB resources and prompts if enabled in config
+        if self.config.get("features", {}).get("knowledge_base", False):
+            self.register_knowledge_base_resources()
+            self.register_knowledge_base_prompts()
 
 
 async def main() -> None:
