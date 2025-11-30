@@ -96,12 +96,17 @@ class Trace:
             server = hop["server"]
             response = hop["response"]
 
+            if not response or not hasattr(response, "question"):
+                output_lines.append(f";; Hop {hop_idx}: Server {server} (No response)")
+                continue
+
             output_lines.append(f";; Hop {hop_idx}: Server {server}")
             output_lines.append(";; QUESTION SECTION:")
-            for question in response.question:
-                output_lines.append(f";; {question.to_text()}")
+            if hasattr(response, "question") and response.question:
+                for question in response.question:
+                    output_lines.append(f";; {question.to_text()}")
 
-            if response.answer:
+            if hasattr(response, "answer") and response.answer:
                 output_lines.append(";; ANSWER SECTION:")
                 for rrset in response.answer:
                     for rdata in rrset:
@@ -110,7 +115,7 @@ class Trace:
                             f"{dns.rdatatype.to_text(rrset.rdtype)} {rdata}"
                         )
 
-            if response.authority:
+            if hasattr(response, "authority") and response.authority:
                 output_lines.append(";; AUTHORITY SECTION:")
                 for rrset in response.authority:
                     for rdata in rrset:
@@ -119,7 +124,7 @@ class Trace:
                             f"{dns.rdatatype.to_text(rrset.rdtype)} {rdata}"
                         )
 
-            if response.additional:
+            if hasattr(response, "additional") and response.additional:
                 output_lines.append(";; ADDITIONAL SECTION:")
                 for rrset in response.additional:
                     for rdata in rrset:
@@ -143,7 +148,7 @@ class Trace:
             DNS message response or None
         """
         for server in servers:
-            _, response = self.resolver.resolve(str(subdomain), "NS", nameserver=server)
+            rrset, response = self.resolver.resolve(str(subdomain), "NS", nameserver=server)
             if not response:
                 continue
 
@@ -176,13 +181,14 @@ class Trace:
         next_servers = []
 
         # First, try to get IPs from additional section
-        for rr in response.additional:
-            if rr.rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
-                for r in rr:
-                    next_servers.append(r.address)
+        if hasattr(response, "additional") and response.additional:
+            for rr in response.additional:
+                if rr.rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                    for r in rr:
+                        next_servers.append(r.address)
 
         # If no additional records, look in authority section
-        if not next_servers:
+        if not next_servers and hasattr(response, "authority") and response.authority:
             ns_names = []
             for rr in response.authority:
                 if rr.rdtype == dns.rdatatype.NS:
@@ -194,7 +200,7 @@ class Trace:
                         next_servers.append(rdata.address)
 
         # If still no servers, try the answer section (for cases like root query)
-        if not next_servers:
+        if not next_servers and hasattr(response, "answer") and response.answer:
             ns_names = []
             for rr in response.answer:
                 if rr.rdtype == dns.rdatatype.NS:
@@ -240,8 +246,13 @@ class Trace:
         Returns:
             List of final A/AAAA records as dicts.
         """
-        if not self.follow_cname or not response or not response.answer:
-            return self._format_rrset(response.answer if response else None)
+        if not response or not hasattr(response, "answer") or not response.answer:
+            return self._format_rrset(
+                response.answer if (response and hasattr(response, "answer")) else None
+            )
+
+        if not self.follow_cname:
+            return self._format_rrset(response.answer)
 
         rrsets = response.answer
         visited = set()

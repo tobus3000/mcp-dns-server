@@ -23,7 +23,7 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "fastmcp>=0.1.0",
+    "fastmcp>=2.13.0",   # For MCP server framework
     "dnspython>=2.6.0",  # For modern DNS features and DNSSEC support
     "pyyaml>=6.0.1",     # Latest stable for configuration handling
     "scapy>=2.6.1",      # For network packet operations
