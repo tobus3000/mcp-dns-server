@@ -10,12 +10,10 @@ from fastmcp import FastMCP
 from fastmcp.utilities.logging import get_logger
 
 from knowledge_base.manager import KnowledgeBaseManager
-from server_mixins import (
-    PromptRegistrationMixin,
-    ResourceRegistrationMixin,
-    ServerLifecycleMixin,
-    ToolRegistrationMixin,
-)
+from prompt_mixins import PromptRegistrationMixin
+from resource_mixins import ResourceRegistrationMixin
+from server_mixins import ServerLifecycleMixin
+from tool_mixins import ToolRegistrationMixin
 
 logger = get_logger(__name__)
 
