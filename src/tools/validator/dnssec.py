@@ -1335,6 +1335,50 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
     # 6) Authoritative consistency
     report["authoritative"] = check_authoritative_consistency(zone_name)
 
+    # 6b) Nameserver connectivity check
+    report["nameserver_connectivity"] = {
+        "nameservers": auth_ns_list if auth_ns_list else [],
+        "reachable": 0,
+        "unreachable": [],
+        "issues": [],
+    }
+    if auth_ns_list:
+        for ns in auth_ns_list:
+            try:
+                # Try to resolve nameserver IP
+                answers = dns.resolver.resolve(ns, "A")
+                if answers:
+                    ns_ip = str(answers[0])
+                    # Try a simple query to the nameserver
+                    try:
+                        _, _ = _resolver.resolve_dnssec(
+                            zone_name, "SOA", nameserver=ns_ip, timeout=timeout
+                        )
+                        report["nameserver_connectivity"]["reachable"] += 1
+                    except (
+                        dns.exception.Timeout,
+                        dns.resolver.NoNameservers,
+                        dns.exception.DNSException,
+                    ) as e:
+                        report["nameserver_connectivity"]["unreachable"].append(
+                            {
+                                "nameserver": ns,
+                                "ip": ns_ip,
+                                "error": str(type(e).__name__),
+                                "details": str(e)[:100],
+                            }
+                        )
+                        report["nameserver_connectivity"]["issues"].append(
+                            f"Nameserver {ns} ({ns_ip}) is unreachable"
+                        )
+            except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.DNSException):
+                report["nameserver_connectivity"]["issues"].append(
+                    f"Could not resolve IP for nameserver {ns}"
+                )
+                report["nameserver_connectivity"]["unreachable"].append(
+                    {"nameserver": ns, "error": "Resolution failed"}
+                )
+
     # 7) Key inspection and rollover hints
     report["keys"] = inspect_keys_and_rollover(dnskey_rrset)
 
@@ -1468,6 +1512,21 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
             interpretation["validation_details"]["status"].append(
                 f"{rr_type} records present and signatures are {status}{reason}"
             )
+        else:
+            # Record is NOT present - check if non-existence is properly proven with DNSSEC
+            if report["dnskey"]["present"]:  # Only check if DNSSEC is enabled
+                nx_proof = result.get("nx_proof", {})
+                if nx_proof.get("proof_type"):  # Has NSEC/NSEC3
+                    if not nx_proof.get("valid"):
+                        # Non-existence proof exists but is invalid
+                        interpretation["validation_details"]["status"].append(
+                            f"CRITICAL: {rr_type} records absent but denial proof is invalid"
+                        )
+                else:
+                    # No NSEC/NSEC3 records at all - this is a critical DNSSEC failure
+                    interpretation["validation_details"]["status"].append(
+                        f"CRITICAL: {rr_type} records absent with no DNSSEC denial proof"
+                    )
 
     # Denial of Existence Analysis
     if "denial_tests" in report:
@@ -1547,6 +1606,20 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
                             interpretation["zone_consistency"]["status"].append(
                                 f"Zone {zone} refresh time is {refresh_avg} seconds"
                             )
+
+    # Add nameserver connectivity check results
+    if "nameserver_connectivity" in report:
+        ns_conn = report["nameserver_connectivity"]
+        if ns_conn.get("issues"):
+            for issue in ns_conn["issues"]:
+                interpretation["validation_details"]["status"].append(f"CRITICAL: {issue}")
+        if ns_conn.get("unreachable"):
+            for unreachable in ns_conn["unreachable"]:
+                ns_name = unreachable.get("nameserver", "unknown")
+                error = unreachable.get("error", "unknown error")
+                interpretation["validation_details"]["status"].append(
+                    f"CRITICAL: Nameserver {ns_name} is unreachable ({error})"
+                )
 
     # Add robustness test interpretation
     if "robustness" in report and "interpretation" in report["robustness"]:
