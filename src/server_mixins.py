@@ -44,11 +44,11 @@ class ServerLifecycleMixin:
         self.logger.info("Received shutdown signal %s", sig_name)
         await self.stop()
 
-    async def start(self, host: str = "localhost", port: int = 3000) -> None:
+    async def start(self, host: str = "0.0.0.0", port: int = 3000) -> None:
         """Start the MCP server using HTTP transport.
 
         Args:
-            host: The host to bind to. Defaults to "localhost"
+            host: The host to bind to. Defaults to "0.0.0.0" (all interfaces)
             port: The port to listen on. Defaults to 3000
         """
         self.setup_signal_handlers()

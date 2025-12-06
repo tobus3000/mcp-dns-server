@@ -332,7 +332,8 @@ def check_rrset_signature(
 ) -> Dict[str, Any]:
     if timeout != DEFAULT_TIMEOUT:
         _resolver.resolver.lifetime = timeout
-    rrset, resp = _resolver.resolve(target, rdtype, nameserver)
+    # Use DNSSEC-aware resolve to get RRSIG records
+    rrset, resp = _resolver.resolve_dnssec(target, rdtype, nameserver, timeout)
     if timeout != DEFAULT_TIMEOUT:
         _resolver.resolver.lifetime = _resolver.default_timeout
     result: Dict[str, Any] = {"type": rdtype, "present": rrset is not None}
@@ -497,12 +498,22 @@ def check_parent_ds(
         result["dnskey_validation"]["total_dnssec_keys"]
         - result["dnskey_validation"]["validated_keys"]
     )
-    if unvalidated_count > 0:
+    if unvalidated_count > 0 and len(validated_ds) == 0:
+        # Only report as error if NO keys validated
         result["dnskey_validation"]["failed_validations"].insert(
             0,
             {
                 "error": f"None of the {result['dnskey_validation']['total_dnssec_keys']} DNSKEY records could be validated by any of the {len(parent_ds_texts)} DS records",
                 "severity": "error",
+            },
+        )
+    elif unvalidated_count > 0:
+        # Some keys didn't validate, but at least one did - this is a warning
+        result["dnskey_validation"]["failed_validations"].insert(
+            0,
+            {
+                "warning": f"{unvalidated_count} of {result['dnskey_validation']['total_dnssec_keys']} DNSKEY records could not be validated, but {result['dnskey_validation']['validated_keys']} key(s) were validated successfully",
+                "severity": "warning",
             },
         )
 
@@ -1101,8 +1112,50 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
         if nameservers:
             report["soa_consistency"][zone] = check_soa_consistency(zone, nameservers)
 
-    # 1) Fetch DNSKEY from an arbitrary resolver (system resolver)
-    dnskey_rrset, _ = _resolver.fetch_dnskey(zone_name)
+    # 1) Fetch DNSKEY from authoritative nameservers with DNSSEC enabled
+    # First, get the authoritative nameservers for this zone
+    auth_ns_list = list_authoritative_nameservers(zone_name)
+    dnskey_rrset = None
+    dnskey_resp = None
+
+    # Try to fetch DNSKEY from each authoritative nameserver with DNSSEC-OK flag
+    if auth_ns_list:
+        for ns in auth_ns_list:
+            try:
+                # Resolve nameserver IP first
+                ns_ip = None
+                try:
+                    answers = dns.resolver.resolve(ns, "A")
+                    if answers:
+                        ns_ip = str(answers[0])
+                except (
+                    dns.resolver.NXDOMAIN,
+                    dns.resolver.NoAnswer,
+                    dns.resolver.NoNameservers,
+                    dns.exception.DNSException,
+                ):
+                    continue
+
+                if ns_ip:
+                    # Fetch DNSKEY with DNSSEC-OK flag from this nameserver
+                    dnskey_rrset, dnskey_resp = _resolver.resolve_dnssec(
+                        zone_name, "DNSKEY", nameserver=ns_ip, timeout=timeout
+                    )
+                    if dnskey_rrset is not None:
+                        break  # Successfully fetched, use this
+            except (
+                dns.resolver.NXDOMAIN,
+                dns.resolver.NoAnswer,
+                dns.resolver.NoNameservers,
+                dns.exception.DNSException,
+                dns.exception.Timeout,
+            ):
+                continue
+
+    # Fallback to system resolver with DNSSEC if authoritative nameservers don't have it
+    if dnskey_rrset is None:
+        dnskey_rrset, dnskey_resp = _resolver.resolve_dnssec(zone_name, "DNSKEY")
+
     report["dnskey"].update(
         {
             "present": dnskey_rrset is not None,
@@ -1116,8 +1169,8 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
 
     # 3) Verify DNSKEY RRset signatures (RRSIG over DNSKEY)
     if dnskey_rrset is not None:
-        # We need the response message to extract RRSIG; fetch again to get response
-        _, resp = _resolver.fetch_dnskey(zone_name)
+        # Use the response message we already fetched
+        resp = dnskey_resp
         rrsig = extract_rrsig_for_rrset(resp, "DNSKEY") if resp else None
         report["dnskey_signature"].update(
             {"present": rrsig is not None, "valid": False, "error": None, "rrsig_count": 0}
@@ -1174,16 +1227,34 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
     # 4) Check common RRsets
     rrtypes = ["SOA", "NS", "A", "AAAA", "MX", "TXT"]
     rrchecks = {}
+    # Use an authoritative nameserver if available
+    auth_ns_for_rrsets = None
+    if auth_ns_list:
+        for ns in auth_ns_list:
+            try:
+                # Try to resolve nameserver IP
+                answers = dns.resolver.resolve(ns, "A")
+                if answers:
+                    auth_ns_for_rrsets = str(answers[0])
+                    break
+            except (
+                dns.resolver.NXDOMAIN,
+                dns.resolver.NoAnswer,
+                dns.resolver.NoNameservers,
+                dns.exception.DNSException,
+            ):
+                continue
+
     for t in rrtypes:
-        rrchecks[t] = check_rrset_signature(zone_name, t, dnskey_rrset, None, timeout)
+        rrchecks[t] = check_rrset_signature(zone_name, t, dnskey_rrset, auth_ns_for_rrsets, timeout)
     report["rrsets"] = rrchecks
 
     # 5) NXDOMAIN / denial proofs check (test non-existent names)
-    # 5) NXDOMAIN / denial proofs check (test non-existent names)
-
     # Test NXDOMAIN with random label
     test_name = f"this-name-should-not-exist-{int(time.time())}.{zone_name}"
-    report["nxdomain_test"] = check_rrset_signature(test_name, "A", dnskey_rrset, None, timeout)
+    report["nxdomain_test"] = check_rrset_signature(
+        test_name, "A", dnskey_rrset, auth_ns_for_rrsets, timeout
+    )
 
     # Additional denial of existence tests
     report["denial_tests"] = {}
@@ -1191,13 +1262,13 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
     # Test wildcard denial (if NSEC3 is in use) with specific name pattern
     wildcard_test = f"*.{zone_name}"
     report["denial_tests"]["wildcard"] = check_rrset_signature(
-        wildcard_test, "A", dnskey_rrset, None, timeout
+        wildcard_test, "A", dnskey_rrset, auth_ns_for_rrsets, timeout
     )
 
     # Test empty non-terminal handling
     ent_test = f"nonexistent.subdomain.{zone_name}"
     report["denial_tests"]["empty_non_terminal"] = check_rrset_signature(
-        ent_test, "A", dnskey_rrset, None, timeout
+        ent_test, "A", dnskey_rrset, auth_ns_for_rrsets, timeout
     )
 
     # 6) Authoritative consistency

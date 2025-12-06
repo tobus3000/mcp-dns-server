@@ -325,6 +325,87 @@ class Resolver:
                 details={"exception_type": type(e).__name__},
             )
 
+    def resolve_dnssec(
+        self,
+        qname: str,
+        rdtype: str,
+        nameserver: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Tuple[Optional[RRset], Optional[Message]]:
+        """Resolve a single RRset with DNSSEC enabled (DO flag set).
+
+        This method is specifically for DNSSEC queries where RRSIG records
+        must be returned by the nameserver.
+
+        Args:
+            qname: The domain name to query.
+            rdtype: DNS record type to query for.
+            nameserver: Optional specific nameserver to query.
+            timeout: Optional query timeout override.
+
+        Returns:
+            Tuple containing:
+            - RRset object or None if no records found
+            - DNS message response or None if query failed
+        """
+        if rdtype not in self.allowed_record_types:
+            return (None, None)
+
+        if timeout is not None:
+            self.resolver.lifetime = timeout
+
+        # Store original nameservers if we're using a specific one
+        original_ns = None
+        if nameserver:
+            original_ns = self.resolver.nameservers
+            self.resolver.nameservers = [nameserver]
+
+        try:
+            # Create a query with DNSSEC-OK flag
+            qname_obj = dns.name.from_text(qname)
+            rdtype_obj = dns.rdatatype.from_text(rdtype)
+            query = dns.message.make_query(qname_obj, rdtype_obj, want_dnssec=True)
+
+            # Perform the query using the resolver's nameserver
+            ns_to_use = nameserver or (
+                self.resolver.nameservers[0] if self.resolver.nameservers else None
+            )
+            if ns_to_use:
+                response = dns.query.udp(
+                    query, str(ns_to_use), timeout=timeout or self.default_timeout
+                )
+                # Extract the answer section
+                if response.answer:
+                    for rrset in response.answer:
+                        if rrset.rdtype == dns.rdatatype.from_text(rdtype):
+                            result = (rrset, response)
+                            break
+                    else:
+                        # Requested type not in answer, return None but keep response
+                        result = (None, response)
+                else:
+                    result = (None, response)
+            else:
+                # Fallback to standard resolver
+                answer = self.resolver.resolve(qname, rdtype, raise_on_no_answer=False)
+                result = (answer.rrset, answer.response)
+        except (
+            dns.resolver.NoAnswer,
+            dns.resolver.NXDOMAIN,
+            dns.resolver.NoNameservers,
+            dns.exception.Timeout,
+            dns.query.BadResponse,
+        ) as e:
+            result = (None, getattr(e, "response", None))
+
+        # Restore original settings
+        if nameserver and original_ns is not None:
+            self.resolver.nameservers = original_ns
+        if timeout is not None:
+            self.resolver.lifetime = self.default_timeout
+
+        return result
+
     def resolve(
         self,
         qname: str,
