@@ -358,6 +358,17 @@ def check_rrset_signature(
     rrsig = extract_rrsig_for_rrset(resp, rdtype)
     result["rrsig_present"] = rrsig is not None
 
+    # If RRSIG is missing, also try to directly query for RRSIG records to confirm
+    # This gives us more information about why signatures are missing
+    if rrsig is None and resp is not None:
+        # Check if there are ANY RRSIG records in the response at all
+        rrsig_in_response = any(
+            rrset.rdtype == dns.rdatatype.RRSIG for rrset in resp.answer + resp.authority
+        )
+        result["rrsig_in_response"] = rrsig_in_response
+        if not rrsig_in_response:
+            result["rrsig_missing_detail"] = "No RRSIG records found in nameserver response"
+
     # Check for expired signatures
     if rrsig is not None:
         expired_sigs = extract_expired_signatures(rrsig)
@@ -1421,11 +1432,19 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
             rcode_info = result["response_code"]
             critical_issues.append(f"Nameserver error for {rr_type} records: {rcode_info['error']}")
 
-    # Check for missing RRSIGs on present records
+    # Check for missing RRSIG records at nameserver
     for rr_type, result in report.get("rrsets", {}).items():
         if result.get("present") and not result.get("rrsig_present"):
             has_critical_failures = True
-            critical_issues.append(f"No RRSIG found for {rr_type} records")
+            if result.get("rrsig_missing_detail"):
+                critical_issues.append(
+                    f"Missing RRSIG signatures for {rr_type} records: {result['rrsig_missing_detail']}"
+                )
+            else:
+                critical_issues.append(f"No RRSIG found for {rr_type} records")
+
+    # Check for invalid denial proofs on absent records
+    for rr_type, result in report.get("rrsets", {}).items():
         # Check for invalid denial proofs
         if not result.get("present"):
             nx_proof = result.get("nx_proof", {})
@@ -1572,8 +1591,11 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
         elif result.get("present"):
             # Check for missing RRSIGs - this is CRITICAL
             if not result.get("rrsig_present"):
+                detail = ""
+                if result.get("rrsig_missing_detail"):
+                    detail = f" ({result['rrsig_missing_detail']})"
                 interpretation["validation_details"]["status"].append(
-                    f"CRITICAL: {rr_type} records present but NO RRSIG signature found"
+                    f"CRITICAL: {rr_type} records present but NO RRSIG signature found{detail}"
                 )
             # Check for expired signatures in RRsets
             elif result.get("expired_signatures"):
