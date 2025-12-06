@@ -1438,7 +1438,8 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
             has_critical_failures = True
             if result.get("rrsig_missing_detail"):
                 critical_issues.append(
-                    f"Missing RRSIG signatures for {rr_type} records: {result['rrsig_missing_detail']}"
+                    f"Missing RRSIG signatures for {rr_type} records: "
+                    f"{result['rrsig_missing_detail']}"
                 )
             else:
                 critical_issues.append(f"No RRSIG found for {rr_type} records")
