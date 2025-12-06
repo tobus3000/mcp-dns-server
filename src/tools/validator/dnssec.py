@@ -420,7 +420,51 @@ def check_parent_ds(
     zone_name: str, dnskey_rrset: Optional[dns.rrset.RRset], parent_ns: Optional[str] = None
 ) -> Dict[str, Any]:
     parent = _resolver.get_parent_name(zone_name)
-    ds_rrset, _ = _resolver.fetch_ds(zone_name, parent_ns)
+    ds_rrset = None
+
+    # If parent_ns not provided, fetch from parent zone's nameservers
+    if parent_ns is None and parent != ".":
+        try:
+            # Get authoritative nameservers for the parent zone
+            parent_ns_list = list_authoritative_nameservers(parent)
+            if parent_ns_list:
+                # Try each parent nameserver to fetch DS records
+                for ns in parent_ns_list:
+                    try:
+                        # Resolve nameserver IP
+                        answers = dns.resolver.resolve(ns, "A")
+                        if answers:
+                            parent_ns_ip = str(answers[0])
+                            # Try to fetch DS from this parent nameserver
+                            ds_rrset, _ = _resolver.fetch_ds(zone_name, parent_ns_ip)
+                            if ds_rrset is not None:
+                                break
+                    except (
+                        dns.resolver.NXDOMAIN,
+                        dns.resolver.NoAnswer,
+                        dns.resolver.NoNameservers,
+                        dns.exception.DNSException,
+                        dns.exception.Timeout,
+                    ):
+                        continue
+                # If we didn't find DS via parent nameservers, try without explicit nameserver
+                if ds_rrset is None:
+                    ds_rrset, _ = _resolver.fetch_ds(zone_name, None)
+            else:
+                # Fallback: try without explicit nameserver
+                ds_rrset, _ = _resolver.fetch_ds(zone_name, None)
+        except (
+            dns.resolver.NXDOMAIN,
+            dns.resolver.NoAnswer,
+            dns.resolver.NoNameservers,
+            dns.exception.DNSException,
+            dns.exception.Timeout,
+        ):
+            ds_rrset = None
+    else:
+        # Use provided parent_ns or fallback to default resolver
+        ds_rrset, _ = _resolver.fetch_ds(zone_name, parent_ns)
+
     result: Dict[str, Any] = {
         "parent": parent,
         "parent_ds_present": ds_rrset is not None,
