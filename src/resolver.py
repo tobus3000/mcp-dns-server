@@ -462,6 +462,9 @@ class Resolver:
     ) -> Tuple[Optional[RRset], Optional[Message]]:
         """Fetch DNSKEY records for the specified domain.
 
+        DNSKEY records should be fetched with DNSSEC support enabled to ensure
+        proper retrieval of RRSIG records alongside the keys.
+
         Args:
             qname: Domain name to fetch DNSKEY records for.
             nameserver: Optional specific nameserver to query.
@@ -470,12 +473,16 @@ class Resolver:
         Returns:
             Tuple of (DNSKEY RRset, DNS message) or (None, None) if not found.
         """
-        return self.resolve(qname, "DNSKEY", nameserver, timeout)
+        # Use resolve_dnssec to ensure RRSIG records are returned
+        return self.resolve_dnssec(qname, "DNSKEY", nameserver, timeout)
 
     def fetch_ds(
         self, qname: str, nameserver: Optional[str] = None, timeout: Optional[float] = None
     ) -> Tuple[Optional[RRset], Optional[Message]]:
         """Fetch DS records for the specified domain.
+
+        DS records should be fetched with DNSSEC support enabled to ensure
+        proper retrieval from authoritative nameservers.
 
         Args:
             qname: Domain name to fetch DS records for.
@@ -485,7 +492,8 @@ class Resolver:
         Returns:
             Tuple of (DS RRset, DNS message) or (None, None) if not found.
         """
-        return self.resolve(qname, "DS", nameserver, timeout)
+        # Use resolve_dnssec to ensure proper DNSSEC-aware querying
+        return self.resolve_dnssec(qname, "DS", nameserver, timeout)
 
     def get_soa_serial(
         self, zone_name: str, nameserver: str, timeout: Optional[float] = None
