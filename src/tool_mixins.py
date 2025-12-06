@@ -170,7 +170,14 @@ class ToolRegistrationMixin:
             name="check_dnssec",
             description=(
                 "Use this tool to check the DNSSEC validation of a given domain "
-                "and return an in-depth report that highlights any issues found."
+                "and return an in-depth report. When analyzing the returned report, "
+                "focus your evaluation on the critical_issues list in the summary section "
+                "and the CRITICAL flags in the validation_details. Pay special attention to: "
+                "(1) Nameserver errors (SERVFAIL, etc.) indicating the server cannot process DNSSEC queries, "
+                "(2) Missing RRSIG signatures on present records, "
+                "(3) Missing or invalid DNSSEC denial proofs for absent records, "
+                "(4) Broken NSEC chains that invalidate denial-of-existence proofs. "
+                "These issues directly indicate DNSSEC configuration problems."
             ),
             tags=set(("dns", "security", "dnssec", "validation")),
             enabled=self.config.get("features", {}).get("dnssec_validation", False),
