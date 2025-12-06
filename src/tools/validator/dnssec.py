@@ -422,6 +422,9 @@ def check_parent_ds(
     parent = _resolver.get_parent_name(zone_name)
     ds_rrset = None
 
+    # List of public DNS servers to try as fallback
+    PUBLIC_DNS_SERVERS = ["8.8.8.8", "8.8.4.4", "1.1.1.1", "1.0.0.1"]
+
     # If parent_ns not provided, fetch from parent zone's nameservers
     if parent_ns is None and parent != ".":
         try:
@@ -447,11 +450,25 @@ def check_parent_ds(
                         dns.exception.Timeout,
                     ):
                         continue
-                # If we didn't find DS via parent nameservers, try without explicit nameserver
-                if ds_rrset is None:
-                    ds_rrset, _ = _resolver.fetch_ds(zone_name, None)
-            else:
-                # Fallback: try without explicit nameserver
+
+            # If we didn't find DS via parent nameservers, try public DNS servers
+            if ds_rrset is None:
+                for public_dns in PUBLIC_DNS_SERVERS:
+                    try:
+                        ds_rrset, _ = _resolver.fetch_ds(zone_name, public_dns)
+                        if ds_rrset is not None:
+                            break
+                    except (
+                        dns.resolver.NXDOMAIN,
+                        dns.resolver.NoAnswer,
+                        dns.resolver.NoNameservers,
+                        dns.exception.DNSException,
+                        dns.exception.Timeout,
+                    ):
+                        continue
+
+            # If still not found, try without explicit nameserver (system resolver)
+            if ds_rrset is None:
                 ds_rrset, _ = _resolver.fetch_ds(zone_name, None)
         except (
             dns.resolver.NXDOMAIN,
