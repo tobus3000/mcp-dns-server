@@ -7,7 +7,7 @@ WORKDIR /app
 # Install system dependencies required for the application
 # - libffi-dev and libssl-dev for cryptography/dnssec support
 # - libpcap-dev for scapy network operations
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     libffi-dev \
     libssl-dev \
     libpcap-dev \
@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir .
 
 # Expose port for MCP server communication (default for stdio transport)
 # Note: Adjust if using HTTP or WebSocket transport
-EXPOSE 3000
+# EXPOSE 3000
 
-# Set the entry point to launch the server
-ENTRYPOINT ["python", "launch.py"]
+# Use the installed console script as entrypoint
+ENTRYPOINT ["mcp-dns-server"]

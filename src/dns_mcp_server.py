@@ -89,16 +89,13 @@ class DNSMCPServer(
 
 
 async def main() -> None:
-    """Main entry point."""
+    """Main entry point for the DNS MCP server."""
     server = DNSMCPServer()
     try:
-        # Start the server with HTTP transport
         await server.start()
     except KeyboardInterrupt:
-        # Handle Ctrl+C gracefully
         await server.stop()
     except (OSError, RuntimeError) as e:
-        # Log any unexpected errors
         logger.error("Unexpected error: %s", e)
         await server.stop()
         sys.exit(1)
@@ -109,7 +106,6 @@ def run_server() -> None:
     loop = None
     try:
         if sys.platform == "win32":
-            # Use ProactorEventLoop on Windows for better signal handling
             loop = asyncio.ProactorEventLoop()
             asyncio.set_event_loop(loop)
         else:
@@ -118,9 +114,8 @@ def run_server() -> None:
 
         loop.run_until_complete(main())
     except KeyboardInterrupt:
-        # This is a fallback in case the signal handlers don't catch it
         if loop is not None:
-            loop.run_until_complete(asyncio.sleep(0))  # Let other tasks complete
+            loop.run_until_complete(asyncio.sleep(0))
     finally:
         if loop is not None:
             loop.close()

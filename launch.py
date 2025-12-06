@@ -1,22 +1,18 @@
-"""Launch script for the MCP DNS Server."""
+"""Launch script for the MCP DNS Server.
 
-import asyncio
+This can be used as:
+- Direct execution: python launch.py
+- Docker entrypoint: ENTRYPOINT ["python", "launch.py"]
+- Package CLI: mcp-dns-server (after installation)
+"""
+
 import os
 import sys
-from typing import NoReturn
 
-# Add src directory to path to import the module
+# Add src directory to path for development
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from dns_mcp_server import DNSMCPServer
-
-
-async def main() -> None:
-    """Main entry point for the DNS MCP server."""
-    server = DNSMCPServer()
-    # Start the server with HTTP transport - this will block until interrupted
-    await server.start()
-
+from dns_mcp_server import run_server
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run_server()

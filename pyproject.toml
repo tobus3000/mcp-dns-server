@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-dns-server"
-version = "0.1.0"
+version = "1.0.0"
 description = "An MCP server for DNS name resolution and troubleshooting"
 readme = "README.md"
 authors = [
@@ -43,7 +43,7 @@ dev = [
 ]
 
 [project.scripts]
-mcp-dns-server = "launch:main"
+mcp-dns-server = "dns_mcp_server:main"  # Entry point for CLI usage
 
 [project.urls]
 Homepage = "https://github.com/tobus3000/mcp-dns-server"
@@ -53,7 +53,7 @@ Repository = "https://github.com/tobus3000/mcp-dns-server.git"
 where = ["src"]
 
 [tool.setuptools.package-data]
-knowledge_base = ["data/*.yaml", "data/*.yml"]
+dns_mcp_server = ["config/*.yaml", "knowledge_base/data/*.yaml"]
 
 [tool.black]
 line-length = 100

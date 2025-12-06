@@ -29,7 +29,7 @@ async def validate_fqdn(domain: str) -> Tuple[bool, str]:
 
     # Entire FQDN length (in ASCII) must be <= 253 chars
     if len(domain_ascii) > 253:
-        description = f"FQDN length {len(domain_ascii)} exceeds maximum " "of 253 characters"
+        description = f"FQDN length {len(domain_ascii)} exceeds maximum of 253 characters"
         return False, description
 
     # Split into labels
@@ -37,9 +37,7 @@ async def validate_fqdn(domain: str) -> Tuple[bool, str]:
 
     # No empty labels allowed (e.g. "example..com")
     if any(label == "" for label in labels):
-        description = (
-            "FQDN contains empty labels (consecutive dots or trailing " "dot after removal)"
-        )
+        description = "FQDN contains empty labels (consecutive dots or trailing dot after removal)"
         return False, description
 
     # RFC label regex:
