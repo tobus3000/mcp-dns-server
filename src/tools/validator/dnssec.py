@@ -1397,14 +1397,58 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[st
 
 def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
     """Add natural language interpretations to the validation report."""
+    # Pre-scan for critical issues before building interpretation
+    has_critical_failures = False
+    critical_issues = []
+
+    # Check for missing RRSIGs on present records
+    for rr_type, result in report.get("rrsets", {}).items():
+        if result.get("present") and not result.get("rrsig_present"):
+            has_critical_failures = True
+            critical_issues.append(f"No RRSIG found for {rr_type} records")
+        # Check for invalid denial proofs
+        if not result.get("present"):
+            nx_proof = result.get("nx_proof", {})
+            if nx_proof.get("proof_type") and not nx_proof.get("valid"):
+                has_critical_failures = True
+                critical_issues.append(f"Invalid DNSSEC denial proof for {rr_type} records")
+            elif not nx_proof.get("proof_type") and report["dnskey"]["present"]:
+                has_critical_failures = True
+                critical_issues.append(f"No DNSSEC denial proof for {rr_type} records")
+
+    # Check for broken NSEC chains in denial tests
+    for test_type, result in report.get("denial_tests", {}).items():
+        nx_proof = result.get("nx_proof", {})
+        if nx_proof.get("validation") and not nx_proof["validation"].get("valid"):
+            has_critical_failures = True
+            errors = nx_proof["validation"].get("errors", [])
+            for error in errors:
+                critical_issues.append(f"Broken NSEC chain: {error}")
+
+    # Check nameserver connectivity
+    ns_conn = report.get("nameserver_connectivity", {})
+    if ns_conn.get("unreachable") or ns_conn.get("issues"):
+        has_critical_failures = True
+        for issue in ns_conn.get("issues", []):
+            critical_issues.append(f"Nameserver issue: {issue}")
+
+    # Determine overall verdict
+    if not report["dnskey"]["present"]:
+        overall_status = "DNSSEC is not configured"
+    elif has_critical_failures:
+        overall_status = "DNSSEC configuration has critical failures"
+    elif not report["parent_ds"].get("parent_ds_present"):
+        overall_status = "DNSSEC is configured but chain of trust is not established"
+    elif not report["dnskey_signature"].get("valid"):
+        overall_status = "DNSSEC is configured but DNSKEY signatures are invalid"
+    else:
+        overall_status = "DNSSEC is properly configured"
+
     interpretation = {
         "summary": {
             "domain": report["domain"],
-            "overall_status": (
-                "DNSSEC is properly configured"
-                if report["dnskey"]["present"]
-                else "DNSSEC is not configured"
-            ),
+            "overall_status": overall_status,
+            "critical_issues": critical_issues if critical_issues else None,
             "description": "This report analyzes the DNSSEC configuration and validation status for the domain.",
         },
         "key_configuration": {
@@ -1500,18 +1544,24 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
     # Record Validation Details
     for rr_type, result in report["rrsets"].items():
         if result.get("present"):
+            # Check for missing RRSIGs - this is CRITICAL
+            if not result.get("rrsig_present"):
+                interpretation["validation_details"]["status"].append(
+                    f"CRITICAL: {rr_type} records present but NO RRSIG signature found"
+                )
             # Check for expired signatures in RRsets
-            if result.get("expired_signatures"):
+            elif result.get("expired_signatures"):
                 for exp_sig in result["expired_signatures"]:
                     interpretation["validation_details"]["status"].append(
-                        f"WARNING: RRSIG={exp_sig.get('rrsig_id')} for {rr_type} is expired"
+                        f"WARNING: {rr_type} signature expired (RRSIG ID {exp_sig.get('rrsig_id')})"
                     )
-
-            status = "valid" if result.get("valid") else "invalid"
-            reason = f" ({result.get('error')})" if result.get("error") else ""
-            interpretation["validation_details"]["status"].append(
-                f"{rr_type} records present and signatures are {status}{reason}"
-            )
+            # Normal validation status
+            else:
+                status = "valid" if result.get("valid") else "invalid"
+                reason = f" ({result.get('error')})" if result.get("error") else ""
+                interpretation["validation_details"]["status"].append(
+                    f"{rr_type} records present and signatures are {status}{reason}"
+                )
         else:
             # Record is NOT present - check if non-existence is properly proven with DNSSEC
             if report["dnskey"]["present"]:  # Only check if DNSSEC is enabled
@@ -1521,6 +1571,11 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
                         # Non-existence proof exists but is invalid
                         interpretation["validation_details"]["status"].append(
                             f"CRITICAL: {rr_type} records absent but denial proof is invalid"
+                        )
+                    else:
+                        # Valid denial proof
+                        interpretation["validation_details"]["status"].append(
+                            f"{rr_type} records properly denied with valid {nx_proof.get('proof_type')} records"
                         )
                 else:
                     # No NSEC/NSEC3 records at all - this is a critical DNSSEC failure
