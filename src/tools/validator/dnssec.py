@@ -337,6 +337,19 @@ def check_rrset_signature(
     if timeout != DEFAULT_TIMEOUT:
         _resolver.resolver.lifetime = _resolver.default_timeout
     result: Dict[str, Any] = {"type": rdtype, "present": rrset is not None}
+
+    # Check response code for errors like SERVFAIL, which indicate nameserver problems
+    if resp is not None:
+        rcode = resp.rcode()
+        if rcode != dns.rcode.NOERROR and rcode != dns.rcode.NXDOMAIN and rcode != dns.rcode.NOTIMP:
+            result["response_code"] = {
+                "code": rcode,
+                "name": dns.rcode.to_text(rcode),
+                "error": f"Nameserver returned {dns.rcode.to_text(rcode)} for {rdtype} query",
+            }
+            # For SERVFAIL and similar errors, we can't trust the response
+            return result
+
     if rrset is None or dnskey_rrset is None:
         # try to see if NXDOMAIN or NODATA with proof
         result["nx_proof"] = validate_denial_proof(resp, target) if resp else None
@@ -1401,6 +1414,13 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
     has_critical_failures = False
     critical_issues = []
 
+    # Check for nameserver response code errors (SERVFAIL, etc.)
+    for rr_type, result in report.get("rrsets", {}).items():
+        if result.get("response_code"):
+            has_critical_failures = True
+            rcode_info = result["response_code"]
+            critical_issues.append(f"Nameserver error for {rr_type} records: {rcode_info['error']}")
+
     # Check for missing RRSIGs on present records
     for rr_type, result in report.get("rrsets", {}).items():
         if result.get("present") and not result.get("rrsig_present"):
@@ -1543,7 +1563,13 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
 
     # Record Validation Details
     for rr_type, result in report["rrsets"].items():
-        if result.get("present"):
+        # Check for nameserver response code errors first
+        if result.get("response_code"):
+            rcode_info = result["response_code"]
+            interpretation["validation_details"]["status"].append(
+                f"CRITICAL: {rr_type} records - {rcode_info['error']}"
+            )
+        elif result.get("present"):
             # Check for missing RRSIGs - this is CRITICAL
             if not result.get("rrsig_present"):
                 interpretation["validation_details"]["status"].append(
