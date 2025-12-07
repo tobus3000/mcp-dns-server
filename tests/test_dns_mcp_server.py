@@ -398,7 +398,9 @@ class TestDNSMCPServerLifecycle:
             except asyncio.TimeoutError:
                 pass
 
-            mock_run.assert_called_once_with(transport="http", host="127.0.0.1", port=9999)
+            mock_run.assert_called_once_with(
+                transport="http", host="127.0.0.1", port=9999, log_level="DEBUG"
+            )
 
     @pytest.mark.integration
     @pytest.mark.asyncio
@@ -412,7 +414,9 @@ class TestDNSMCPServerLifecycle:
             except asyncio.TimeoutError:
                 pass
 
-            mock_run.assert_called_once_with(transport="http", host="127.0.0.1", port=3000)
+            mock_run.assert_called_once_with(
+                transport="http", host="0.0.0.0", port=3000, log_level="DEBUG"
+            )
 
     @pytest.mark.integration
     @pytest.mark.asyncio

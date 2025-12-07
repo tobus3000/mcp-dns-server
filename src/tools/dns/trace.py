@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional
 import dns.name
 import dns.rdatatype
 
-from resolver import Resolver
-from typedefs import ToolResult
+from src.resolver import Resolver
+from src.typedefs import ToolResult
 
 
 class Trace:

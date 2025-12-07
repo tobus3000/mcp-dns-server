@@ -3,8 +3,8 @@ import time
 import aiohttp
 import dns.rcode
 
-from resolver import Resolver
-from typedefs import ToolResult
+from src.resolver import Resolver
+from src.typedefs import ToolResult
 
 # Cache for IANA TLDs (memory-only)
 _IANA_TLD_CACHE: set[str] = set()

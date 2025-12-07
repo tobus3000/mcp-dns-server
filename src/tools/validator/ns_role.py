@@ -19,8 +19,8 @@ from typing import Optional
 
 import dns.flags
 
-from resolver import Resolver
-from typedefs import ToolResult
+from src.resolver import Resolver
+from src.typedefs import ToolResult
 
 
 async def verify_nameserver_role(

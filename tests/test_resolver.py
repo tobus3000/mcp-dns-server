@@ -224,24 +224,24 @@ class TestResolverSynchronousResolution:
     @pytest.mark.dns
     def test_fetch_dnskey(self, resolver):
         """Test fetch_dnskey method."""
-        with patch.object(resolver, "resolve") as mock_resolve:
-            mock_resolve.return_value = (MagicMock(), MagicMock())
+        with patch.object(resolver, "resolve_dnssec") as mock_resolve_dnssec:
+            mock_resolve_dnssec.return_value = (MagicMock(), MagicMock())
 
             rrset, response = resolver.fetch_dnskey("example.com")
 
-            mock_resolve.assert_called_once_with("example.com", "DNSKEY", None, None)
+            mock_resolve_dnssec.assert_called_once_with("example.com", "DNSKEY", None, None)
             assert rrset is not None
 
     @pytest.mark.unit
     @pytest.mark.dns
     def test_fetch_ds(self, resolver):
         """Test fetch_ds method."""
-        with patch.object(resolver, "resolve") as mock_resolve:
-            mock_resolve.return_value = (MagicMock(), MagicMock())
+        with patch.object(resolver, "resolve_dnssec") as mock_resolve_dnssec:
+            mock_resolve_dnssec.return_value = (MagicMock(), MagicMock())
 
             rrset, response = resolver.fetch_ds("example.com")
 
-            mock_resolve.assert_called_once_with("example.com", "DS", None, None)
+            mock_resolve_dnssec.assert_called_once_with("example.com", "DS", None, None)
             assert rrset is not None
 
     @pytest.mark.unit

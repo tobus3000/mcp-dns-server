@@ -1,8 +1,8 @@
 import asyncio
 from typing import Any, Dict, List, Optional
 
-from resolver import Resolver
-from typedefs import ToolResult
+from src.resolver import Resolver
+from src.typedefs import ToolResult
 
 
 class RootServerDetector:

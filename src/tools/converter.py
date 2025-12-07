@@ -1,5 +1,5 @@
-from resolver import Resolver
-from typedefs import ToolResult
+from src.resolver import Resolver
+from src.typedefs import ToolResult
 
 
 async def punycode_converter_impl(domain: str) -> ToolResult:

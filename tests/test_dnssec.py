@@ -427,21 +427,24 @@ class TestRobustness:
 
 
 @pytest.mark.unit
-@pytest.mark.dns
 @pytest.mark.slow
 class TestFullValidationWorkflow:
     """Test complete DNSSEC validation workflow."""
 
     def test_validate_domain_no_dnskey(self):
         """Test validate_domain when DNSKEY is not present."""
-        with patch("src.tools.validator.dnssec._resolver.fetch_dnskey") as mock_fetch:
-            mock_fetch.return_value = (None, None)
+        with patch("src.tools.validator.dnssec.list_authoritative_nameservers") as mock_list:
+            with patch("src.tools.validator.dnssec._resolver.resolve_dnssec") as mock_resolve:
+                # Return empty list for nameservers, then (None, None) for DNSKEY resolution
+                mock_list.return_value = []
+                mock_resolve.return_value = (None, None)
 
-            result = validate_domain("example.com")
+                result = validate_domain("example.com")
 
-            assert "domain" in result
-            assert result["dnskey"]["present"] is False
-            assert result["dnskey"]["count"] == 0
+                assert "domain" in result
+                assert result["dnskey"]["present"] is False
+                assert result["dnskey"]["count"] == 0
+                assert result["dnskey"]["text"] == []
 
     def test_validate_domain_structure(self):
         """Test validate_domain returns expected structure."""
@@ -501,6 +504,7 @@ class TestResultInterpretation:
         report = {
             "domain": "example.com",
             "dnskey": {"present": True, "count": 2},
+            "dnskey_signature": {"present": True, "valid": True},
             "parent_ds": {"parent_ds_present": True, "parent": "com"},
             "rrsets": {},
             "soa_consistency": {},

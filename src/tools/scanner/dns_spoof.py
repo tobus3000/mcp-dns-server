@@ -3,7 +3,7 @@ import time
 
 from scapy.all import DNS, DNSQR, ICMP, IP, UDP, AsyncSniffer, Ether, sr1
 
-from typedefs import ToolResult
+from src.typedefs import ToolResult
 
 
 async def detect_dns_spoof_async(

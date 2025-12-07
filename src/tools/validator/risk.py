@@ -26,8 +26,8 @@ import string
 import unicodedata
 from typing import Dict, List, Optional, Set, Tuple
 
-from resolver import Resolver
-from typedefs import ToolResult
+from src.resolver import Resolver
+from src.typedefs import ToolResult
 
 # ----- Configurable small datasets (keyboard adjacency + homoglyphs) -----
 # Keyboard adjacency (QWERTY) for simple substitution/insertion choices

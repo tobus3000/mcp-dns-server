@@ -26,7 +26,7 @@ import dns.reversename
 import dns.rrset
 import dns.zone
 
-from typedefs import AXFRResult, QueryResult
+from src.typedefs import AXFRResult, QueryResult
 
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA

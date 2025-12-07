@@ -5,9 +5,8 @@ server:
 
 dns:
   # Custom DNS servers to use (optional, if not specified, system defaults will be used)
-  # dns_servers:
-  #   - "8.8.8.8"
-  #   - "8.8.4.4"
+  dns_servers:
+    - "192.168.200.4"
 
   # Timeout for DNS queries in seconds
   timeout: 5

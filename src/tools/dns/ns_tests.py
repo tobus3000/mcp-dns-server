@@ -26,8 +26,8 @@ import dns.rcode
 import dns.rdataclass
 import dns.rdatatype
 
-from resolver import Resolver
-from typedefs import QueryResult, ToolResult
+from src.resolver import Resolver
+from src.typedefs import QueryResult, ToolResult
 
 DEFAULT_TIMEOUT = 5.0
 MAX_UDP_SIZE = 4096

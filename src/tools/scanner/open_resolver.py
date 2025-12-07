@@ -1,8 +1,8 @@
 import asyncio
 import ipaddress
 
-from resolver import Resolver
-from typedefs import OpenResolver, ToolResult
+from src.resolver import Resolver
+from src.typedefs import OpenResolver, ToolResult
 
 
 async def check_open_resolver(

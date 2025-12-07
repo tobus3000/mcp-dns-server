@@ -25,8 +25,8 @@ from dns.rdtypes.ANY.NSEC3 import NSEC3
 from dns.rdtypes.ANY.RRSIG import RRSIG
 
 from exceptions import handle_dns_error
-from resolver import Resolver
-from typedefs import ToolResult, ValidationResult
+from src.resolver import Resolver
+from src.typedefs import ToolResult, ValidationResult
 
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA
@@ -1489,7 +1489,10 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
             "domain": report["domain"],
             "overall_status": overall_status,
             "critical_issues": critical_issues if critical_issues else None,
-            "description": "This report analyzes the DNSSEC configuration and validation status for the domain.",
+            "description": (
+                "This report analyzes the DNSSEC configuration and "
+                "validation status for the domain."
+            ),
         },
         "key_configuration": {
             "description": "Analysis of the DNSKEY records and their properties",
@@ -1531,8 +1534,9 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
         # Add information about single-key setup when applicable
         if key_info["sep_count"] > 0 and key_info["zsk_count"] == 0:
             interpretation["key_configuration"]["status"].append(
-                "Single-key signing model: One key serves as both KSK and ZSK. This is operationally valid but "
-                "less flexible for key rollover compared to separate KSK/ZSK model."
+                "Single-key signing model: One key serves as both KSK and ZSK. "
+                "This is operationally valid but less flexible for key rollover "
+                "compared to separate KSK/ZSK model."
             )
 
         if key_info.get("critical"):
@@ -1558,7 +1562,8 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
             )
         else:
             interpretation["trust_chain"]["status"].append(
-                f"DS record present in parent zone {parent_ds['parent']} but does not match child DNSKEY"
+                f"DS record present in parent zone {parent_ds['parent']} "
+                "but does not match child DNSKEY"
             )
     else:
         interpretation["trust_chain"]["status"].append(
@@ -1728,7 +1733,9 @@ def interpret_validation_results(report: Dict[str, Any]) -> Dict[str, Any]:
     # Add robustness test interpretation
     if "robustness" in report and "interpretation" in report["robustness"]:
         interpretation["security_robustness"] = {
-            "description": "Analysis of DNS server robustness against malformed and malicious queries",
+            "description": (
+                "Analysis of DNS server robustness against malformed and " "malicious queries"
+            ),
             "status": report["robustness"]["interpretation"]["findings"],
             "recommendations": report["robustness"]["interpretation"]["recommendations"],
         }
