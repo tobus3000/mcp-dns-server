@@ -1,5 +1,8 @@
 # MCP DNS Server
 
+[![CI](https://github.com/tobus3000/mcp-dns-server/actions/workflows/python-package.yml/badge.svg)](https://github.com/tobus3000/mcp-dns-server/actions)
+[![codecov](https://codecov.io/gh/tobus3000/mcp-dns-server/graph/badge.svg?token=0H8USNAAJ0)](https://codecov.io/gh/tobus3000/mcp-dns-server)
+
 An MCP (Model Context Protocol) server designed to assist with DNS name resolution and advanced DNS troubleshooting scenarios.
 
 ## Features
