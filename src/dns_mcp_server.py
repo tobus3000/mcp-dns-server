@@ -53,7 +53,9 @@ class DNSMCPServer(
             with open(self.config_path, encoding="utf-8") as f:
                 self.config = yaml.safe_load(f)
         except FileNotFoundError:
-            self.logger.info("Config file %s not found, using default settings", self.config_path)
+            self.logger.info(
+                "Config file %s not found, using default settings", self.config_path
+            )
             self.config = {}
         except (yaml.YAMLError, OSError) as e:
             self.logger.error("Error loading config: %s", e)

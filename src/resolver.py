@@ -79,7 +79,9 @@ class Resolver:
         "OPENPGPKEY",
     ]
 
-    def __init__(self, nameservers: list[str] | None = None, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(
+        self, nameservers: list[str] | None = None, timeout: float = DEFAULT_TIMEOUT
+    ):
         """Initialize the resolver with optional nameservers and timeout.
 
         Args:
@@ -150,7 +152,9 @@ class Resolver:
         try:
             # Use socket.getaddrinfo to resolve the FQDN
             # This handles both IPv4 and IPv6 resolution
-            addr_info = socket.getaddrinfo(fqdn, 53, socket.AF_UNSPEC, socket.SOCK_DGRAM)
+            addr_info = socket.getaddrinfo(
+                fqdn, 53, socket.AF_UNSPEC, socket.SOCK_DGRAM
+            )
             ips = []
             seen = set()  # Avoid duplicates
 
@@ -231,13 +235,19 @@ class Resolver:
                 response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
             else:
                 try:
-                    response = await dns.asyncquery.udp(query, nameserver, timeout=timeout)
+                    response = await dns.asyncquery.udp(
+                        query, nameserver, timeout=timeout
+                    )
                     if response.flags & dns.flags.TC:  # Truncated, retry with TCP
-                        response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
+                        response = await dns.asyncquery.tcp(
+                            query, nameserver, timeout=timeout
+                        )
                 except dns.exception.DNSException as e:
                     if "Message too big" in str(e):
                         # UDP message too large, retry with TCP
-                        response = await dns.asyncquery.tcp(query, nameserver, timeout=timeout)
+                        response = await dns.asyncquery.tcp(
+                            query, nameserver, timeout=timeout
+                        )
                     else:
                         return QueryResult(
                             success=False,
@@ -736,7 +746,9 @@ class Resolver:
                     }
                 )
             elif rdtype == "NSEC":
-                records.append({"next": rdata.next, "windows": rdata.windows, "ttl": rrset.ttl})
+                records.append(
+                    {"next": rdata.next, "windows": rdata.windows, "ttl": rrset.ttl}
+                )
             elif rdtype == "NSEC3":
                 records.append(
                     {

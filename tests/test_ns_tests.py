@@ -257,7 +257,9 @@ class TestPerformance:
             mock_resolver.async_resolve = AsyncMock(return_value=mock_result)
             mock_resolver_class.return_value = mock_resolver
 
-            result = await performance_test("example.com", "8.8.8.8", num_queries=5, concurrent=2)
+            result = await performance_test(
+                "example.com", "8.8.8.8", num_queries=5, concurrent=2
+            )
 
             assert isinstance(result, dict)
             assert "domain" in result
@@ -284,7 +286,9 @@ class TestPerformance:
             mock_resolver.async_resolve = AsyncMock(return_value=mock_result)
             mock_resolver_class.return_value = mock_resolver
 
-            result = await performance_test("example.com", "8.8.8.8", num_queries=10, concurrent=5)
+            result = await performance_test(
+                "example.com", "8.8.8.8", num_queries=10, concurrent=5
+            )
 
             # Should report success rate
             assert result["summary"]["success_rate"] >= 0
@@ -507,7 +511,9 @@ class TestNSTestsEdgeCases:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            result = await performance_test("example.com", "8.8.8.8", num_queries=3, concurrent=1)
+            result = await performance_test(
+                "example.com", "8.8.8.8", num_queries=3, concurrent=1
+            )
 
             # Success rate should be less than 100%
             assert result["summary"]["success_rate"] < 100

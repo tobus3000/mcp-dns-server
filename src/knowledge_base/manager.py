@@ -94,7 +94,9 @@ class KnowledgeBaseManager:
             # Search in title, content, and tags
             title_match = query_lower in article.get("title", "").lower()
             content_match = query_lower in article.get("content", "").lower()
-            tags_match = any(query_lower in tag.lower() for tag in article.get("tags", []))
+            tags_match = any(
+                query_lower in tag.lower() for tag in article.get("tags", [])
+            )
 
             if title_match or content_match or tags_match:
                 matching_articles.append(article)

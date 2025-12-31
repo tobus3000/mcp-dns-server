@@ -389,7 +389,9 @@ class TestDNSMCPServerLifecycle:
     @pytest.mark.asyncio
     async def test_start_calls_run_async(self, server):
         """Test that start() calls server.run_async with correct parameters."""
-        with patch.object(server.server, "run_async", new_callable=AsyncMock) as mock_run:
+        with patch.object(
+            server.server, "run_async", new_callable=AsyncMock
+        ) as mock_run:
             mock_run.side_effect = asyncio.TimeoutError("Test timeout")
 
             try:
@@ -405,7 +407,9 @@ class TestDNSMCPServerLifecycle:
     @pytest.mark.asyncio
     async def test_start_with_default_host_port(self, server):
         """Test that start() uses default host and port."""
-        with patch.object(server.server, "run_async", new_callable=AsyncMock) as mock_run:
+        with patch.object(
+            server.server, "run_async", new_callable=AsyncMock
+        ) as mock_run:
             mock_run.side_effect = asyncio.TimeoutError
 
             try:

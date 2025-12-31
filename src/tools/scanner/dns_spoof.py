@@ -25,7 +25,11 @@ async def detect_dns_spoof_async(
         timeout: timeout in seconds
         iface: network interface to use for sniffing
     """
-    pkt = IP(dst=target_dns_ip) / UDP(sport=55555, dport=53) / DNS(rd=1, qd=DNSQR(qname=domain))
+    pkt = (
+        IP(dst=target_dns_ip)
+        / UDP(sport=55555, dport=53)
+        / DNS(rd=1, qd=DNSQR(qname=domain))
+    )
 
     # Measure normal ICMP hop distance to target
     icmp_ttl = None
@@ -44,7 +48,9 @@ async def detect_dns_spoof_async(
             response_container["packet"] = packet
             return True
 
-    sniffer = AsyncSniffer(filter="udp port 53", prn=handle_packet, store=False, iface=iface)
+    sniffer = AsyncSniffer(
+        filter="udp port 53", prn=handle_packet, store=False, iface=iface
+    )
     sniffer.start()
 
     start = time.time()
@@ -81,13 +87,17 @@ async def detect_dns_spoof_async(
     # Latency check
     if rtt < 5:
         tampered = True
-        notes.append(f"Suspiciously fast reply ({rtt:.1f} ms) — likely intercepted locally.")
+        notes.append(
+            f"Suspiciously fast reply ({rtt:.1f} ms) — likely intercepted locally."
+        )
 
     # MAC-level check
     if router_mac:
         if observed_mac and observed_mac.lower() == router_mac.lower():
             tampered = True
-            notes.append(f"Reply MAC matches local router ({observed_mac}) — spoofing detected.")
+            notes.append(
+                f"Reply MAC matches local router ({observed_mac}) — spoofing detected."
+            )
 
     # Answer check
     if expected_answer and str(answer) != expected_answer:

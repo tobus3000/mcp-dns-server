@@ -65,7 +65,9 @@ class TestDNSKEYandDS:
         mock_rdata = MagicMock()
         mock_rdata.key_tag = 54321
 
-        with patch("dns.dnssec.key_id", side_effect=ValueError("Key ID calculation failed")):
+        with patch(
+            "dns.dnssec.key_id", side_effect=ValueError("Key ID calculation failed")
+        ):
             result = key_tag_from_dnskey(mock_rdata)
             assert result == 54321
 
@@ -81,7 +83,9 @@ class TestDNSKEYandDS:
         """Test compute_ds_from_dnskey with empty RRset."""
         empty_rrset = dns.rrset.from_text("example.com.", 300, "IN", "DNSKEY")
 
-        ds_list, denied_keys = compute_ds_from_dnskey("example.com", empty_rrset, "SHA256")
+        ds_list, denied_keys = compute_ds_from_dnskey(
+            "example.com", empty_rrset, "SHA256"
+        )
 
         assert isinstance(ds_list, list)
         assert isinstance(denied_keys, list)
@@ -95,7 +99,9 @@ class TestDNSKEYandDS:
         rrset.__iter__ = MagicMock(return_value=iter([mock_rdata]))
 
         with patch("dns.dnssec.make_ds", return_value="mock_ds_record"):
-            ds_list, denied_keys = compute_ds_from_dnskey("example.com", rrset, "SHA256")
+            ds_list, denied_keys = compute_ds_from_dnskey(
+                "example.com", rrset, "SHA256"
+            )
             assert isinstance(ds_list, list)
 
 
@@ -348,7 +354,9 @@ class TestAuthoritativeNameservers:
 
     def test_check_authoritative_consistency(self):
         """Test check_authoritative_consistency."""
-        with patch("src.tools.validator.dnssec.list_authoritative_nameservers") as mock_list:
+        with patch(
+            "src.tools.validator.dnssec.list_authoritative_nameservers"
+        ) as mock_list:
             with patch("src.tools.validator.dnssec._resolver.fetch_dnskey"):
                 mock_list.return_value = []
 
@@ -387,7 +395,9 @@ class TestKeyInspection:
         rrset = MagicMock()
         rrset.__iter__ = MagicMock(return_value=iter([mock_rdata]))
 
-        with patch("src.tools.validator.dnssec.key_tag_from_dnskey", return_value=12345):
+        with patch(
+            "src.tools.validator.dnssec.key_tag_from_dnskey", return_value=12345
+        ):
             with patch("dns.dnssec.algorithm_to_text", return_value="RSASHA256"):
                 result = inspect_keys_and_rollover(rrset)
 
@@ -417,7 +427,9 @@ class TestRobustness:
         """Test robustness testing includes invalid chars test."""
         result = check_robustness("example.com")
 
-        invalid_test = next((t for t in result["tests"] if t["name"] == "invalid_chars"), None)
+        invalid_test = next(
+            (t for t in result["tests"] if t["name"] == "invalid_chars"), None
+        )
         assert invalid_test is not None or result["tests"]
 
 
@@ -433,8 +445,12 @@ class TestFullValidationWorkflow:
 
     def test_validate_domain_no_dnskey(self):
         """Test validate_domain when DNSKEY is not present."""
-        with patch("src.tools.validator.dnssec.list_authoritative_nameservers") as mock_list:
-            with patch("src.tools.validator.dnssec._resolver.resolve_dnssec") as mock_resolve:
+        with patch(
+            "src.tools.validator.dnssec.list_authoritative_nameservers"
+        ) as mock_list:
+            with patch(
+                "src.tools.validator.dnssec._resolver.resolve_dnssec"
+            ) as mock_resolve:
                 # Return empty list for nameservers, then (None, None) for DNSKEY resolution
                 mock_list.return_value = []
                 mock_resolve.return_value = (None, None)
@@ -451,8 +467,12 @@ class TestFullValidationWorkflow:
         with patch("src.tools.validator.dnssec._resolver.fetch_dnskey") as mock_fetch:
             with patch("src.tools.validator.dnssec.check_parent_ds"):
                 with patch("src.tools.validator.dnssec.check_rrset_signature"):
-                    with patch("src.tools.validator.dnssec.check_authoritative_consistency"):
-                        with patch("src.tools.validator.dnssec.inspect_keys_and_rollover"):
+                    with patch(
+                        "src.tools.validator.dnssec.check_authoritative_consistency"
+                    ):
+                        with patch(
+                            "src.tools.validator.dnssec.inspect_keys_and_rollover"
+                        ):
                             with patch("src.tools.validator.dnssec.check_robustness"):
                                 mock_fetch.return_value = (None, None)
 
@@ -588,9 +608,15 @@ class TestIntegration:
         """Test full validation workflow with mocks."""
         with patch("src.tools.validator.dnssec._resolver.fetch_dnskey") as mock_dnskey:
             with patch("src.tools.validator.dnssec.check_parent_ds") as mock_parent:
-                with patch("src.tools.validator.dnssec.check_rrset_signature") as mock_sig:
-                    with patch("src.tools.validator.dnssec.check_authoritative_consistency"):
-                        with patch("src.tools.validator.dnssec.inspect_keys_and_rollover"):
+                with patch(
+                    "src.tools.validator.dnssec.check_rrset_signature"
+                ) as mock_sig:
+                    with patch(
+                        "src.tools.validator.dnssec.check_authoritative_consistency"
+                    ):
+                        with patch(
+                            "src.tools.validator.dnssec.inspect_keys_and_rollover"
+                        ):
                             with patch("src.tools.validator.dnssec.check_robustness"):
                                 mock_dnskey.return_value = (None, None)
                                 mock_parent.return_value = {}

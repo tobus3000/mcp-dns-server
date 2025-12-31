@@ -44,10 +44,14 @@ async def discover_mdns_services_impl(
             error: Error message if discovery failed
             details: Additional metadata including service types discovered
     """
-    runner = AsyncRunner(find_all=find_all, ip_version=IPVersion.All if ipv6 else IPVersion.V4Only)
+    runner = AsyncRunner(
+        find_all=find_all, ip_version=IPVersion.All if ipv6 else IPVersion.V4Only
+    )
 
     try:
-        success, error, services, service_types = await runner.start_browsing(timeout=timeout)
+        success, error, services, service_types = await runner.start_browsing(
+            timeout=timeout
+        )
 
         if not success:
             return ToolResult(success=False, error=error)
@@ -63,7 +67,9 @@ async def discover_mdns_services_impl(
         )
 
     except Exception as e:
-        return ToolResult(success=False, error=f"mDNS service discovery failed: {str(e)}")
+        return ToolResult(
+            success=False, error=f"mDNS service discovery failed: {str(e)}"
+        )
 
     finally:
         await runner.stop_browsing()
@@ -76,7 +82,9 @@ class MDNSServiceDiscoveryError(Exception):
 
 
 class AsyncRunner:
-    def __init__(self, find_all: bool = False, ip_version: IPVersion = IPVersion.V4Only) -> None:
+    def __init__(
+        self, find_all: bool = False, ip_version: IPVersion = IPVersion.V4Only
+    ) -> None:
         self.find_all = find_all
         self.ip_version = ip_version
         self.aiobrowser: AsyncServiceBrowser | None = None
@@ -92,17 +100,22 @@ class AsyncRunner:
         state_change: ServiceStateChange,
     ) -> None:
         if state_change is ServiceStateChange.Added:
-            task = asyncio.ensure_future(self._process_service_info(zeroconf, service_type, name))
+            task = asyncio.ensure_future(
+                self._process_service_info(zeroconf, service_type, name)
+            )
             _PENDING_TASKS.add(task)
             task.add_done_callback(_PENDING_TASKS.discard)
 
-    async def _process_service_info(self, zeroconf: Zeroconf, service_type: str, name: str) -> None:
+    async def _process_service_info(
+        self, zeroconf: Zeroconf, service_type: str, name: str
+    ) -> None:
         info = AsyncServiceInfo(service_type, name)
         await info.async_request(zeroconf, 3000)
 
         if info:
             addresses = [
-                f"{addr}:{cast(int, info.port)}" for addr in info.parsed_scoped_addresses()
+                f"{addr}:{cast(int, info.port)}"
+                for addr in info.parsed_scoped_addresses()
             ]
             meta = SERVICE_MAP.get(
                 service_type,

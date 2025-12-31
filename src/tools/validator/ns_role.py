@@ -43,7 +43,11 @@ async def verify_nameserver_role(
 
     # --- 1. Test for recursion (resolver role) ---
     recursion_result = await resolver.async_resolve(domain, "A", nameserver=nameserver)
-    if recursion_result.success and recursion_result.response and recursion_result.rcode == 0:
+    if (
+        recursion_result.success
+        and recursion_result.response
+        and recursion_result.rcode == 0
+    ):
         if recursion_result.response.answer:
             results["recursive"] = True
 
@@ -62,7 +66,9 @@ async def verify_nameserver_role(
 
     # --- 3. Evaluate and report ---
     if results["authoritative"] and not results["recursive"]:
-        return ToolResult(success=True, output=f"{nameserver} is an *authoritative* nameserver.")
+        return ToolResult(
+            success=True, output=f"{nameserver} is an *authoritative* nameserver."
+        )
     if results["recursive"] and not results["authoritative"]:
         return ToolResult(
             success=True, output=f"{nameserver} is a *DNS resolver* (recursive server)."

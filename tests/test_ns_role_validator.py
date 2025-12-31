@@ -16,7 +16,10 @@ import dns.flags
 import dns.message
 import pytest
 
-from src.tools.validator.ns_role import verify_nameserver_role, verify_nameserver_role_impl
+from src.tools.validator.ns_role import (
+    verify_nameserver_role,
+    verify_nameserver_role_impl,
+)
 
 # ============================================================================
 # Test Class: Nameserver Role Detection
@@ -49,7 +52,9 @@ class TestNameserverRoleDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name") as mock_reverse:
+            with patch(
+                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+            ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
                 result = await verify_nameserver_role("192.168.1.1")
@@ -84,14 +89,19 @@ class TestNameserverRoleDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name") as mock_reverse:
+            with patch(
+                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+            ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
                 result = await verify_nameserver_role("192.168.1.1")
 
                 assert result.success is True
                 if isinstance(result.output, str):
-                    assert "*DNS resolver*" in result.output or "recursive" in result.output.lower()
+                    assert (
+                        "*DNS resolver*" in result.output
+                        or "recursive" in result.output.lower()
+                    )
 
     async def test_test_nameserver_role_mixed_mode(self):
         """Test detection of mixed-mode nameserver (both authoritative and recursive)."""
@@ -116,7 +126,9 @@ class TestNameserverRoleDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name") as mock_reverse:
+            with patch(
+                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+            ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
                 result = await verify_nameserver_role("192.168.1.1")
@@ -145,7 +157,9 @@ class TestNameserverRoleDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name") as mock_reverse:
+            with patch(
+                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+            ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
                 result = await verify_nameserver_role("192.168.1.1")
@@ -193,7 +207,8 @@ class TestRecursionDetection:
                 # Should indicate resolver capability
                 if isinstance(result.output, str):
                     assert (
-                        "resolver" in result.output.lower() or "recursive" in result.output.lower()
+                        "resolver" in result.output.lower()
+                        or "recursive" in result.output.lower()
                     )
 
     async def test_recursion_test_without_answer_section(self):
@@ -221,7 +236,9 @@ class TestRecursionDetection:
 
                 # Should not be marked as resolver
                 if isinstance(result.output, str):
-                    assert "*DNS resolver*" not in result.output or result.success is False
+                    assert (
+                        "*DNS resolver*" not in result.output or result.success is False
+                    )
 
     async def test_recursion_test_default_domain(self):
         """Test that default domain is used for recursion test."""
@@ -266,7 +283,9 @@ class TestRecursionDetection:
 
             with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
                 custom_domain = "google.com"
-                result = await verify_nameserver_role("192.168.1.1", domain=custom_domain)
+                result = await verify_nameserver_role(
+                    "192.168.1.1", domain=custom_domain
+                )
 
                 # Verify async_resolve was called with custom domain
                 call_args_list = mock_resolver.async_resolve.call_args_list
@@ -304,7 +323,9 @@ class TestAuthorityDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name") as mock_reverse:
+            with patch(
+                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+            ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
                 result = await verify_nameserver_role("192.168.1.1")
@@ -337,7 +358,10 @@ class TestAuthorityDetection:
 
                 # Should not be marked as authoritative
                 if isinstance(result.output, str):
-                    assert "*authoritative*" not in result.output or result.success is False
+                    assert (
+                        "*authoritative*" not in result.output
+                        or result.success is False
+                    )
 
     async def test_authority_test_default_reverse_zone(self):
         """Test that reverse zone is used by default for authority test."""
@@ -355,7 +379,9 @@ class TestAuthorityDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name") as mock_reverse:
+            with patch(
+                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+            ) as mock_reverse:
                 mock_reverse.return_value = "expected.reverse.zone"
 
                 result = await verify_nameserver_role("192.168.1.1")
@@ -364,7 +390,9 @@ class TestAuthorityDetection:
                 mock_reverse.assert_called_with("192.168.1.1")
                 # Verify async_resolve was called with reverse zone
                 call_args_list = mock_resolver.async_resolve.call_args_list
-                assert any("expected.reverse.zone" in str(call) for call in call_args_list)
+                assert any(
+                    "expected.reverse.zone" in str(call) for call in call_args_list
+                )
 
     async def test_authority_test_custom_zone(self):
         """Test that custom zone is used for authority test when provided."""
@@ -383,7 +411,9 @@ class TestAuthorityDetection:
             mock_resolver_class.return_value = mock_resolver
 
             custom_zone = "example.corp."
-            result = await verify_nameserver_role("192.168.1.1", authority_test_domain=custom_zone)
+            result = await verify_nameserver_role(
+                "192.168.1.1", authority_test_domain=custom_zone
+            )
 
             # Verify async_resolve was called with custom zone
             call_args_list = mock_resolver.async_resolve.call_args_list
@@ -445,7 +475,9 @@ class TestNameserverRoleImpl:
             mock_test.return_value = MagicMock(success=True, output="Test result")
 
             custom_domain = "custom.domain"
-            result = await verify_nameserver_role_impl("192.168.1.1", custom_domain, None)
+            result = await verify_nameserver_role_impl(
+                "192.168.1.1", custom_domain, None
+            )
 
             # Verify verify_nameserver_role was called with custom domain
             mock_test.assert_called_once()
@@ -515,7 +547,9 @@ class TestNameserverRoleEdgeCases:
         """Test handling of unreachable nameserver."""
         with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
-            mock_resolver.async_resolve = AsyncMock(side_effect=Exception("Connection refused"))
+            mock_resolver.async_resolve = AsyncMock(
+                side_effect=Exception("Connection refused")
+            )
             mock_resolver_class.return_value = mock_resolver
 
             with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):

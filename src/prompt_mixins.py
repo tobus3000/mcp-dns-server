@@ -51,7 +51,9 @@ class PromptRegistrationMixin:
             name="advanced_lookup",
             description="Perform an advanced DNS lookup supporting multiple record types",
             tags=set(("dns", "query", "lookup", "advanced")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         def advanced_lookup(hostname: str, record_type: str) -> str:
             """Perform an advanced DNS lookup for a hostname and record type."""
@@ -65,7 +67,9 @@ class PromptRegistrationMixin:
             name="dns_domain_troubleshoot",
             description="Perform comprehensive DNS troubleshooting for a given domain",
             tags=set(("dns", "troubleshooting", "diagnostics", "domain")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         def dns_domain_troubleshoot(domain: str) -> str:
             """Perform DNS troubleshooting for a domain."""
@@ -79,7 +83,9 @@ class PromptRegistrationMixin:
             name="dns_domain_on_server_troubleshoot",
             description="Perform comprehensive DNS troubleshooting for a given domain",
             tags=set(("dns", "troubleshooting", "diagnostics", "domain")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         def dns_domain_on_server_troubleshoot(domain: str, nameserver: str) -> str:
             """Perform DNS troubleshooting for a domain against a specific DNS server."""
@@ -96,7 +102,9 @@ class PromptRegistrationMixin:
                 " domain and nameserver"
             ),
             tags=set(("dns", "troubleshooting", "diagnostics", "server", "nameserver")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         def dns_server_troubleshoot(domain: str, nameserver: str) -> str:
             """Perform comprehensive DNS server troubleshooting."""
@@ -110,7 +118,9 @@ class PromptRegistrationMixin:
             name="dns_domain_trace",
             description="Perform a DNS trace to see the resolution path for a domain",
             tags=set(("dns", "query", "troubleshooting", "trace")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         def dns_domain_trace(domain: str) -> str:
             """Perform a DNS trace for a domain."""
@@ -132,7 +142,9 @@ class PromptRegistrationMixin:
                     "nameserver",
                 )
             ),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         def dns_edns_test(domain: str, nameserver: str) -> str:
             """Perform EDNS tests for a nameserver."""
@@ -145,8 +157,12 @@ class PromptRegistrationMixin:
         @self.server.prompt(
             name="dns_udp_tcp_test",
             description="Perform UDP and TCP behavior tests on a given domain and nameserver",
-            tags=set(("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            tags=set(
+                ("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")
+            ),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         def dns_udp_tcp_test(domain: str, nameserver: str) -> str:
             """Perform UDP and TCP behavior tests for a nameserver."""
@@ -159,8 +175,12 @@ class PromptRegistrationMixin:
         @self.server.prompt(
             name="check_dns_cookie",
             description="Perform DNS Cookie behavior test on a given domain and nameserver",
-            tags=set(("dns", "troubleshooting", "diagnostics", "cookie", "edns", "dnscookie")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            tags=set(
+                ("dns", "troubleshooting", "diagnostics", "cookie", "edns", "dnscookie")
+            ),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         def dns_cookie_test(domain: str, nameserver: str) -> str:
             """Perform DNS Cookie test against a nameserver."""
@@ -217,7 +237,9 @@ class PromptRegistrationMixin:
                 "Return the DNS resource record types that are supported by this MCP server."
             ),
             tags=set(("dns", "record_types")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         def supported_record_types() -> str:
             """Get supported DNS record types."""
@@ -240,8 +262,12 @@ class PromptRegistrationMixin:
         @self.server.prompt(
             name="detect_open_resolvers",
             description="Scan a subnet in CIDR notation for open DNS resolvers.",
-            tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
-            enabled=self.config.get("features", {}).get("open_resolver_scan_tool", False),
+            tags=set(
+                ("dns", "security", "scanner", "open resolver", "subnet", "network")
+            ),
+            enabled=self.config.get("features", {}).get(
+                "open_resolver_scan_tool", False
+            ),
         )
         def detect_open_resolvers(cidr: str, domain: str) -> str:
             """Scan a subnet in CIDR notation for open DNS resolvers."""
@@ -250,8 +276,12 @@ class PromptRegistrationMixin:
         @self.server.prompt(
             name="detect_dns_spoofing",
             description="Detect DNS interception/spoofing.",
-            tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
-            enabled=self.config.get("features", {}).get("open_resolver_scan_tool", False),
+            tags=set(
+                ("dns", "security", "scanner", "open resolver", "subnet", "network")
+            ),
+            enabled=self.config.get("features", {}).get(
+                "open_resolver_scan_tool", False
+            ),
         )
         def detect_dns_spoofing(nameserver: str, domain: str) -> str:
             """Detect DNS interception/spoofing including MAC-level fingerprinting."""
@@ -263,8 +293,12 @@ class PromptRegistrationMixin:
         @self.server.prompt(
             name="detect_dns_spoofing_with_router_mac",
             description="Detect DNS interception/spoofing including MAC-level fingerprinting.",
-            tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
-            enabled=self.config.get("features", {}).get("open_resolver_scan_tool", False),
+            tags=set(
+                ("dns", "security", "scanner", "open resolver", "subnet", "network")
+            ),
+            enabled=self.config.get("features", {}).get(
+                "open_resolver_scan_tool", False
+            ),
         )
         def detect_dns_spoofing_with_router_mac(
             nameserver: str, domain: str, router_mac: str
@@ -280,7 +314,9 @@ class PromptRegistrationMixin:
             description=(
                 "Test whether a given DNS server is authoritative, a resolver, or mixed-mode."
             ),
-            tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
+            tags=set(
+                ("dns", "authority", "caching", "recursion", "role", "nameserver")
+            ),
             enabled=self.config.get("features", {}).get("nameserver_role_test", False),
         )
         def detect_nameserver_role(nameserver: str) -> str:
@@ -295,7 +331,9 @@ class PromptRegistrationMixin:
             description=(
                 "Test whether a given DNS server is authoritative, a resolver, or mixed-mode."
             ),
-            tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
+            tags=set(
+                ("dns", "authority", "caching", "recursion", "role", "nameserver")
+            ),
             enabled=self.config.get("features", {}).get("nameserver_role_test", False),
         )
         def detect_nameserver_role_with_auth_domain(
@@ -316,7 +354,9 @@ class PromptRegistrationMixin:
                 "for name resolution by the resolver."
             ),
             tags=set(("dns", "authority", "root", "nameserver")),
-            enabled=self.config.get("features", {}).get("detect_dns_root_environment", False),
+            enabled=self.config.get("features", {}).get(
+                "detect_dns_root_environment", False
+            ),
         )
         def detect_dns_root_environment() -> str:
             """Detect the DNS root server infrastructure used for name resolution."""
@@ -326,7 +366,9 @@ class PromptRegistrationMixin:
             name="top_level_domain_verification",
             description="Check if the top-level domain of a given domain is valid.",
             tags=set(("dns", "authority", "root", "TLD", "gTLD")),
-            enabled=self.config.get("features", {}).get("top_level_domain_verification", False),
+            enabled=self.config.get("features", {}).get(
+                "top_level_domain_verification", False
+            ),
         )
         def top_level_domain_verification(domain: str) -> str:
             """Check if the top-level domain of a given domain is valid."""
@@ -336,7 +378,9 @@ class PromptRegistrationMixin:
             name="mdns_service_discovery",
             description="Discover mDNS services on the local network.",
             tags=set(("mdns", "discovery", "network")),
-            enabled=self.config.get("features", {}).get("mdns_service_discovery", False),
+            enabled=self.config.get("features", {}).get(
+                "mdns_service_discovery", False
+            ),
         )
         def mdns_service_discovery(
             find_all: bool = False, timeout: float = 5.0, ipv6: bool = False
@@ -353,7 +397,9 @@ class PromptRegistrationMixin:
                 "Interactive assistant that gathers information progressively from the "
                 "user to help solve a DNS related problem."
             ),
-            tags=set(("interactive", "elicitation", "dns", "assistant", "problem", "help")),
+            tags=set(
+                ("interactive", "elicitation", "dns", "assistant", "problem", "help")
+            ),
             enabled=self.config.get("features", {}).get("basic_dns_assistant", False),
         )
         def dns_assistant() -> str:

@@ -40,7 +40,9 @@ async def fetch_iana_tlds(force_refresh: bool = False) -> set[str]:
         return set()
 
 
-async def is_valid_tld(domain: str, alternative_roots: list[str] | None = None) -> ToolResult:
+async def is_valid_tld(
+    domain: str, alternative_roots: list[str] | None = None
+) -> ToolResult:
     """
     Check if the TLD of a given domain is valid, supporting both global (IANA)
     and enterprise (non-public) DNS root environments.
@@ -85,11 +87,15 @@ async def is_valid_tld(domain: str, alternative_roots: list[str] | None = None) 
     # Step 2: Try enterprise/local root servers
     target_nameservers = alternative_roots or resolver.resolver.nameservers
     for ns in target_nameservers:
-        result = await resolver.async_resolve(domain=tld_zone, rdtype="NS", nameserver=str(ns))
+        result = await resolver.async_resolve(
+            domain=tld_zone, rdtype="NS", nameserver=str(ns)
+        )
 
         if result.success and result.rcode == dns.rcode.NOERROR:
             # Accept if we got any delegation or authoritative NS response
-            if result.response and (result.response.answer or result.response.authority):
+            if result.response and (
+                result.response.answer or result.response.authority
+            ):
                 return ToolResult(
                     success=True,
                     output=f"TLD {tld_zone} is a valid top-level domain in this environment.",

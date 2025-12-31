@@ -148,7 +148,9 @@ class Trace:
             DNS message response or None
         """
         for server in servers:
-            rrset, response = self.resolver.resolve(str(subdomain), "NS", nameserver=server)
+            rrset, response = self.resolver.resolve(
+                str(subdomain), "NS", nameserver=server
+            )
             if not response:
                 continue
 
@@ -303,4 +305,6 @@ async def dns_trace_impl(domain: str) -> ToolResult:
     """
     tracer = Trace(follow_cname=True)
     tracer.perform_trace(domain.strip())
-    return ToolResult(success=True, output={"domain": domain, "dns_trace": tracer.get_dig_style()})
+    return ToolResult(
+        success=True, output={"domain": domain, "dns_trace": tracer.get_dig_style()}
+    )

@@ -32,7 +32,9 @@ class ServerLifecycleMixin:
                     sig, lambda s=sig: asyncio.create_task(self._signal_handler(s))
                 )
             except NotImplementedError:
-                signal.signal(sig, lambda s, f: asyncio.create_task(self._signal_handler(s)))
+                signal.signal(
+                    sig, lambda s, f: asyncio.create_task(self._signal_handler(s))
+                )
 
     async def _signal_handler(self, sig: int) -> None:
         """Handle shutdown signals.
@@ -54,7 +56,9 @@ class ServerLifecycleMixin:
         self.setup_signal_handlers()
         try:
             self.logger.info("Starting MCP DNS Server on %s:%d", host, port)
-            await self.server.run_async(transport="http", host=host, port=port, log_level="DEBUG")
+            await self.server.run_async(
+                transport="http", host=host, port=port, log_level="DEBUG"
+            )
         except (OSError, RuntimeError) as e:
             self.logger.error("Error starting server: %s", e)
             await self.stop()

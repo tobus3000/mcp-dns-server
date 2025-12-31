@@ -12,7 +12,9 @@ class TestKnowledgeBaseResources:
     def setup_method(self):
         """Set up test fixtures before each test method."""
         # Create a temporary config file for testing
-        self.temp_config = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
+        self.temp_config = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        )
         self.temp_config.write(
             """
 server:

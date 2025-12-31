@@ -114,12 +114,16 @@ def validate_nsec3_parameters(nsec3_record: NSEC3) -> dict[str, Any]:
         result["warnings"].append(f"NSEC3 iterations too high: {result['iterations']}")
 
     if result["salt"] and result["salt_length"] > 32:
-        result["warnings"].append(f"NSEC3 salt length too long: {result['salt_length']}")
+        result["warnings"].append(
+            f"NSEC3 salt length too long: {result['salt_length']}"
+        )
 
     return result
 
 
-def validate_nsec_chain(nsec_records: list[dns.rrset.RRset], zone_name: str) -> dict[str, Any]:
+def validate_nsec_chain(
+    nsec_records: list[dns.rrset.RRset], zone_name: str
+) -> dict[str, Any]:
     """Validate that NSEC records form a complete chain."""
     if not nsec_records:
         return {"valid": False, "error": "No NSEC records found"}
@@ -147,7 +151,9 @@ def validate_nsec_chain(nsec_records: list[dns.rrset.RRset], zone_name: str) -> 
             {
                 "owner": current_rrset.name.to_text(),
                 "next": next_owner.to_text(),
-                "types": [str(dns.rdatatype.RdataType(t[0])) for t in current_nsec.windows],
+                "types": [
+                    str(dns.rdatatype.RdataType(t[0])) for t in current_nsec.windows
+                ],
             }
         )
     return result
@@ -299,7 +305,9 @@ def extract_expired_signatures(
             key_id = (
                 rdata.key_tag
                 if hasattr(rdata, "key_tag")
-                else rdata.key_id if hasattr(rdata, "key_id") else 0
+                else rdata.key_id
+                if hasattr(rdata, "key_id")
+                else 0
             )
             inception = rdata.inception
             expiration = rdata.expiration
@@ -343,7 +351,11 @@ def check_rrset_signature(
     # Check response code for errors like SERVFAIL, which indicate nameserver problems
     if resp is not None:
         rcode = resp.rcode()
-        if rcode != dns.rcode.NOERROR and rcode != dns.rcode.NXDOMAIN and rcode != dns.rcode.NOTIMP:
+        if (
+            rcode != dns.rcode.NOERROR
+            and rcode != dns.rcode.NXDOMAIN
+            and rcode != dns.rcode.NOTIMP
+        ):
             result["response_code"] = {
                 "code": rcode,
                 "name": dns.rcode.to_text(rcode),
@@ -365,11 +377,14 @@ def check_rrset_signature(
     if rrsig is None and resp is not None:
         # Check if there are ANY RRSIG records in the response at all
         rrsig_in_response = any(
-            rrset.rdtype == dns.rdatatype.RRSIG for rrset in resp.answer + resp.authority
+            rrset.rdtype == dns.rdatatype.RRSIG
+            for rrset in resp.answer + resp.authority
         )
         result["rrsig_in_response"] = rrsig_in_response
         if not rrsig_in_response:
-            result["rrsig_missing_detail"] = "No RRSIG records found in nameserver response"
+            result["rrsig_missing_detail"] = (
+                "No RRSIG records found in nameserver response"
+            )
 
     # Check for expired signatures
     if rrsig is not None:
@@ -396,7 +411,9 @@ def check_rrset_signature(
                 key_id = (
                     rdata.key_tag
                     if hasattr(rdata, "key_tag")
-                    else rdata.key_id if hasattr(rdata, "key_id") else 0
+                    else rdata.key_id
+                    if hasattr(rdata, "key_id")
+                    else 0
                 )
                 sig_details.append(
                     {
@@ -424,7 +441,9 @@ def check_rrset_signature(
                 key_id = (
                     rdata.key_tag
                     if hasattr(rdata, "key_tag")
-                    else rdata.key_id if hasattr(rdata, "key_id") else 0
+                    else rdata.key_id
+                    if hasattr(rdata, "key_id")
+                    else 0
                 )
                 sig_ok_times.append(
                     {
@@ -531,7 +550,9 @@ def check_parent_ds(
         1 for r in dnskey_rrset if bool(r.flags & 0x0100)
     )
 
-    computed_sha256, denied_sha256 = compute_ds_from_dnskey(zone_name, dnskey_rrset, "SHA256")
+    computed_sha256, denied_sha256 = compute_ds_from_dnskey(
+        zone_name, dnskey_rrset, "SHA256"
+    )
     computed_sha1, denied_sha1 = compute_ds_from_dnskey(zone_name, dnskey_rrset, "SHA1")
     # Track all denied keys
     result["denied_keys"].extend(denied_sha256)
@@ -663,13 +684,19 @@ def check_soa_consistency(zone_name: str, nameservers: list[str]) -> dict[str, A
             results["refresh_times"][ns] = None
 
     # Analyze serial consistency
-    valid_serials = {ns: serial for ns, serial in results["serials"].items() if serial is not None}
+    valid_serials = {
+        ns: serial for ns, serial in results["serials"].items() if serial is not None
+    }
     unique_serials = set(valid_serials.values())
 
     # Get refresh times for analysis
-    valid_refresh_times = [rt for rt in results["refresh_times"].values() if rt is not None]
+    valid_refresh_times = [
+        rt for rt in results["refresh_times"].values() if rt is not None
+    ]
     avg_refresh_time = (
-        sum(valid_refresh_times) / len(valid_refresh_times) if valid_refresh_times else 0
+        sum(valid_refresh_times) / len(valid_refresh_times)
+        if valid_refresh_times
+        else 0
     )
 
     # Analyze consistency and refresh times
@@ -723,7 +750,9 @@ def check_soa_consistency(zone_name: str, nameservers: list[str]) -> dict[str, A
             "consistent": len(unique_serials) <= 1,
             "unique_serials": len(unique_serials),
             "serial_details": {
-                str(serial): [ns for ns, ns_serial in valid_serials.items() if ns_serial == serial]
+                str(serial): [
+                    ns for ns, ns_serial in valid_serials.items() if ns_serial == serial
+                ]
                 for serial in unique_serials
             },
         },
@@ -899,7 +928,9 @@ def inspect_keys_and_rollover(
     elif zsk_count == 0:
         key_results["critical"].append("No ZSK keys found and no KSK present")
     if sep_count > 2:
-        key_results["warnings"].append(f"Unusually high number of KSK keys: {sep_count}")
+        key_results["warnings"].append(
+            f"Unusually high number of KSK keys: {sep_count}"
+        )
 
     # Check algorithm consistency
     if len(key_results["algorithms"]) > 1:
@@ -913,7 +944,9 @@ def inspect_keys_and_rollover(
     return key_results
 
 
-def check_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> dict[str, Any]:
+def check_robustness(
+    zone_name: str, timeout: float = DEFAULT_TIMEOUT
+) -> dict[str, Any]:
     """Test DNS server's robustness to various edge cases.
 
     Tests various edge cases and potential attack vectors:
@@ -1128,7 +1161,9 @@ def check_robustness(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> dict[s
             sig1: RRSIG = cast(RRSIG, sig1_rrset[0])
             sig2: RRSIG = cast(RRSIG, sig2_rrset[0])
             # Compare inception times - shouldn't be identical for fresh signatures
-            passed = sig1.inception != sig2.inception or sig1.expiration != sig2.expiration
+            passed = (
+                sig1.inception != sig2.inception or sig1.expiration != sig2.expiration
+            )
         else:
             passed = True  # No RRSIG means no replay vulnerability
 
@@ -1299,7 +1334,9 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> dict[st
                     key_id = (
                         rdata.key_tag
                         if hasattr(rdata, "key_tag")
-                        else rdata.key_id if hasattr(rdata, "key_id") else 0
+                        else rdata.key_id
+                        if hasattr(rdata, "key_id")
+                        else 0
                     )
                     inception = rdata.inception
                     expiration = rdata.expiration
@@ -1355,7 +1392,9 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> dict[st
                 continue
 
     for t in rrtypes:
-        rrchecks[t] = check_rrset_signature(zone_name, t, dnskey_rrset, auth_ns_for_rrsets, timeout)
+        rrchecks[t] = check_rrset_signature(
+            zone_name, t, dnskey_rrset, auth_ns_for_rrsets, timeout
+        )
     report["rrsets"] = rrchecks
 
     # 5) NXDOMAIN / denial proofs check (test non-existent names)
@@ -1458,7 +1497,9 @@ def interpret_validation_results(report: dict[str, Any]) -> dict[str, Any]:
         if result.get("response_code"):
             has_critical_failures = True
             rcode_info = result["response_code"]
-            critical_issues.append(f"Nameserver error for {rr_type} records: {rcode_info['error']}")
+            critical_issues.append(
+                f"Nameserver error for {rr_type} records: {rcode_info['error']}"
+            )
 
     # Check for missing RRSIG records at nameserver
     for rr_type, result in report.get("rrsets", {}).items():
@@ -1479,7 +1520,9 @@ def interpret_validation_results(report: dict[str, Any]) -> dict[str, Any]:
             nx_proof = result.get("nx_proof", {})
             if nx_proof.get("proof_type") and not nx_proof.get("valid"):
                 has_critical_failures = True
-                critical_issues.append(f"Invalid DNSSEC denial proof for {rr_type} records")
+                critical_issues.append(
+                    f"Invalid DNSSEC denial proof for {rr_type} records"
+                )
             elif not nx_proof.get("proof_type") and report["dnskey"]["present"]:
                 has_critical_failures = True
                 critical_issues.append(f"No DNSSEC denial proof for {rr_type} records")
@@ -1582,7 +1625,9 @@ def interpret_validation_results(report: dict[str, Any]) -> dict[str, Any]:
         if dnskey_val.get("failed_validations"):
             for failure in dnskey_val["failed_validations"]:
                 if "error" in failure:
-                    interpretation["trust_chain"]["status"].append(f"ERROR: {failure['error']}")
+                    interpretation["trust_chain"]["status"].append(
+                        f"ERROR: {failure['error']}"
+                    )
 
         if parent_ds.get("matches"):
             interpretation["trust_chain"]["status"].append(
@@ -1611,7 +1656,9 @@ def interpret_validation_results(report: dict[str, Any]) -> dict[str, Any]:
 
         # Check validation status
         if not dnskey_sig.get("valid"):
-            error = dnskey_sig.get("validation_error") or dnskey_sig.get("error", "Unknown error")
+            error = dnskey_sig.get("validation_error") or dnskey_sig.get(
+                "error", "Unknown error"
+            )
             interpretation["trust_chain"]["status"].append(f"ERROR: {error}")
 
     # Record Validation Details
@@ -1749,7 +1796,9 @@ def interpret_validation_results(report: dict[str, Any]) -> dict[str, Any]:
         ns_conn = report["nameserver_connectivity"]
         if ns_conn.get("issues"):
             for issue in ns_conn["issues"]:
-                interpretation["validation_details"]["status"].append(f"CRITICAL: {issue}")
+                interpretation["validation_details"]["status"].append(
+                    f"CRITICAL: {issue}"
+                )
         if ns_conn.get("unreachable"):
             for unreachable in ns_conn["unreachable"]:
                 ns_name = unreachable.get("nameserver", "unknown")
@@ -1762,14 +1811,20 @@ def interpret_validation_results(report: dict[str, Any]) -> dict[str, Any]:
     if "robustness" in report and "interpretation" in report["robustness"]:
         interpretation["security_robustness"] = {
             "description": (
-                "Analysis of DNS server robustness against malformed and " "malicious queries"
+                "Analysis of DNS server robustness against malformed and "
+                "malicious queries"
             ),
             "status": report["robustness"]["interpretation"]["findings"],
-            "recommendations": report["robustness"]["interpretation"]["recommendations"],
+            "recommendations": report["robustness"]["interpretation"][
+                "recommendations"
+            ],
         }
         if report["robustness"]["issues_found"]:
             interpretation["recommendations"].extend(
-                [f"Security Issue: {issue}" for issue in report["robustness"]["issues_found"]]
+                [
+                    f"Security Issue: {issue}"
+                    for issue in report["robustness"]["issues_found"]
+                ]
             )
 
     return interpretation

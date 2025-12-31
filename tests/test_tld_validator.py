@@ -81,7 +81,9 @@ class TestIANATLDFetching:
         """Test network error handling."""
         with patch("aiohttp.ClientSession") as mock_session_class:
             mock_session = AsyncMock()
-            mock_session.get = MagicMock(side_effect=aiohttp.ClientError("Network error"))
+            mock_session.get = MagicMock(
+                side_effect=aiohttp.ClientError("Network error")
+            )
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
             mock_session_class.return_value = mock_session
@@ -291,7 +293,9 @@ class TestEnterpriseTLDValidation:
                 mock_resolver.async_resolve = AsyncMock(return_value=mock_result)
                 mock_resolver_class.return_value = mock_resolver
 
-                result = await is_valid_tld("example.internal", alternative_roots=["10.0.0.1"])
+                result = await is_valid_tld(
+                    "example.internal", alternative_roots=["10.0.0.1"]
+                )
 
                 # Should validate via DNS
                 assert isinstance(result, object)
@@ -334,7 +338,9 @@ class TestEnterpriseTLDValidation:
                 mock_resolver.async_resolve = AsyncMock(return_value=mock_result)
                 mock_resolver_class.return_value = mock_resolver
 
-                result = await is_valid_tld("example.corp", alternative_roots=alternative_roots)
+                result = await is_valid_tld(
+                    "example.corp", alternative_roots=alternative_roots
+                )
 
                 assert isinstance(result, object)
 

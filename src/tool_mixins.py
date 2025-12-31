@@ -67,11 +67,17 @@ class ToolRegistrationMixin:
                 "types from the `supported_dns_record_types` resource."
             ),
             tags=set(("dns", "query", "lookup", "advanced")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
-        async def advanced_dns_lookup(hostname: str, record_type: str, ctx: Context) -> ToolResult:
+        async def advanced_dns_lookup(
+            hostname: str, record_type: str, ctx: Context
+        ) -> ToolResult:
             await ctx.info(f"Querying for {record_type} record of `{hostname}`.")
-            return await advanced_dns_lookup_impl(hostname.strip(), record_type.strip().upper())
+            return await advanced_dns_lookup_impl(
+                hostname.strip(), record_type.strip().upper()
+            )
 
         @self.server.tool(
             name="reverse_dns_lookup",
@@ -90,7 +96,9 @@ class ToolRegistrationMixin:
             name="dns_domain_troubleshooting",
             description="Perform comprehensive DNS troubleshooting for a given domain",
             tags=set(("dns", "troubleshooting", "diagnostics", "domain")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         async def dns_domain_troubleshooting(domain: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Performing troubleshooting tasks for domain `{domain}`.")
@@ -103,7 +111,9 @@ class ToolRegistrationMixin:
                 " domain and nameserver"
             ),
             tags=set(("dns", "troubleshooting", "diagnostics", "server", "nameserver")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         async def dns_server_troubleshooting(
             domain: str, nameserver: str, ctx: Context
@@ -112,13 +122,17 @@ class ToolRegistrationMixin:
                 f"Performing standard compliance tests against nameserver `{nameserver.strip()}` "
                 + f"using domain `{domain.strip()}`."
             )
-            return await run_comprehensive_tests_impl(domain.strip(), nameserver.strip())
+            return await run_comprehensive_tests_impl(
+                domain.strip(), nameserver.strip()
+            )
 
         @self.server.tool(
             name="dns_trace",
             description="Perform a DNS trace to see the resolution path for a domain",
             tags=set(("dns", "query", "troubleshooting", "trace")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
         async def dns_trace(domain: str, ctx: Context) -> ToolResult:
             await ctx.info(f"Performing DNS trace for domain `{domain}`.")
@@ -137,9 +151,13 @@ class ToolRegistrationMixin:
                     "nameserver",
                 )
             ),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
-        async def dns_server_edns_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
+        async def dns_server_edns_test(
+            domain: str, nameserver: str, ctx: Context
+        ) -> ToolResult:
             await ctx.info(
                 f"Performing EDNS tests against nameserver `{nameserver}` "
                 + f"using domain `{domain}` for testing."
@@ -152,10 +170,16 @@ class ToolRegistrationMixin:
                 "Use this tool to test that the given nameserver answers UDP and TCP "
                 "queries by using the specified domain."
             ),
-            tags=set(("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            tags=set(
+                ("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")
+            ),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
-        async def dns_udp_tcp_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
+        async def dns_udp_tcp_test(
+            domain: str, nameserver: str, ctx: Context
+        ) -> ToolResult:
             await ctx.info(
                 f"Performing UDP/TCP validation tests against nameserver {nameserver} "
                 + f"using domain `{domain}` for testing."
@@ -166,9 +190,13 @@ class ToolRegistrationMixin:
             name="dns_cookie_test",
             description="Perform a DNS Cookie behavior test on a given domain and nameserver.",
             tags=set(("dns", "cookie", "edns", "diagnostics", "troubleshooting")),
-            enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
+            enabled=self.config.get("features", {}).get(
+                "advanced_troubleshooting", False
+            ),
         )
-        async def dns_cookie_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
+        async def dns_cookie_test(
+            domain: str, nameserver: str, ctx: Context
+        ) -> ToolResult:
             await ctx.info(
                 f"Performing DNS Cookie validation against nameserver {nameserver} "
                 + f"using domain `{domain}` for testing."
@@ -182,7 +210,8 @@ class ToolRegistrationMixin:
                 "and return an in-depth report. When analyzing the returned report, "
                 "focus your evaluation on the critical_issues list in the summary section "
                 "and the CRITICAL flags in the validation_details. Pay special attention to: "
-                "(1) Nameserver errors (SERVFAIL, etc.) indicating the server cannot process DNSSEC queries, "
+                "(1) Nameserver errors (SERVFAIL, etc.) indicating the server cannot process "
+                "DNSSEC queries"
                 "(2) Missing RRSIG signatures on present records, "
                 "(3) Missing or invalid DNSSEC denial proofs for absent records, "
                 "(4) Broken NSEC chains that invalidate denial-of-existence proofs. "
@@ -192,7 +221,9 @@ class ToolRegistrationMixin:
             enabled=self.config.get("features", {}).get("dnssec_validation", False),
         )
         async def check_dnssec(domain: str, ctx: Context) -> ToolResult:
-            await ctx.info(f"Performing DNSSEC verification tasks for domain `{domain}`.")
+            await ctx.info(
+                f"Performing DNSSEC verification tasks for domain `{domain}`."
+            )
             return await check_dnssec_impl(domain)
 
         @self.server.tool(
@@ -201,8 +232,12 @@ class ToolRegistrationMixin:
             tags=set(("dns", "security", "lookalike", "typosquatting")),
             enabled=self.config.get("features", {}).get("lookalike_risk_tool", False),
         )
-        async def lookalike_risk(domain: str, ctx: Context, check_dns: bool = False) -> ToolResult:
-            await ctx.info(f"Performing lookalike risk verification tests for domain `{domain}`.")
+        async def lookalike_risk(
+            domain: str, ctx: Context, check_dns: bool = False
+        ) -> ToolResult:
+            await ctx.info(
+                f"Performing lookalike risk verification tests for domain `{domain}`."
+            )
             return await lookalike_risk_impl(domain, check_dns)
 
         @self.server.tool(
@@ -221,13 +256,21 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="detect_open_resolvers",
             description="Use this tool to scan a given subnet for open DNS resolvers.",
-            tags=set(("dns", "security", "scanner", "open resolver", "subnet", "network")),
-            enabled=self.config.get("features", {}).get("open_resolver_scan_tool", False),
+            tags=set(
+                ("dns", "security", "scanner", "open resolver", "subnet", "network")
+            ),
+            enabled=self.config.get("features", {}).get(
+                "open_resolver_scan_tool", False
+            ),
         )
-        async def detect_open_resolvers(cidr: str, domain: str, ctx: Context) -> ToolResult:
+        async def detect_open_resolvers(
+            cidr: str, domain: str, ctx: Context
+        ) -> ToolResult:
             network = ipaddress.ip_network(cidr, strict=False)
             if network.is_private:
-                await ctx.info(f"Performing open resolver scan on private subnet `{cidr}`.")
+                await ctx.info(
+                    f"Performing open resolver scan on private subnet `{cidr}`."
+                )
                 return await scan_subnet_for_open_resolvers_impl(cidr, domain)
             await ctx.info(
                 "The tool is limited to only scan private networks. Provided network "
@@ -264,7 +307,9 @@ class ToolRegistrationMixin:
                 "Use this tool to test whether a given DNS server is authoritative, a resolver, "
                 "or operates in mixed-mode."
             ),
-            tags=set(("dns", "authority", "caching", "recursion", "role", "nameserver")),
+            tags=set(
+                ("dns", "authority", "caching", "recursion", "role", "nameserver")
+            ),
             enabled=self.config.get("features", {}).get("nameserver_role_test", False),
         )
         async def detect_nameserver_role(
@@ -286,7 +331,9 @@ class ToolRegistrationMixin:
             name="detect_dns_root_environment",
             description="Detect the DNS root infrastructure that is used for name resolution.",
             tags=set(("dns", "authority", "root", "nameserver")),
-            enabled=self.config.get("features", {}).get("detect_dns_root_environment", False),
+            enabled=self.config.get("features", {}).get(
+                "detect_dns_root_environment", False
+            ),
         )
         async def detect_dns_root_environment(ctx: Context) -> ToolResult:
             await ctx.info("Performing root DNS infrastructure test.")
@@ -299,9 +346,13 @@ class ToolRegistrationMixin:
                 "name is a valid global top-level domain (gTLD)."
             ),
             tags=set(("dns", "authority", "root", "TLD", "gTLD")),
-            enabled=self.config.get("features", {}).get("top_level_domain_verification", False),
+            enabled=self.config.get("features", {}).get(
+                "top_level_domain_verification", False
+            ),
         )
-        async def top_level_domain_verification(ctx: Context, domain: str) -> ToolResult:
+        async def top_level_domain_verification(
+            ctx: Context, domain: str
+        ) -> ToolResult:
             await ctx.info("Performing top-level-domain check.")
             return await tld_check_impl(domain=domain)
 
@@ -309,7 +360,9 @@ class ToolRegistrationMixin:
             name="mdns_service_discovery",
             description="Use this tool to discover mDNS services on the local network.",
             tags=set(("mdns", "discovery", "network")),
-            enabled=self.config.get("features", {}).get("mdns_service_discovery", False),
+            enabled=self.config.get("features", {}).get(
+                "mdns_service_discovery", False
+            ),
         )
         async def mdns_service_discovery(
             ctx: Context,
@@ -318,7 +371,9 @@ class ToolRegistrationMixin:
             ipv6: bool = False,
         ) -> ToolResult:
             await ctx.info("Starting mDNS service discovery.")
-            return await discover_mdns_services_impl(find_all=find_all, timeout=timeout, ipv6=ipv6)
+            return await discover_mdns_services_impl(
+                find_all=find_all, timeout=timeout, ipv6=ipv6
+            )
 
         @self.server.tool(
             name="validate_dns_fqdn",
@@ -333,9 +388,13 @@ class ToolRegistrationMixin:
             await ctx.info(f"Validating FQDN: {domain}")
             result, message = await validate_fqdn(domain=domain)
             if result:
-                return ToolResult(success=True, output=f"`{domain}` is a syntactically valid FQDN.")
+                return ToolResult(
+                    success=True, output=f"`{domain}` is a syntactically valid FQDN."
+                )
             else:
-                return ToolResult(success=False, error=f"`{domain}` is not a valid FQDN: {message}")
+                return ToolResult(
+                    success=False, error=f"`{domain}` is not a valid FQDN: {message}"
+                )
 
         @self.server.tool(
             name="dns_assistant",
@@ -343,7 +402,9 @@ class ToolRegistrationMixin:
                 "Use this tool to start a DNS support assistant that gathers information "
                 "progressively to help find a DNS-related problem."
             ),
-            tags=set(("interactive", "elicitation", "dns", "assistant", "problem", "help")),
+            tags=set(
+                ("interactive", "elicitation", "dns", "assistant", "problem", "help")
+            ),
             enabled=self.config.get("features", {}).get("basic_dns_assistant", False),
         )
         async def basic_dns_assistant(ctx: Context) -> ToolResult:

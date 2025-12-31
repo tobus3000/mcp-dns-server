@@ -47,7 +47,9 @@ async def simple_dns_lookup_impl(hostname: str) -> ToolResult:
                 "query_name": str(result.qname),
                 "query_type": dns.rdatatype.to_text(result.rdtype),
                 "rcode_text": (
-                    dns.rcode.to_text(result.response.rcode()) if result.response else "No response"
+                    dns.rcode.to_text(result.response.rcode())
+                    if result.response
+                    else "No response"
                 ),
             },
         )
@@ -66,7 +68,9 @@ async def advanced_dns_lookup_impl(hostname: str, record_type: str) -> ToolResul
     """
     auth_nameservers = []
     resolver = Resolver(timeout=5.0)
-    supported_types = [dns.rdatatype.to_text(rdtype) for rdtype in dns.rdatatype.RdataType]
+    supported_types = [
+        dns.rdatatype.to_text(rdtype) for rdtype in dns.rdatatype.RdataType
+    ]
     if record_type.upper() not in supported_types:
         return ToolResult(
             success=False,
@@ -112,7 +116,9 @@ async def advanced_dns_lookup_impl(hostname: str, record_type: str) -> ToolResul
         details={
             "duration": result.duration,
             "query_name": str(result.qname) if result.qname else hostname,
-            "query_type": dns.rdatatype.to_text(result.rdtype) if result.rdtype else record_type,
+            "query_type": dns.rdatatype.to_text(result.rdtype)
+            if result.rdtype
+            else record_type,
             "rcode_text": result.rcode_text,
             "authoritative_nameservers": auth_nameservers if auth_nameservers else None,
         },
@@ -129,7 +135,9 @@ async def reverse_dns_lookup_impl(ip_address: str) -> ToolResult:
     try:
         ip = ipaddress.ip_address(ip_address)
     except ValueError:
-        return ToolResult(success=False, error=f"Invalid IP address: {ip_address}", details={})
+        return ToolResult(
+            success=False, error=f"Invalid IP address: {ip_address}", details={}
+        )
     rev_name = Resolver.get_reverse_name(ip_address)
     if rev_name is None:
         return ToolResult(
@@ -156,7 +164,9 @@ async def reverse_dns_lookup_impl(ip_address: str) -> ToolResult:
                 "query_name": str(result.qname),
                 "query_type": dns.rdatatype.to_text(result.rdtype),
                 "rcode_text": (
-                    dns.rcode.to_text(result.response.rcode()) if result.response else "No response"
+                    dns.rcode.to_text(result.response.rcode())
+                    if result.response
+                    else "No response"
                 ),
                 "is_local": ip.is_private or ip.is_loopback,
             },
@@ -164,7 +174,9 @@ async def reverse_dns_lookup_impl(ip_address: str) -> ToolResult:
     return ToolResult(success=False, error=result.error or "Unknown error", details={})
 
 
-async def dns_troubleshooting_impl(domain: str, nameserver: str | None = None) -> ToolResult:
+async def dns_troubleshooting_impl(
+    domain: str, nameserver: str | None = None
+) -> ToolResult:
     """Perform comprehensive DNS troubleshooting using the Resolver class.
 
     Args:
@@ -196,4 +208,6 @@ async def dns_troubleshooting_impl(domain: str, nameserver: str | None = None) -
             if rrset:
                 records = Resolver.get_records_from_rrset(rrset)
         troubleshooting_results[record_type] = records
-    return ToolResult(success=True, output=troubleshooting_results, details={"domain": domain})
+    return ToolResult(
+        success=True, output=troubleshooting_results, details={"domain": domain}
+    )

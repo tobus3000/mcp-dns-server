@@ -157,7 +157,9 @@ class TestResolverSynchronousResolution:
             mock_resolve.return_value = mock_response
 
             original_ns = (
-                resolver.resolver.nameservers.copy() if resolver.resolver.nameservers else []
+                resolver.resolver.nameservers.copy()
+                if resolver.resolver.nameservers
+                else []
             )
 
             rrset, response = resolver.resolve("example.com", "A", nameserver="8.8.8.8")
@@ -228,7 +230,9 @@ class TestResolverSynchronousResolution:
 
             rrset, response = resolver.fetch_dnskey("example.com")
 
-            mock_resolve_dnssec.assert_called_once_with("example.com", "DNSKEY", None, None)
+            mock_resolve_dnssec.assert_called_once_with(
+                "example.com", "DNSKEY", None, None
+            )
             assert rrset is not None
 
     @pytest.mark.unit
@@ -308,12 +312,16 @@ class TestResolverAsyncResolution:
             mock_response.edns = -1
             mock_udp.return_value = mock_response
 
-            result = await resolver.async_resolve("example.com", "A", nameserver="8.8.8.8")
+            result = await resolver.async_resolve(
+                "example.com", "A", nameserver="8.8.8.8"
+            )
 
             assert isinstance(result, QueryResult)
             assert result.success is True
             assert result.error is None
-            assert result.duration is not None or result.duration is None  # May be calculated
+            assert (
+                result.duration is not None or result.duration is None
+            )  # May be calculated
 
     @pytest.mark.asyncio
     @pytest.mark.unit
@@ -361,7 +369,9 @@ class TestResolverAsyncResolution:
             tcp_response.edns = -1
             mock_tcp.return_value = tcp_response
 
-            result = await resolver.async_resolve("example.com", "A", nameserver="8.8.8.8")
+            result = await resolver.async_resolve(
+                "example.com", "A", nameserver="8.8.8.8"
+            )
 
             assert result.success is True
             mock_tcp.assert_called_once()
@@ -396,7 +406,9 @@ class TestResolverAsyncResolution:
         with patch("dns.asyncquery.udp", new_callable=AsyncMock) as mock_udp:
             mock_udp.side_effect = asyncio.TimeoutError()
 
-            result = await resolver.async_resolve("example.com", "A", nameserver="8.8.8.8")
+            result = await resolver.async_resolve(
+                "example.com", "A", nameserver="8.8.8.8"
+            )
 
             assert result.success is False
             assert result.error is not None
@@ -409,7 +421,9 @@ class TestResolverAsyncResolution:
         with patch("dns.asyncquery.udp", new_callable=AsyncMock) as mock_udp:
             mock_udp.side_effect = dns.exception.DNSException("Test DNS error")
 
-            result = await resolver.async_resolve("example.com", "A", nameserver="8.8.8.8")
+            result = await resolver.async_resolve(
+                "example.com", "A", nameserver="8.8.8.8"
+            )
 
             assert result.success is False
             assert "Test DNS error" in result.error
@@ -422,7 +436,9 @@ class TestResolverAsyncResolution:
         with patch("dns.asyncquery.udp", new_callable=AsyncMock) as mock_udp:
             mock_udp.side_effect = OSError("Connection refused")
 
-            result = await resolver.async_resolve("example.com", "A", nameserver="8.8.8.8")
+            result = await resolver.async_resolve(
+                "example.com", "A", nameserver="8.8.8.8"
+            )
 
             assert result.success is False
 
@@ -450,7 +466,9 @@ class TestResolverCHAOSQueries:
     @pytest.mark.dns
     async def test_query_version_bind(self, resolver):
         """Test query_version_bind method."""
-        with patch.object(resolver, "async_resolve", new_callable=AsyncMock) as mock_resolve:
+        with patch.object(
+            resolver, "async_resolve", new_callable=AsyncMock
+        ) as mock_resolve:
             mock_resolve.return_value = QueryResult(success=True)
 
             result = await resolver.query_version_bind("8.8.8.8")
@@ -466,7 +484,9 @@ class TestResolverCHAOSQueries:
     @pytest.mark.dns
     async def test_query_hostname_bind(self, resolver):
         """Test query_hostname_bind method."""
-        with patch.object(resolver, "async_resolve", new_callable=AsyncMock) as mock_resolve:
+        with patch.object(
+            resolver, "async_resolve", new_callable=AsyncMock
+        ) as mock_resolve:
             mock_resolve.return_value = QueryResult(success=True)
 
             result = await resolver.query_hostname_bind("8.8.8.8")
@@ -481,7 +501,9 @@ class TestResolverCHAOSQueries:
     @pytest.mark.dns
     async def test_query_authors_bind(self, resolver):
         """Test query_authors_bind method."""
-        with patch.object(resolver, "async_resolve", new_callable=AsyncMock) as mock_resolve:
+        with patch.object(
+            resolver, "async_resolve", new_callable=AsyncMock
+        ) as mock_resolve:
             mock_resolve.return_value = QueryResult(success=True)
 
             result = await resolver.query_authors_bind("8.8.8.8")
@@ -495,7 +517,9 @@ class TestResolverCHAOSQueries:
     @pytest.mark.dns
     async def test_query_id_server(self, resolver):
         """Test query_id_server method."""
-        with patch.object(resolver, "async_resolve", new_callable=AsyncMock) as mock_resolve:
+        with patch.object(
+            resolver, "async_resolve", new_callable=AsyncMock
+        ) as mock_resolve:
             mock_resolve.return_value = QueryResult(success=True)
 
             result = await resolver.query_id_server("8.8.8.8")
@@ -766,7 +790,9 @@ class TestResolverRRsetExtraction:
     def test_get_records_from_rrset_txt_record(self):
         """Test extract TXT records from RRset."""
         mock_rdata = MagicMock()
-        mock_rdata.__class__.__str__ = MagicMock(return_value="v=spf1 include:_spf.google.com ~all")
+        mock_rdata.__class__.__str__ = MagicMock(
+            return_value="v=spf1 include:_spf.google.com ~all"
+        )
 
         mock_rrset = MagicMock()
         mock_rrset.rdtype = dns.rdatatype.TXT
@@ -1058,7 +1084,9 @@ class TestResolverEdgeCases:
                     "OPENPGPKEY",
                 ]:
                     # All should be allowed
-                    assert rrset is not None or rrset is None  # Either result is acceptable
+                    assert (
+                        rrset is not None or rrset is None
+                    )  # Either result is acceptable
 
     @pytest.mark.slow
     @pytest.mark.unit

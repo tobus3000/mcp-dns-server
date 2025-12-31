@@ -70,7 +70,9 @@ async def detect_open_resolvers_in_subnet(
     async def worker(ip: str):
         async with sem:
             try:
-                scan_result = await check_open_resolver(ip, domain=domain, timeout=timeout)
+                scan_result = await check_open_resolver(
+                    ip, domain=domain, timeout=timeout
+                )
                 if scan_result.success:
                     open_res.append(ip)
                     open_res_details.append(scan_result)
@@ -163,7 +165,9 @@ async def scan_subnet_for_open_resolvers_impl(cidr: str, domain: str) -> ToolRes
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Async Open Resolver Detector (custom Resolver)")
+    parser = argparse.ArgumentParser(
+        description="Async Open Resolver Detector (custom Resolver)"
+    )
     parser.add_argument("cidr", help="CIDR subnet to scan, e.g. 192.0.2.0/24")
     parser.add_argument("--domain", default="example.com", help="Domain to query")
     parser.add_argument("--timeout", type=float, default=2.0)

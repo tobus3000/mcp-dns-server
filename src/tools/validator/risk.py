@@ -467,7 +467,9 @@ def assess_domain_risk(
         avg_similarity=avg_similarity,
     )
 
-    sorted_candidates = sorted(candidates, key=lambda c: (_similarity(domain, c), c), reverse=True)
+    sorted_candidates = sorted(
+        candidates, key=lambda c: (_similarity(domain, c), c), reverse=True
+    )
 
     details = {
         "num_variants_generated": num_variants,
@@ -521,7 +523,9 @@ if __name__ == "__main__":
     for td in test_domains:
         try:
             report = assess_domain_risk(td, check_dns=False, max_variants=300)
-            print(f"{td} → score={report['risk_score']:.3f}  summary={report['summary']}")
+            print(
+                f"{td} → score={report['risk_score']:.3f}  summary={report['summary']}"
+            )
             print(" sample:", report["sample_variants"][:6])
             print()
         except Exception as e:

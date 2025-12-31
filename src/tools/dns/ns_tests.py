@@ -68,11 +68,17 @@ async def verify_basic_records(domain: str, nameserver: str) -> dict[str, Any]:
             },
         }
         results["summary"]["total_tests"] += 2
-        results["summary"]["successful"] += int(standard_result.success) + int(edns_result.success)
+        results["summary"]["successful"] += int(standard_result.success) + int(
+            edns_result.success
+        )
         if not standard_result.success:
-            results["summary"]["errors"].append(f"{rdtype} query failed: {standard_result.error}")
+            results["summary"]["errors"].append(
+                f"{rdtype} query failed: {standard_result.error}"
+            )
         if not edns_result.success:
-            results["summary"]["errors"].append(f"{rdtype} EDNS query failed: {edns_result.error}")
+            results["summary"]["errors"].append(
+                f"{rdtype} EDNS query failed: {edns_result.error}"
+            )
 
     results["summary"]["failed"] = (
         results["summary"]["total_tests"] - results["summary"]["successful"]
@@ -93,7 +99,9 @@ async def verify_qname_handling(domain: str, nameserver: str) -> dict[str, Any]:
     test_cases = {
         "standard": domain,
         "uppercase": domain.upper(),
-        "mixed_case": "".join(c.upper() if i % 2 else c.lower() for i, c in enumerate(domain)),
+        "mixed_case": "".join(
+            c.upper() if i % 2 else c.lower() for i, c in enumerate(domain)
+        ),
         "trailing_dot": domain + ".",
         "leading_dots": "." + domain,
         "maximum_label": ("x" * 63 + ".").join(domain.split(".")),  # Max label length
@@ -115,7 +123,9 @@ async def verify_qname_handling(domain: str, nameserver: str) -> dict[str, Any]:
             results["summary"]["passed"] += 1
         else:
             results["summary"]["failed"] += 1
-            results["summary"]["errors"].append(f"{test_name} test failed: {result.error}")
+            results["summary"]["errors"].append(
+                f"{test_name} test failed: {result.error}"
+            )
 
     # Test invalid cases (should fail gracefully)
     invalid_cases = {
@@ -137,14 +147,18 @@ async def verify_qname_handling(domain: str, nameserver: str) -> dict[str, Any]:
         }
 
         # For invalid cases, success means proper error handling
-        if not result.success or (result.rcode in [dns.rcode.FORMERR, dns.rcode.REFUSED]):
+        if not result.success or (
+            result.rcode in [dns.rcode.FORMERR, dns.rcode.REFUSED]
+        ):
             results["summary"]["passed"] += 1
         else:
             results["summary"]["failed"] += 1
             results["summary"]["errors"].append(
                 f"{test_name} test failed: Server accepted invalid domain"
             )
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -192,14 +206,22 @@ async def verify_edns_support(domain: str, nameserver: str) -> dict[str, Any]:
             "A",
             use_edns=True,
             payload=4096,
-            options=[dns.edns.GenericOption(option_data["code"], option_data.get("data", b""))],
+            options=[
+                dns.edns.GenericOption(
+                    option_data["code"], option_data.get("data", b"")
+                )
+            ],
         )
 
         try:
-            response = await dns.asyncquery.udp(query, nameserver, timeout=DEFAULT_TIMEOUT)
+            response = await dns.asyncquery.udp(
+                query, nameserver, timeout=DEFAULT_TIMEOUT
+            )
             results["tests"][f"option_{option_name}"] = {
                 "success": True,
-                "has_option": any(opt.otype == option_data["code"] for opt in response.options),
+                "has_option": any(
+                    opt.otype == option_data["code"] for opt in response.options
+                ),
             }
             results["summary"]["passed"] += 1
         except Exception as e:
@@ -208,8 +230,12 @@ async def verify_edns_support(domain: str, nameserver: str) -> dict[str, Any]:
                 "error": str(e),
             }
             results["summary"]["failed"] += 1
-            results["summary"]["errors"].append(f"EDNS option {option_name} failed: {str(e)}")
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+            results["summary"]["errors"].append(
+                f"EDNS option {option_name} failed: {str(e)}"
+            )
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -310,7 +336,9 @@ async def verify_tcp_behavior(domain: str, nameserver: str) -> dict[str, Any]:
         results["tests"]["pipelined_queries"] = {"success": False, "error": str(e)}
         results["summary"]["failed"] += 1
         results["summary"]["errors"].append(f"TCP setup failed: {str(e)}")
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -384,7 +412,9 @@ async def performance_test(
                 )
 
     # Collect errors
-    results["measurements"]["errors"] = [{"error": r.error, "details": r.details} for r in failed]
+    results["measurements"]["errors"] = [
+        {"error": r.error, "details": r.details} for r in failed
+    ]
 
     # Summarize results
     results["summary"] = {
@@ -417,7 +447,9 @@ async def verify_delegation(domain: str, nameserver: str) -> dict[str, Any]:
 
     ns_records = []
     if ns_result.response and ns_result.response.answer:
-        ns_records = [rr for rr in ns_result.response.answer[0] if rr.rdtype == dns.rdatatype.NS]
+        ns_records = [
+            rr for rr in ns_result.response.answer[0] if rr.rdtype == dns.rdatatype.NS
+        ]
 
     results["tests"]["ns_records"] = {
         "success": True,
@@ -443,7 +475,9 @@ async def verify_delegation(domain: str, nameserver: str) -> dict[str, Any]:
             results["summary"]["passed"] += 1
         else:
             results["summary"]["failed"] += 1
-            results["summary"]["errors"].append(f"Glue record test failed for {ns_name}")
+            results["summary"]["errors"].append(
+                f"Glue record test failed for {ns_name}"
+            )
 
     # Test parent zone delegation
     parent_domain = ".".join(domain.split(".")[1:]) or "."
@@ -456,7 +490,9 @@ async def verify_delegation(domain: str, nameserver: str) -> dict[str, Any]:
         "error": parent_result.error,
         "has_parent_ns": bool(parent_result.response and parent_result.response.answer),
     }
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -505,13 +541,19 @@ async def verify_any_queries(domain: str, nameserver: str) -> dict[str, Any]:
                 try:
                     is_compliant = (
                         # Check if response is HINFO (RFC 8482 recommendation)
-                        any(rrset.rdtype == dns.rdatatype.HINFO for rrset in response.answer)
+                        any(
+                            rrset.rdtype == dns.rdatatype.HINFO
+                            for rrset in response.answer
+                        )
                         or
                         # Or check if response contains a reasonable subset of records
                         (len(response.answer) > 0 and len(response.answer) < 10)
                         or
                         # Or empty response with NOERROR is also acceptable
-                        (len(response.answer) == 0 and response.rcode() == dns.rcode.NOERROR)
+                        (
+                            len(response.answer) == 0
+                            and response.rcode() == dns.rcode.NOERROR
+                        )
                     )
                     response_size = len(response.to_wire())
                     record_types = [
@@ -533,7 +575,9 @@ async def verify_any_queries(domain: str, nameserver: str) -> dict[str, Any]:
                 results["summary"]["passed"] += 1
             else:
                 results["summary"]["failed"] += 1
-                results["summary"]["errors"].append(f"{test_name}: Response not RFC 8482 compliant")
+                results["summary"]["errors"].append(
+                    f"{test_name}: Response not RFC 8482 compliant"
+                )
         else:
             # A refused response is also RFC 8482 compliant
             if result.rcode in [dns.rcode.REFUSED, dns.rcode.NOTIMP]:
@@ -541,7 +585,9 @@ async def verify_any_queries(domain: str, nameserver: str) -> dict[str, Any]:
                 results["summary"]["passed"] += 1
             else:
                 results["summary"]["failed"] += 1
-                results["summary"]["errors"].append(f"{test_name} failed: {result.error}")
+                results["summary"]["errors"].append(
+                    f"{test_name} failed: {result.error}"
+                )
 
     # Test rate limiting of ANY queries
     try:
@@ -560,7 +606,9 @@ async def verify_any_queries(domain: str, nameserver: str) -> dict[str, Any]:
         results["tests"]["rate_limiting"] = {
             "success": True,
             "queries_per_second": test_count / duration,
-            "refused_count": sum(1 for r in test_results if r.rcode == dns.rcode.REFUSED),
+            "refused_count": sum(
+                1 for r in test_results if r.rcode == dns.rcode.REFUSED
+            ),
             "error_count": sum(1 for r in test_results if not r.success),
             "average_response_time": sum(r.duration for r in test_results if r.duration)
             / test_count,
@@ -573,12 +621,16 @@ async def verify_any_queries(domain: str, nameserver: str) -> dict[str, Any]:
         else:
             results["tests"]["rate_limiting"]["rate_limited"] = False
             # Not having rate limiting is not a failure, just a note
-            results["tests"]["rate_limiting"]["note"] = "No rate limiting detected for ANY queries"
+            results["tests"]["rate_limiting"]["note"] = (
+                "No rate limiting detected for ANY queries"
+            )
 
     except Exception as e:
         results["tests"]["rate_limiting"] = {"success": False, "error": str(e)}
         results["summary"]["errors"].append(f"Rate limiting test failed: {str(e)}")
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -625,7 +677,9 @@ async def verify_zone_transfer(domain: str, nameserver: str) -> dict[str, Any]:
             "error": res.error,
         }
         results["summary"]["failed"] += 1
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -744,7 +798,9 @@ async def verify_chaos_records(domain: str, nameserver: str) -> dict[str, Any]:
     else:
         results["tests"]["authors_bind"] = {"success": False, "error": res.error}
         results["summary"]["failed"] += 1
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -815,7 +871,9 @@ async def verify_open_resolver(domain: str, nameserver: str) -> dict[str, Any]:
     test_query.flags |= dns.flags.RD
 
     try:
-        test_response = await dns.asyncquery.udp(test_query, nameserver, timeout=DEFAULT_TIMEOUT)
+        test_response = await dns.asyncquery.udp(
+            test_query, nameserver, timeout=DEFAULT_TIMEOUT
+        )
 
         results["tests"]["secondary_query"] = {
             "success": True,
@@ -834,7 +892,9 @@ async def verify_open_resolver(domain: str, nameserver: str) -> dict[str, Any]:
 
     except Exception as e:
         results["tests"]["secondary_query"] = {"success": False, "error": str(e)}
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -865,7 +925,8 @@ async def verify_robustness(domain: str, nameserver: str) -> dict[str, Any]:
             "rcode": result.rcode,
             "error": result.error,
             "handled_correctly": (
-                not result.success or result.rcode in [dns.rcode.FORMERR, dns.rcode.REFUSED]
+                not result.success
+                or result.rcode in [dns.rcode.FORMERR, dns.rcode.REFUSED]
             ),
         }
 
@@ -886,7 +947,8 @@ async def verify_robustness(domain: str, nameserver: str) -> dict[str, Any]:
             "error": result.error,
             "handled_correctly": (
                 not result.success
-                or result.rcode in [dns.rcode.REFUSED, dns.rcode.NOTIMP, dns.rcode.NOERROR]
+                or result.rcode
+                in [dns.rcode.REFUSED, dns.rcode.NOTIMP, dns.rcode.NOERROR]
             ),
         }
 
@@ -911,7 +973,9 @@ async def verify_robustness(domain: str, nameserver: str) -> dict[str, Any]:
             "handled_correctly": True,  # Rejecting invalid EDNS is acceptable
         }
 
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -1006,7 +1070,9 @@ async def verify_dns_cookie(domain: str, nameserver: str) -> dict[str, Any]:
                 "details": query_result.details,
             }
             results["summary"]["failed"] += 1
-            results["summary"]["errors"].append(f"{nameserver} did not return a DNS Cookie")
+            results["summary"]["errors"].append(
+                f"{nameserver} did not return a DNS Cookie"
+            )
 
     except Exception as e:
         results["tests"]["dns_cookie"] = {"success": False, "error": str(e)}
@@ -1014,7 +1080,9 @@ async def verify_dns_cookie(domain: str, nameserver: str) -> dict[str, Any]:
         results["summary"]["errors"].append(
             f"RFC 7873 DNS Cookie test failed for {nameserver}: {e}"
         )
-    results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
+    results["summary"]["total_tests"] = (
+        results["summary"]["failed"] + results["summary"]["passed"]
+    )
     return results
 
 
@@ -1086,7 +1154,9 @@ async def run_comprehensive_tests(domain: str, nameserver: str) -> dict[str, Any
 def interpret_test_results(report: dict[str, Any]) -> dict[str, Any]:
     """Generate a natural language interpretation of test results."""
     overall_status = "Some tests failed"
-    coverage = f"Ran {report['summary']['total_tests']} tests across multiple categories"
+    coverage = (
+        f"Ran {report['summary']['total_tests']} tests across multiple categories"
+    )
     if report["summary"]["failed_tests"] == 0:
         overall_status = "All tests passed"
     interpretation = {
@@ -1147,7 +1217,9 @@ def interpret_test_results(report: dict[str, Any]) -> dict[str, Any]:
         open_res = report["results"]["open_resolver"]
         interpretation["security_analysis"].update(
             {
-                "open_resolver_status": "Vulnerable" if open_res["is_open_resolver"] else "Secure",
+                "open_resolver_status": "Vulnerable"
+                if open_res["is_open_resolver"]
+                else "Secure",
                 "open_resolver_risk": open_res["security_risk"],
                 "open_resolver_details": open_res.get("details", {}),
             }
@@ -1162,7 +1234,9 @@ def interpret_test_results(report: dict[str, Any]) -> dict[str, Any]:
             )
 
     if "zone_transfer" in report["results"]:
-        status = "The non TSIG AXFR zone transfer request has been denied by the server."
+        status = (
+            "The non TSIG AXFR zone transfer request has been denied by the server."
+        )
         recommend = False
         axfr_allowed = False
         axfr_stats = report["results"]["zone_transfer"]
@@ -1189,7 +1263,9 @@ def interpret_test_results(report: dict[str, Any]) -> dict[str, Any]:
             if axfr_allowed:
                 status = "Non TSIG AXFR zone transfer seems to be generally allowed."
                 if axfr_stats["tests"]["axfr_transfer"]["rcode"] == "NOERROR":
-                    status = "The AXFR zone transfer from the DNS server was successful."
+                    status = (
+                        "The AXFR zone transfer from the DNS server was successful."
+                    )
                     recommend = (
                         "Check if this is the expected behaviour and consider protecting AXFR "
                         "zone transfer through the use of TSIG keys and/or a strict access "

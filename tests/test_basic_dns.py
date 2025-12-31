@@ -259,7 +259,9 @@ class TestReverseDNSLookup:
     async def test_reverse_dns_lookup_success_ipv4(self):
         """Test successful reverse DNS lookup for IPv4."""
         with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
-            with patch("src.tools.dns.basic_dns.Resolver.get_reverse_name") as mock_rev_name:
+            with patch(
+                "src.tools.dns.basic_dns.Resolver.get_reverse_name"
+            ) as mock_rev_name:
                 mock_rev_name.return_value = "34.216.184.93.in-addr.arpa"
 
                 mock_resolver = MagicMock()
@@ -299,7 +301,9 @@ class TestReverseDNSLookup:
     async def test_reverse_dns_lookup_private_ip(self):
         """Test that private IPs are marked as local."""
         with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
-            with patch("src.tools.dns.basic_dns.Resolver.get_reverse_name") as mock_rev_name:
+            with patch(
+                "src.tools.dns.basic_dns.Resolver.get_reverse_name"
+            ) as mock_rev_name:
                 mock_rev_name.return_value = "1.168.192.in-addr.arpa"
 
                 mock_resolver = MagicMock()
@@ -328,7 +332,9 @@ class TestReverseDNSLookup:
     async def test_reverse_dns_lookup_invalid_reverse_name(self):
         """Test reverse DNS lookup when reverse name cannot be computed."""
         with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
-            with patch("src.tools.dns.basic_dns.Resolver.get_reverse_name") as mock_rev_name:
+            with patch(
+                "src.tools.dns.basic_dns.Resolver.get_reverse_name"
+            ) as mock_rev_name:
                 mock_rev_name.return_value = None
 
                 result = await reverse_dns_lookup_impl("93.184.216.34")
@@ -401,11 +407,15 @@ class TestDNSTroubleshooting:
                 mock_get_records.return_value = []
                 mock_resolver_class.return_value = mock_resolver
 
-                result = await dns_troubleshooting_impl("example.com", nameserver="8.8.8.8")
+                result = await dns_troubleshooting_impl(
+                    "example.com", nameserver="8.8.8.8"
+                )
 
                 assert result.success is True
                 # Verify Resolver was created with nameserver
-                mock_resolver_class.assert_called_with(nameservers=["8.8.8.8"], timeout=5.0)
+                mock_resolver_class.assert_called_with(
+                    nameservers=["8.8.8.8"], timeout=5.0
+                )
 
     async def test_dns_troubleshooting_output_structure(self):
         """Test that troubleshooting output has correct structure."""
@@ -484,7 +494,9 @@ class TestBasicDNSEdgeCases:
     async def test_reverse_dns_lookup_loopback(self):
         """Test reverse DNS lookup for loopback address."""
         with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
-            with patch("src.tools.dns.basic_dns.Resolver.get_reverse_name") as mock_rev_name:
+            with patch(
+                "src.tools.dns.basic_dns.Resolver.get_reverse_name"
+            ) as mock_rev_name:
                 mock_rev_name.return_value = "1.0.0.127.in-addr.arpa"
 
                 mock_resolver = MagicMock()

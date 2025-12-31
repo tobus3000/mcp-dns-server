@@ -48,8 +48,12 @@ class RootServerDetector:
 
             ns_records = list(set(ns_records))
 
-            official_hits = [ns for ns in ns_records if ns in self.OFFICIAL_ROOT_SERVERS]
-            alternative_roots = [ns for ns in ns_records if ns not in self.OFFICIAL_ROOT_SERVERS]
+            official_hits = [
+                ns for ns in ns_records if ns in self.OFFICIAL_ROOT_SERVERS
+            ]
+            alternative_roots = [
+                ns for ns in ns_records if ns not in self.OFFICIAL_ROOT_SERVERS
+            ]
 
             return {
                 "detected_root_servers": ns_records,
@@ -133,7 +137,9 @@ class RootServerDetector:
                 details={
                     "is_official_roots": root_info.get("is_official"),
                     "environment": access_info.get("environment"),
-                    "reachable_root_count": len(access_info.get("reachable_servers", [])),
+                    "reachable_root_count": len(
+                        access_info.get("reachable_servers", [])
+                    ),
                 },
             )
 
