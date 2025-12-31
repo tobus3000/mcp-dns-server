@@ -10,6 +10,8 @@ Tests all aspects of the tld submodule including:
 
 from __future__ import annotations
 
+# Import asyncio for timeout tests
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -379,7 +381,7 @@ class TestTLDCheckImpl:
         with patch("src.tools.validator.tld.is_valid_tld") as mock_validate:
             mock_validate.return_value = MagicMock(success=True, output="Valid TLD")
 
-            result = await tld_check_impl("  example.com  ")
+            _result = await tld_check_impl("  example.com  ")
 
             # Should be called with stripped domain
             mock_validate.assert_called_once()
@@ -459,7 +461,3 @@ class TestTLDValidatorEdgeCases:
                 result = await is_valid_tld("example.co.uk")
 
                 assert isinstance(result, object)
-
-
-# Import asyncio for timeout tests
-import asyncio

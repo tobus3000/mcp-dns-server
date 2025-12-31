@@ -114,7 +114,7 @@ class KnowledgeBaseManager:
             category = article.get("category")
             if category:
                 categories.add(category)
-        return sorted(list(categories))
+        return sorted(categories)
 
     def get_all_articles(self) -> dict[str, dict]:
         """Get all articles.

@@ -99,7 +99,7 @@ class TestDNSKEYandDS:
         rrset.__iter__ = MagicMock(return_value=iter([mock_rdata]))
 
         with patch("dns.dnssec.make_ds", return_value="mock_ds_record"):
-            ds_list, denied_keys = compute_ds_from_dnskey(
+            ds_list, _denied_keys = compute_ds_from_dnskey(
                 "example.com", rrset, "SHA256"
             )
             assert isinstance(ds_list, list)
@@ -240,13 +240,13 @@ class TestSignatureValidation:
         """Test extract_rrsig_for_rrset finds RRSIG records."""
         response = dns.message.Message()
 
-        rrsig_rdata = MagicMock()
+        _rrsig_rdata = MagicMock()
         rrsig_rrset = MagicMock()
         rrsig_rrset.rdtype = dns.rdatatype.RRSIG
 
         response.answer.append(rrsig_rrset)
 
-        result = extract_rrsig_for_rrset(response, "A")
+        _result = extract_rrsig_for_rrset(response, "A")
         # Result depends on implementation
 
 

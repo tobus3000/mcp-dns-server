@@ -13,7 +13,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import dns.flags
-import dns.message
 import pytest
 
 from src.tools.validator.ns_role import (
@@ -257,7 +256,7 @@ class TestRecursionDetection:
             mock_resolver_class.return_value = mock_resolver
 
             with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
-                result = await verify_nameserver_role("192.168.1.1")
+                _result = await verify_nameserver_role("192.168.1.1")
 
                 # Verify async_resolve was called with default domain "example.com"
                 call_args_list = mock_resolver.async_resolve.call_args_list
@@ -283,7 +282,7 @@ class TestRecursionDetection:
 
             with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
                 custom_domain = "google.com"
-                result = await verify_nameserver_role(
+                _result = await verify_nameserver_role(
                     "192.168.1.1", domain=custom_domain
                 )
 
@@ -384,7 +383,7 @@ class TestAuthorityDetection:
             ) as mock_reverse:
                 mock_reverse.return_value = "expected.reverse.zone"
 
-                result = await verify_nameserver_role("192.168.1.1")
+                _result = await verify_nameserver_role("192.168.1.1")
 
                 # Verify get_reverse_name was called
                 mock_reverse.assert_called_with("192.168.1.1")
@@ -411,7 +410,7 @@ class TestAuthorityDetection:
             mock_resolver_class.return_value = mock_resolver
 
             custom_zone = "example.corp."
-            result = await verify_nameserver_role(
+            _result = await verify_nameserver_role(
                 "192.168.1.1", authority_test_domain=custom_zone
             )
 
@@ -462,7 +461,7 @@ class TestNameserverRoleImpl:
         with patch("src.tools.validator.ns_role.verify_nameserver_role") as mock_test:
             mock_test.return_value = MagicMock(success=True, output="Test result")
 
-            result = await verify_nameserver_role_impl("192.168.1.1", None, None)
+            _result = await verify_nameserver_role_impl("192.168.1.1", None, None)
 
             # Verify verify_nameserver_role was called with default domain
             mock_test.assert_called_once()
@@ -475,7 +474,7 @@ class TestNameserverRoleImpl:
             mock_test.return_value = MagicMock(success=True, output="Test result")
 
             custom_domain = "custom.domain"
-            result = await verify_nameserver_role_impl(
+            _result = await verify_nameserver_role_impl(
                 "192.168.1.1", custom_domain, None
             )
 
@@ -490,7 +489,7 @@ class TestNameserverRoleImpl:
             mock_test.return_value = MagicMock(success=True, output="Test result")
 
             custom_zone = "internal.corp"
-            result = await verify_nameserver_role_impl("192.168.1.1", None, custom_zone)
+            _result = await verify_nameserver_role_impl("192.168.1.1", None, custom_zone)
 
             # Verify verify_nameserver_role was called with custom zone
             mock_test.assert_called_once()
@@ -558,7 +557,7 @@ class TestNameserverRoleEdgeCases:
                     result = await verify_nameserver_role("192.168.1.1")
                     # If exception is caught internally, we get a result
                     assert isinstance(result, object)
-                except Exception:
+                except Exception: # pylint: disable=broad-except
                     # If exception is not caught, that's also acceptable behavior
                     pass
 

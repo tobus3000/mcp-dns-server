@@ -86,8 +86,6 @@ class TestResolverInitialization:
     @pytest.mark.dns
     def test_allowed_record_types_present(self):
         """Test that allowed record types are defined."""
-        resolver = Resolver()
-
         expected_types = [
             "A",
             "AAAA",
@@ -156,13 +154,13 @@ class TestResolverSynchronousResolution:
             mock_response.response = MagicMock()
             mock_resolve.return_value = mock_response
 
-            original_ns = (
+            _original_ns = (
                 resolver.resolver.nameservers.copy()
                 if resolver.resolver.nameservers
                 else []
             )
 
-            rrset, response = resolver.resolve("example.com", "A", nameserver="8.8.8.8")
+            rrset, _response = resolver.resolve("example.com", "A", nameserver="8.8.8.8")
 
             assert rrset is not None
             mock_resolve.assert_called_once()
@@ -178,7 +176,7 @@ class TestResolverSynchronousResolution:
             mock_resolve.return_value = mock_response
 
             original_lifetime = resolver.resolver.lifetime
-            rrset, response = resolver.resolve("example.com", "A", timeout=20.0)
+            rrset, _response = resolver.resolve("example.com", "A", timeout=20.0)
 
             assert rrset is not None
             # Verify timeout was restored
@@ -193,7 +191,7 @@ class TestResolverSynchronousResolution:
 
             mock_resolve.side_effect = NoAnswer()
 
-            rrset, response = resolver.resolve("example.com", "A")
+            rrset, _response = resolver.resolve("example.com", "A")
 
             assert rrset is None
 
@@ -206,7 +204,7 @@ class TestResolverSynchronousResolution:
 
             mock_resolve.side_effect = NXDOMAIN()
 
-            rrset, response = resolver.resolve("nonexistent.example.com", "A")
+            rrset, _response = resolver.resolve("nonexistent.example.com", "A")
 
             assert rrset is None
 
@@ -217,7 +215,7 @@ class TestResolverSynchronousResolution:
         with patch.object(resolver.resolver, "resolve") as mock_resolve:
             mock_resolve.side_effect = dns.exception.Timeout()
 
-            rrset, response = resolver.resolve("example.com", "A")
+            rrset, _response = resolver.resolve("example.com", "A")
 
             assert rrset is None
 
@@ -228,7 +226,7 @@ class TestResolverSynchronousResolution:
         with patch.object(resolver, "resolve_dnssec") as mock_resolve_dnssec:
             mock_resolve_dnssec.return_value = (MagicMock(), MagicMock())
 
-            rrset, response = resolver.fetch_dnskey("example.com")
+            rrset, _response = resolver.fetch_dnskey("example.com")
 
             mock_resolve_dnssec.assert_called_once_with(
                 "example.com", "DNSKEY", None, None
@@ -242,7 +240,7 @@ class TestResolverSynchronousResolution:
         with patch.object(resolver, "resolve_dnssec") as mock_resolve_dnssec:
             mock_resolve_dnssec.return_value = (MagicMock(), MagicMock())
 
-            rrset, response = resolver.fetch_ds("example.com")
+            rrset, _response = resolver.fetch_ds("example.com")
 
             mock_resolve_dnssec.assert_called_once_with("example.com", "DS", None, None)
             assert rrset is not None
@@ -471,7 +469,7 @@ class TestResolverCHAOSQueries:
         ) as mock_resolve:
             mock_resolve.return_value = QueryResult(success=True)
 
-            result = await resolver.query_version_bind("8.8.8.8")
+            _result = await resolver.query_version_bind("8.8.8.8")
 
             mock_resolve.assert_called_once()
             call_args = mock_resolve.call_args
@@ -489,7 +487,7 @@ class TestResolverCHAOSQueries:
         ) as mock_resolve:
             mock_resolve.return_value = QueryResult(success=True)
 
-            result = await resolver.query_hostname_bind("8.8.8.8")
+            _result = await resolver.query_hostname_bind("8.8.8.8")
 
             mock_resolve.assert_called_once()
             call_args = mock_resolve.call_args
@@ -506,7 +504,7 @@ class TestResolverCHAOSQueries:
         ) as mock_resolve:
             mock_resolve.return_value = QueryResult(success=True)
 
-            result = await resolver.query_authors_bind("8.8.8.8")
+            _result = await resolver.query_authors_bind("8.8.8.8")
 
             mock_resolve.assert_called_once()
             call_args = mock_resolve.call_args
@@ -522,7 +520,7 @@ class TestResolverCHAOSQueries:
         ) as mock_resolve:
             mock_resolve.return_value = QueryResult(success=True)
 
-            result = await resolver.query_id_server("8.8.8.8")
+            _result = await resolver.query_id_server("8.8.8.8")
 
             mock_resolve.assert_called_once()
             call_args = mock_resolve.call_args

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import dns.rdataclass
 import dns.rdatatype
 import pytest
 
@@ -331,7 +330,7 @@ class TestReverseDNSLookup:
 
     async def test_reverse_dns_lookup_invalid_reverse_name(self):
         """Test reverse DNS lookup when reverse name cannot be computed."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("src.tools.dns.basic_dns.Resolver") as _mock_resolver_class:
             with patch(
                 "src.tools.dns.basic_dns.Resolver.get_reverse_name"
             ) as mock_rev_name:

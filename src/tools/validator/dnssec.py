@@ -922,8 +922,10 @@ def inspect_keys_and_rollover(
     # A zone can be validly signed with a single key acting as both KSK and ZSK.
     if zsk_count == 0 and sep_count > 0:
         key_results["warnings"].append(
-            "No dedicated Zone Signing Keys (ZSK) found. This zone uses a single key for both signing and delegation. "
-            "This is valid but less flexible than using separate KSK and ZSK for easier key rollover."
+            "No dedicated Zone Signing Keys (ZSK) found. "
+            "This zone uses a single key for both signing and delegation. "
+            "This is valid but less flexible than using separate KSK and "
+            "ZSK for easier key rollover."
         )
     elif zsk_count == 0:
         key_results["critical"].append("No ZSK keys found and no KSK present")
@@ -940,7 +942,7 @@ def inspect_keys_and_rollover(
         )
 
     # Convert algorithms set to list for JSON serialization
-    key_results["algorithms"] = sorted(list(key_results["algorithms"]))
+    key_results["algorithms"] = sorted(key_results["algorithms"])
     return key_results
 
 
@@ -1478,7 +1480,7 @@ def validate_domain(zone_name: str, timeout: float = DEFAULT_TIMEOUT) -> dict[st
     if dnskey_rrset is not None:
         for r in dnskey_rrset:
             algs.add(r.algorithm)
-    report["algorithms"] = {"algorithm_numbers": sorted(list(algs))}
+    report["algorithms"] = {"algorithm_numbers": sorted(algs)}
 
     # 9) Robustness Testing
     report["robustness"] = check_robustness(zone_name, timeout)
@@ -1528,7 +1530,7 @@ def interpret_validation_results(report: dict[str, Any]) -> dict[str, Any]:
                 critical_issues.append(f"No DNSSEC denial proof for {rr_type} records")
 
     # Check for broken NSEC chains in denial tests
-    for test_type, result in report.get("denial_tests", {}).items():
+    for _test_type, result in report.get("denial_tests", {}).items():
         nx_proof = result.get("nx_proof", {})
         if nx_proof.get("validation") and not nx_proof["validation"].get("valid"):
             has_critical_failures = True

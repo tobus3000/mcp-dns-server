@@ -99,7 +99,7 @@ class RootServerDetector:
         tasks = [check_reachability(ns) for ns in self.OFFICIAL_ROOT_SERVERS]
         results = await asyncio.gather(*tasks)
 
-        for ns, ok in zip(self.OFFICIAL_ROOT_SERVERS, results):
+        for ns, ok in zip(self.OFFICIAL_ROOT_SERVERS, results, strict=True):
             (reachable if ok else unreachable).append(ns)
 
         public_accessible = len(reachable) >= 3  # heuristic: at least 3 reachable
