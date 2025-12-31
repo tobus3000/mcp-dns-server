@@ -22,9 +22,4 @@ RUN pip install --no-cache-dir .
 # Expose port for MCP server communication (default for stdio transport)
 # Note: Adjust if using HTTP or WebSocket transport
 EXPOSE 3000
-
-# Development endpoint
-ENTRYPOINT ["python", "launch.py"]
-
-# Use the installed console script as entrypoint
-#ENTRYPOINT ["mcp-dns-server"]
+ENTRYPOINT ["mcp-dns-server"]

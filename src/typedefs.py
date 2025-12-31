@@ -16,7 +16,7 @@ type checking and IDE support while maintaining runtime flexibility.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, TypedDict
 
 import dns.message
 import dns.name
@@ -37,14 +37,14 @@ class QueryResult:
     """
 
     success: bool
-    qname: Optional[dns.name.Name] = None
-    rdtype: Optional[dns.rdatatype.RdataType] = None
-    response: Optional[dns.message.Message] = None
-    error: Optional[str] = None
-    rcode: Optional[int] = None
-    rcode_text: Optional[str] = None
-    duration: Optional[float] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    qname: dns.name.Name | None = None
+    rdtype: dns.rdatatype.RdataType | None = None
+    response: dns.message.Message | None = None
+    error: str | None = None
+    rcode: int | None = None
+    rcode_text: str | None = None
+    duration: float | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -54,12 +54,12 @@ class AXFRResult:
     success: bool
     zone_name: str
     nameserver: str
-    response: Optional[dns.zone.Zone] = None
-    error: Optional[str] = None
-    rcode: Optional[int] = None
-    rcode_text: Optional[str] = None
-    duration: Optional[float] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    response: dns.zone.Zone | None = None
+    error: str | None = None
+    rcode: int | None = None
+    rcode_text: str | None = None
+    duration: float | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -67,9 +67,9 @@ class ToolResult:
     """Stores the result of a DNS tool operation."""
 
     success: bool
-    output: Optional[str | List[str] | Dict[str, Any] | List[Dict[str, Any]]] = None
-    error: Optional[str] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    output: str | list[str] | dict[str, Any] | list[dict[str, Any]] | None = None
+    error: str | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -78,10 +78,10 @@ class OpenResolver:
 
     success: bool
     ip: str
-    rcode: Optional[int] = None
-    rcode_text: Optional[str] = None
-    duration: Optional[float] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    rcode: int | None = None
+    rcode_text: str | None = None
+    duration: float | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 # Type definitions for result dictionaries
@@ -103,11 +103,11 @@ class ValidationResult(TypedDict, total=False):
 
     valid: bool
     error: str  # Single error string
-    errors: List[str]  # List of errors
-    warnings: List[str]
-    parameters: Optional[Dict[str, Any]]
-    chain: List[Dict[str, Any]]
-    validation: Dict[str, Any]
+    errors: list[str]  # List of errors
+    warnings: list[str]
+    parameters: dict[str, Any] | None
+    chain: list[dict[str, Any]]
+    validation: dict[str, Any]
 
 
 class TestResult(TypedDict):
@@ -126,7 +126,7 @@ class TestResult(TypedDict):
     name: str
     description: str
     passed: bool
-    error: Optional[str]
+    error: str | None
 
 
 @dataclass

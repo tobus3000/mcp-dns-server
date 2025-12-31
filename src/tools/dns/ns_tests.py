@@ -15,7 +15,7 @@ import os
 import random
 import struct
 import time
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import dns.asyncquery
 import dns.edns
@@ -35,7 +35,7 @@ DEFAULT_EDNS_SIZE = 1232  # Conservative EDNS buffer size
 COMMON_RECORD_TYPES = ["A", "AAAA", "MX", "NS", "TXT", "SOA", "CNAME"]
 
 
-async def verify_basic_records(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_basic_records(domain: str, nameserver: str) -> dict[str, Any]:
     """Test basic DNS record types and their correctness."""
     results = {
         "domain": domain,
@@ -80,7 +80,7 @@ async def verify_basic_records(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def verify_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_qname_handling(domain: str, nameserver: str) -> dict[str, Any]:
     """Test handling of various QNAME formats and edge cases."""
     results = {
         "domain": domain,
@@ -148,7 +148,7 @@ async def verify_qname_handling(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def verify_edns_support(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_edns_support(domain: str, nameserver: str) -> dict[str, Any]:
     """Test EDNS(0) support and behavior."""
     results = {
         "domain": domain,
@@ -203,14 +203,17 @@ async def verify_edns_support(domain: str, nameserver: str) -> Dict[str, Any]:
             }
             results["summary"]["passed"] += 1
         except Exception as e:
-            results["tests"][f"option_{option_name}"] = {"success": False, "error": str(e)}
+            results["tests"][f"option_{option_name}"] = {
+                "success": False,
+                "error": str(e),
+            }
             results["summary"]["failed"] += 1
             results["summary"]["errors"].append(f"EDNS option {option_name} failed: {str(e)}")
     results["summary"]["total_tests"] = results["summary"]["failed"] + results["summary"]["passed"]
     return results
 
 
-async def verify_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_tcp_behavior(domain: str, nameserver: str) -> dict[str, Any]:
     """Test DNS-over-TCP behavior and handling."""
     results = {
         "domain": domain,
@@ -239,7 +242,12 @@ async def verify_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
     # Test large response handling
     # Request many records to force TCP
     result = await resolver.async_resolve(
-        domain, rdtype="ANY", rdclass="IN", nameserver=nameserver, use_edns=True, payload_size=4096
+        domain,
+        rdtype="ANY",
+        rdclass="IN",
+        nameserver=nameserver,
+        use_edns=True,
+        payload_size=4096,
     )
     results["tests"]["large_response"] = {
         "success": result.success,
@@ -308,7 +316,7 @@ async def verify_tcp_behavior(domain: str, nameserver: str) -> Dict[str, Any]:
 
 async def performance_test(
     domain: str, nameserver: str, num_queries: int = 100, concurrent: int = 10
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Test nameserver performance under load.
     TODO: Refactor to return tests stats (total_tests, etc.)
@@ -389,7 +397,7 @@ async def performance_test(
     return results
 
 
-async def verify_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_delegation(domain: str, nameserver: str) -> dict[str, Any]:
     """Test delegation correctness and glue record handling."""
     results = {
         "domain": domain,
@@ -452,7 +460,7 @@ async def verify_delegation(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def verify_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_any_queries(domain: str, nameserver: str) -> dict[str, Any]:
     """Test server behavior for ANY queries according to RFC 8482."""
     results = {
         "domain": domain,
@@ -574,7 +582,7 @@ async def verify_any_queries(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def verify_zone_transfer(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_zone_transfer(domain: str, nameserver: str) -> dict[str, Any]:
     """Test if server allows a zone transfer.
 
     Args:
@@ -621,7 +629,7 @@ async def verify_zone_transfer(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def verify_chaos_records(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_chaos_records(domain: str, nameserver: str) -> dict[str, Any]:
     """Test if a nameserver responds to version.bind and others in CHAOS rdclass.
 
     Args:
@@ -740,7 +748,7 @@ async def verify_chaos_records(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def verify_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_open_resolver(domain: str, nameserver: str) -> dict[str, Any]:
     """Test if nameserver behaves like an open resolver.
 
     An open resolver will:
@@ -830,7 +838,7 @@ async def verify_open_resolver(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def verify_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_robustness(domain: str, nameserver: str) -> dict[str, Any]:
     """Test nameserver's handling of edge cases and malformed queries."""
     results = {
         "domain": domain,
@@ -907,7 +915,7 @@ async def verify_robustness(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def verify_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
+async def verify_dns_cookie(domain: str, nameserver: str) -> dict[str, Any]:
     """Test DNS Cookie (RFC 7873) support and behavior for a given nameserver."""
 
     results = {
@@ -1010,14 +1018,19 @@ async def verify_dns_cookie(domain: str, nameserver: str) -> Dict[str, Any]:
     return results
 
 
-async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any]:
+async def run_comprehensive_tests(domain: str, nameserver: str) -> dict[str, Any]:
     """Run all available tests and compile a comprehensive report."""
     report = {
         "domain": domain,
         "nameserver": nameserver,
         "timestamp": time.time(),
         "results": {},
-        "summary": {"total_tests": 0, "passed_tests": 0, "failed_tests": 0, "errors": []},
+        "summary": {
+            "total_tests": 0,
+            "passed_tests": 0,
+            "failed_tests": 0,
+            "errors": [],
+        },
     }
 
     # Run all test suites
@@ -1037,7 +1050,7 @@ async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any
     }
 
     # Run all test suites concurrently
-    async def run_suite(suite_name: str, test_func) -> Tuple[str, Dict[str, Any]]:
+    async def run_suite(suite_name: str, test_func) -> tuple[str, dict[str, Any]]:
         try:
             results = await test_func(domain, nameserver)
             return suite_name, results
@@ -1070,7 +1083,7 @@ async def run_comprehensive_tests(domain: str, nameserver: str) -> Dict[str, Any
     return report
 
 
-def interpret_test_results(report: Dict[str, Any]) -> Dict[str, Any]:
+def interpret_test_results(report: dict[str, Any]) -> dict[str, Any]:
     """Generate a natural language interpretation of test results."""
     overall_status = "Some tests failed"
     coverage = f"Ran {report['summary']['total_tests']} tests across multiple categories"
@@ -1143,7 +1156,8 @@ def interpret_test_results(report: Dict[str, Any]) -> Dict[str, Any]:
             interpretation["recommendations"].append(
                 "Critical: Server is operating as an open resolver. "
                 + open_res.get("details", {}).get(
-                    "recommendation", "Configure access controls to restrict recursive queries."
+                    "recommendation",
+                    "Configure access controls to restrict recursive queries.",
                 )
             )
 

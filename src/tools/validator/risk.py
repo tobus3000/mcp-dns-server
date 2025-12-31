@@ -24,7 +24,6 @@ import math
 import random
 import string
 import unicodedata
-from typing import Dict, List, Optional, Set, Tuple
 
 from src.resolver import Resolver
 from src.typedefs import ToolResult
@@ -95,7 +94,7 @@ _SAFE_CHARS = set(string.ascii_letters + string.digits + "-")
 # ----- Utility functions -----
 
 
-def _split_domain(domain: str) -> Tuple[str, str]:
+def _split_domain(domain: str) -> tuple[str, str]:
     """Split "example.co.uk" into ("example", "co.uk") by taking the leftmost label
     as the 'sld' we mutate, and the remainder as TLD/psl part.
     This is simple: it doesn't consult a public suffix list. If you want PSL-aware
@@ -115,7 +114,7 @@ def _split_domain(domain: str) -> Tuple[str, str]:
     return sld, tld
 
 
-def _mutations_deletion(s: str) -> Set[str]:
+def _mutations_deletion(s: str) -> set[str]:
     """Delete one character
 
     Args:
@@ -130,7 +129,7 @@ def _mutations_deletion(s: str) -> Set[str]:
     return out
 
 
-def _mutations_transpose(s: str) -> Set[str]:
+def _mutations_transpose(s: str) -> set[str]:
     """Swap adjacent characters
 
     Args:
@@ -145,7 +144,7 @@ def _mutations_transpose(s: str) -> Set[str]:
     return out
 
 
-def _mutations_replace_adjacent(s: str) -> Set[str]:
+def _mutations_replace_adjacent(s: str) -> set[str]:
     """Replace characters with keyboard-adjacent characters
 
     Args:
@@ -164,7 +163,7 @@ def _mutations_replace_adjacent(s: str) -> Set[str]:
     return out
 
 
-def _mutations_insert_adjacent(s: str) -> Set[str]:
+def _mutations_insert_adjacent(s: str) -> set[str]:
     """Insert keyboard-adjacent characters
 
     Args:
@@ -187,7 +186,7 @@ def _mutations_insert_adjacent(s: str) -> Set[str]:
     return out
 
 
-def _mutations_repeat_char(s: str) -> Set[str]:
+def _mutations_repeat_char(s: str) -> set[str]:
     """Repeat a character (double letters omitted or added)
 
     Args:
@@ -202,7 +201,7 @@ def _mutations_repeat_char(s: str) -> Set[str]:
     return out
 
 
-def _mutations_homoglyph(s: str) -> Set[str]:
+def _mutations_homoglyph(s: str) -> set[str]:
     """Substitute characters with homoglyphs (one-per-string substitutions)
 
     Args:
@@ -250,7 +249,7 @@ def _normalize_variant(label: str) -> str:
     return norm
 
 
-def _generate_variants_for_label(label: str, max_variants: int = 500) -> Set[str]:
+def _generate_variants_for_label(label: str, max_variants: int = 500) -> set[str]:
     """Combine many mutation strategies to produce variants for the leftmost label.
 
     Args:
@@ -259,7 +258,7 @@ def _generate_variants_for_label(label: str, max_variants: int = 500) -> Set[str
     Returns:
         Set of plausible look-alike variants (up to max_variants)
     """
-    gen: Set[str] = set()
+    gen: set[str] = set()
     # simple typos
     gen |= _mutations_deletion(label)
     gen |= _mutations_transpose(label)
@@ -301,7 +300,7 @@ def _generate_variants_for_label(label: str, max_variants: int = 500) -> Set[str
     return cleaned
 
 
-def _build_full_domains(label_variants: Set[str], tld_part: str) -> List[str]:
+def _build_full_domains(label_variants: set[str], tld_part: str) -> list[str]:
     """Append TLD part back. If tld_part is empty, return labels only.
 
     Args:
@@ -338,9 +337,9 @@ def _similarity(a: str, b: str) -> float:
 
 def _score_components(
     num_variants: int,
-    prop_resolving: Optional[float],
+    prop_resolving: float | None,
     avg_similarity: float,
-    params: Optional[Dict] = None,
+    params: dict | None = None,
 ) -> float:
     """Combine components into a single risk score in [0,1].
     - num_variants: total plausible variants generated (raw)
@@ -395,7 +394,7 @@ def _score_components(
 
 def assess_domain_risk(
     domain: str, check_dns: bool = False, max_variants: int = 500, timeout: float = 2.0
-) -> Dict:
+) -> dict:
     """
     Assess look-alike/typosquatting risk for `domain`.
 
@@ -463,7 +462,9 @@ def assess_domain_risk(
             prop_resolving = num_resolving / num_variants
 
     risk_score = _score_components(
-        num_variants=num_variants, prop_resolving=prop_resolving, avg_similarity=avg_similarity
+        num_variants=num_variants,
+        prop_resolving=prop_resolving,
+        avg_similarity=avg_similarity,
     )
 
     sorted_candidates = sorted(candidates, key=lambda c: (_similarity(domain, c), c), reverse=True)
@@ -511,7 +512,12 @@ async def lookalike_risk_impl(domain: str, check_dns: bool = False) -> ToolResul
 
 
 if __name__ == "__main__":
-    test_domains = ["example.com", "google.com", "paypal.com", "xn--p1ai"]  # example punycode
+    test_domains = [
+        "example.com",
+        "google.com",
+        "paypal.com",
+        "xn--p1ai",
+    ]  # example punycode
     for td in test_domains:
         try:
             report = assess_domain_risk(td, check_dns=False, max_variants=300)

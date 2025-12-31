@@ -63,7 +63,8 @@ async def is_valid_tld(domain: str, alternative_roots: list[str] | None = None) 
     labels = domain.split(".")
     if len(labels) == 0:
         return ToolResult(
-            success=False, error="No top-level domain could be derived from domain name."
+            success=False,
+            error="No top-level domain could be derived from domain name.",
         )
 
     tld = labels[-1].lower()
@@ -97,7 +98,8 @@ async def is_valid_tld(domain: str, alternative_roots: list[str] | None = None) 
         elif result.rcode == dns.rcode.NXDOMAIN:
             # Authoritatively does not exist
             return ToolResult(
-                success=False, error=f"The TLD {tld_zone} does not authoritatively exist."
+                success=False,
+                error=f"The TLD {tld_zone} does not authoritatively exist.",
             )
 
     return ToolResult(

@@ -15,7 +15,7 @@ All network interactions are mocked to ensure fast, deterministic tests.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import dns.message
 import dns.name
@@ -25,7 +25,6 @@ import dns.rrset
 import pytest
 
 from src.tools.dns.trace import Trace, dns_trace_impl
-from src.typedefs import ToolResult
 
 # ============================================================================
 # Test Fixtures - Root server response with proper NS records
@@ -435,7 +434,12 @@ class TestFormatOutput:
             response2.additional = []
 
             trace.trace_steps = [
-                {"server": "198.41.0.4", "qname": ".", "qtype": "NS", "response": response1},
+                {
+                    "server": "198.41.0.4",
+                    "qname": ".",
+                    "qtype": "NS",
+                    "response": response1,
+                },
                 {
                     "server": "192.0.32.8",
                     "qname": "com.",

@@ -606,7 +606,11 @@ class TestIntegration:
         report = {
             "domain": "example.com",
             "dnskey": {"present": True, "count": 2, "text": []},
-            "parent_ds": {"parent_ds_present": True, "child_dnskey_present": True, "parent": "com"},
+            "parent_ds": {
+                "parent_ds_present": True,
+                "child_dnskey_present": True,
+                "parent": "com",
+            },
             "rrsets": {"SOA": {}, "NS": {}, "A": {}},
             "nxdomain_test": {"success": True},
             "authoritative": {},

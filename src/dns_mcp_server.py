@@ -50,7 +50,7 @@ class DNSMCPServer(
         )
         self.logger = get_logger(__name__)
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 self.config = yaml.safe_load(f)
         except FileNotFoundError:
             self.logger.info("Config file %s not found, using default settings", self.config_path)
@@ -70,7 +70,8 @@ class DNSMCPServer(
         """Initialize the knowledge base manager."""
         self.kb_manager = KnowledgeBaseManager()
         self.logger.info(
-            "Knowledge base initialized with %d articles", len(self.kb_manager.get_all_articles())
+            "Knowledge base initialized with %d articles",
+            len(self.kb_manager.get_all_articles()),
         )
 
     def _register_all_components(self) -> None:

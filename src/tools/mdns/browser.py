@@ -7,8 +7,7 @@ It is integrated with the MCP server's async architecture and returns structured
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from zeroconf import IPVersion, ServiceStateChange, Zeroconf
 from zeroconf.asyncio import (
@@ -86,7 +85,11 @@ class AsyncRunner:
         self._discovered_service_types: list[str] = []
 
     def _service_callback(
-        self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange
+        self,
+        zeroconf: Zeroconf,
+        service_type: str,
+        name: str,
+        state_change: ServiceStateChange,
     ) -> None:
         if state_change is ServiceStateChange.Added:
             task = asyncio.ensure_future(self._process_service_info(zeroconf, service_type, name))
@@ -103,7 +106,10 @@ class AsyncRunner:
             ]
             meta = SERVICE_MAP.get(
                 service_type,
-                {"category": "Unknown", "description": "Unrecognized mDNS service type"},
+                {
+                    "category": "Unknown",
+                    "description": "Unrecognized mDNS service type",
+                },
             )
 
             service_data = {
@@ -122,7 +128,7 @@ class AsyncRunner:
 
     async def start_browsing(
         self, timeout: float = 5.0
-    ) -> tuple[bool, Optional[str], list[dict[str, Any]], list[str]]:
+    ) -> tuple[bool, str | None, list[dict[str, Any]], list[str]]:
         """Start browsing for mDNS services.
 
         Args:

@@ -17,7 +17,6 @@ All network interactions are mocked to ensure fast, deterministic tests.
 
 from __future__ import annotations
 
-from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import dns.rdatatype

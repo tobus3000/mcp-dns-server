@@ -3,7 +3,7 @@ Tool Mixin classes for DNSMCPServer to separate concerns.
 """
 
 import ipaddress
-from typing import Any, Dict
+from typing import Any
 
 from fastmcp import Context
 
@@ -41,7 +41,7 @@ class ToolRegistrationMixin:
 
     # Type hints for attributes provided by the host class
     server: Any  # FastMCP instance
-    config: Dict[str, Any]  # Configuration dictionary
+    config: dict[str, Any]  # Configuration dictionary
 
     def register_tools(self) -> None:
         """Register all DNS-related tools with the MCP server."""
@@ -127,7 +127,16 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="dns_server_edns_test",
             description="Perform EDNS tests on a given domain and nameserver",
-            tags=set(("dns", "edns", "troubleshooting", "diagnostics", "server", "nameserver")),
+            tags=set(
+                (
+                    "dns",
+                    "edns",
+                    "troubleshooting",
+                    "diagnostics",
+                    "server",
+                    "nameserver",
+                )
+            ),
             enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
         )
         async def dns_server_edns_test(domain: str, nameserver: str, ctx: Context) -> ToolResult:
@@ -259,13 +268,18 @@ class ToolRegistrationMixin:
             enabled=self.config.get("features", {}).get("nameserver_role_test", False),
         )
         async def detect_nameserver_role(
-            ctx: Context, nameserver: str, domain: str | None, authority_test_domain: str | None
+            ctx: Context,
+            nameserver: str,
+            domain: str | None,
+            authority_test_domain: str | None,
         ) -> ToolResult:
             await ctx.info(
                 f"Performing role check for nameserver `{nameserver}` using domain {domain}."
             )
             return await verify_nameserver_role_impl(
-                nameserver=nameserver, domain=domain, authority_test_domain=authority_test_domain
+                nameserver=nameserver,
+                domain=domain,
+                authority_test_domain=authority_test_domain,
             )
 
         @self.server.tool(
@@ -298,7 +312,10 @@ class ToolRegistrationMixin:
             enabled=self.config.get("features", {}).get("mdns_service_discovery", False),
         )
         async def mdns_service_discovery(
-            ctx: Context, find_all: bool = False, timeout: float = 5.0, ipv6: bool = False
+            ctx: Context,
+            find_all: bool = False,
+            timeout: float = 5.0,
+            ipv6: bool = False,
         ) -> ToolResult:
             await ctx.info("Starting mDNS service discovery.")
             return await discover_mdns_services_impl(find_all=find_all, timeout=timeout, ipv6=ipv6)

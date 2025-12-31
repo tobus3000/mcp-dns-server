@@ -2,9 +2,6 @@
 
 import os
 import tempfile
-from unittest.mock import Mock, patch
-
-import pytest
 
 from src.dns_mcp_server import DNSMCPServer
 

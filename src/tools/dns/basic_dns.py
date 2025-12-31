@@ -1,5 +1,5 @@
 import ipaddress
-from typing import Any, Dict, Optional
+from typing import Any
 
 import dns.rcode
 import dns.rdataclass
@@ -164,7 +164,7 @@ async def reverse_dns_lookup_impl(ip_address: str) -> ToolResult:
     return ToolResult(success=False, error=result.error or "Unknown error", details={})
 
 
-async def dns_troubleshooting_impl(domain: str, nameserver: Optional[str] = None) -> ToolResult:
+async def dns_troubleshooting_impl(domain: str, nameserver: str | None = None) -> ToolResult:
     """Perform comprehensive DNS troubleshooting using the Resolver class.
 
     Args:
@@ -178,7 +178,7 @@ async def dns_troubleshooting_impl(domain: str, nameserver: Optional[str] = None
         resolver = Resolver(timeout=5.0)
     else:
         resolver = Resolver(nameservers=[nameserver], timeout=5.0)
-    troubleshooting_results: Dict[str, Any] = {}
+    troubleshooting_results: dict[str, Any] = {}
 
     # Define the record types we want to check
     record_types = ["SOA", "A", "AAAA", "CNAME", "MX", "NS", "TXT", "SPF"]

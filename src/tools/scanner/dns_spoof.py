@@ -44,7 +44,7 @@ async def detect_dns_spoof_async(
             response_container["packet"] = packet
             return True
 
-    sniffer = AsyncSniffer(filter=f"udp port 53", prn=handle_packet, store=False, iface=iface)
+    sniffer = AsyncSniffer(filter="udp port 53", prn=handle_packet, store=False, iface=iface)
     sniffer.start()
 
     start = time.time()

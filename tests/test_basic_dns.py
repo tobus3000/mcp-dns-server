@@ -25,7 +25,6 @@ from src.tools.dns.basic_dns import (
     reverse_dns_lookup_impl,
     simple_dns_lookup_impl,
 )
-from src.typedefs import ToolResult
 
 # ============================================================================
 # Test Class: Simple DNS Lookups

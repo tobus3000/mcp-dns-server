@@ -11,8 +11,7 @@ Tests all aspects of the risk submodule including:
 
 from __future__ import annotations
 
-from typing import Set
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 

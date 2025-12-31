@@ -17,8 +17,7 @@ All network interactions are mocked to ensure fast, deterministic tests.
 """
 
 import asyncio
-import socket
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import dns.asyncquery
 import dns.exception
@@ -34,7 +33,7 @@ import dns.rrset
 import dns.zone
 import pytest
 
-from src.resolver import DEFAULT_EDNS_SIZE, DEFAULT_TIMEOUT, Resolver
+from src.resolver import DEFAULT_TIMEOUT, Resolver
 from src.typedefs import AXFRResult, QueryResult
 
 
@@ -347,7 +346,6 @@ class TestResolverAsyncResolution:
             patch("dns.asyncquery.udp", new_callable=AsyncMock) as mock_udp,
             patch("dns.asyncquery.tcp", new_callable=AsyncMock) as mock_tcp,
         ):
-
             # UDP response is truncated
             truncated_response = MagicMock()
             truncated_response.flags = dns.flags.TC  # Truncation flag
@@ -422,7 +420,7 @@ class TestResolverAsyncResolution:
     async def test_async_resolve_socket_error(self, resolver):
         """Test async_resolve handles socket error."""
         with patch("dns.asyncquery.udp", new_callable=AsyncMock) as mock_udp:
-            mock_udp.side_effect = socket.error("Connection refused")
+            mock_udp.side_effect = OSError("Connection refused")
 
             result = await resolver.async_resolve("example.com", "A", nameserver="8.8.8.8")
 
@@ -520,8 +518,10 @@ class TestResolverZoneTransfer:
     @pytest.mark.dns
     async def test_async_axfr_success(self, resolver):
         """Test async_axfr with successful zone transfer."""
-        with patch("dns.query.xfr") as mock_xfr, patch("dns.zone.from_xfr") as mock_from_xfr:
-
+        with (
+            patch("dns.query.xfr") as mock_xfr,
+            patch("dns.zone.from_xfr") as mock_from_xfr,
+        ):
             # Mock AXFR iterator
             mock_msg = MagicMock()
             mock_msg.rcode.return_value = dns.rcode.NOERROR
@@ -544,8 +544,10 @@ class TestResolverZoneTransfer:
     @pytest.mark.dns
     async def test_async_axfr_custom_port(self, resolver):
         """Test async_axfr with custom port."""
-        with patch("dns.query.xfr") as mock_xfr, patch("dns.zone.from_xfr") as mock_from_xfr:
-
+        with (
+            patch("dns.query.xfr") as mock_xfr,
+            patch("dns.zone.from_xfr") as mock_from_xfr,
+        ):
             mock_msg = MagicMock()
             mock_msg.rcode.return_value = dns.rcode.NOERROR
             mock_xfr.return_value = iter([mock_msg])

@@ -10,7 +10,6 @@ Tests all aspects of the tld submodule including:
 
 from __future__ import annotations
 
-from typing import Set
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp

@@ -9,7 +9,7 @@ import asyncio
 import ipaddress
 import socket
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import dns.asyncquery
 import dns.exception
@@ -79,7 +79,7 @@ class Resolver:
         "OPENPGPKEY",
     ]
 
-    def __init__(self, nameservers: Optional[List[str]] = None, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(self, nameservers: list[str] | None = None, timeout: float = DEFAULT_TIMEOUT):
         """Initialize the resolver with optional nameservers and timeout.
 
         Args:
@@ -95,7 +95,7 @@ class Resolver:
             if validated_ns:
                 self.resolver.nameservers = validated_ns
 
-    def _validate_and_convert_nameservers(self, nameservers: List[str]) -> List[str]:
+    def _validate_and_convert_nameservers(self, nameservers: list[str]) -> list[str]:
         """Validate nameservers and convert FQDNs to IP addresses.
 
         Args:
@@ -138,7 +138,7 @@ class Resolver:
             return False
 
     @staticmethod
-    def _resolve_nameserver_fqdn(fqdn: str) -> List[str]:
+    def _resolve_nameserver_fqdn(fqdn: str) -> list[str]:
         """Resolve a nameserver FQDN to its IP address(es).
 
         Args:
@@ -161,7 +161,7 @@ class Resolver:
                     seen.add(ip)
 
             return ips
-        except (socket.gaierror, socket.error, OSError):
+        except (socket.gaierror, OSError):
             # Resolution failed; return empty list
             # Could be a misconfigured FQDN or network issue
             return []
@@ -202,18 +202,26 @@ class Resolver:
 
             # Create the query message
             query = dns.message.make_query(
-                qname, rdtype_obj, rdclass=rdclass_obj, want_dnssec=bool(flags & dns.flags.DO)
+                qname,
+                rdtype_obj,
+                rdclass=rdclass_obj,
+                want_dnssec=bool(flags & dns.flags.DO),
             )
 
             # Add EDNS if requested
             if use_edns:
                 query.use_edns(
-                    0, flags, payload_size, options=options if options else []  # EDNS version 0
+                    0,
+                    flags,
+                    payload_size,
+                    options=options if options else [],  # EDNS version 0
                 )
             if nameserver is None:
                 if not self.resolver.nameservers:
                     return QueryResult(
-                        success=False, error="No nameservers configured in resolver", details={}
+                        success=False,
+                        error="No nameservers configured in resolver",
+                        details={},
                     )
                 nameserver = str(self.resolver.nameservers[0])
 
@@ -236,9 +244,11 @@ class Resolver:
                             error=str(e),
                             details={"exception_type": type(e).__name__},
                         )
-                except (socket.error, asyncio.TimeoutError) as e:
+                except (OSError, asyncio.TimeoutError) as e:
                     return QueryResult(
-                        success=False, error=str(e), details={"exception_type": type(e).__name__}
+                        success=False,
+                        error=str(e),
+                        details={"exception_type": type(e).__name__},
                     )
                 except Exception as e:
                     return QueryResult(
@@ -267,11 +277,15 @@ class Resolver:
 
         except dns.exception.DNSException as e:
             return QueryResult(
-                success=False, error=str(e), details={"exception_type": type(e).__name__}
+                success=False,
+                error=str(e),
+                details={"exception_type": type(e).__name__},
             )
-        except (socket.error, asyncio.TimeoutError) as e:
+        except (OSError, asyncio.TimeoutError) as e:
             return QueryResult(
-                success=False, error=str(e), details={"exception_type": type(e).__name__}
+                success=False,
+                error=str(e),
+                details={"exception_type": type(e).__name__},
             )
         except Exception as e:
             return QueryResult(
@@ -281,7 +295,11 @@ class Resolver:
             )
 
     async def async_axfr(
-        self, zone_name: str, nameserver: str, port: int = 53, timeout: float = DEFAULT_TIMEOUT
+        self,
+        zone_name: str,
+        nameserver: str,
+        port: int = 53,
+        timeout: float = DEFAULT_TIMEOUT,
     ) -> AXFRResult:
         """Attempt an asynchronous AXFR zone transfer.
 
@@ -316,7 +334,11 @@ class Resolver:
                 details={"names": z.nodes.items()},
             )
 
-        except (dns.exception.FormError, dns.exception.Timeout, ConnectionRefusedError) as e:
+        except (
+            dns.exception.FormError,
+            dns.exception.Timeout,
+            ConnectionRefusedError,
+        ) as e:
             return AXFRResult(
                 zone_name=zone_name,
                 nameserver=nameserver,
@@ -329,9 +351,9 @@ class Resolver:
         self,
         qname: str,
         rdtype: str,
-        nameserver: Optional[str] = None,
-        timeout: Optional[float] = None,
-    ) -> Tuple[Optional[RRset], Optional[Message]]:
+        nameserver: str | None = None,
+        timeout: float | None = None,
+    ) -> tuple[RRset | None, Message | None]:
         """Resolve a single RRset with DNSSEC enabled (DO flag set).
 
         This method is specifically for DNSSEC queries where RRSIG records
@@ -410,9 +432,9 @@ class Resolver:
         self,
         qname: str,
         rdtype: str,
-        nameserver: Optional[str] = None,
-        timeout: Optional[float] = None,
-    ) -> Tuple[Optional[RRset], Optional[Message]]:
+        nameserver: str | None = None,
+        timeout: float | None = None,
+    ) -> tuple[RRset | None, Message | None]:
         """Resolve a single RRset using the configured resolver.
 
         Args:
@@ -458,8 +480,11 @@ class Resolver:
         return result
 
     def fetch_dnskey(
-        self, qname: str, nameserver: Optional[str] = None, timeout: Optional[float] = None
-    ) -> Tuple[Optional[RRset], Optional[Message]]:
+        self,
+        qname: str,
+        nameserver: str | None = None,
+        timeout: float | None = None,
+    ) -> tuple[RRset | None, Message | None]:
         """Fetch DNSKEY records for the specified domain.
 
         DNSKEY records should be fetched with DNSSEC support enabled to ensure
@@ -477,8 +502,11 @@ class Resolver:
         return self.resolve_dnssec(qname, "DNSKEY", nameserver, timeout)
 
     def fetch_ds(
-        self, qname: str, nameserver: Optional[str] = None, timeout: Optional[float] = None
-    ) -> Tuple[Optional[RRset], Optional[Message]]:
+        self,
+        qname: str,
+        nameserver: str | None = None,
+        timeout: float | None = None,
+    ) -> tuple[RRset | None, Message | None]:
         """Fetch DS records for the specified domain.
 
         DS records should be fetched with DNSSEC support enabled to ensure
@@ -496,8 +524,8 @@ class Resolver:
         return self.resolve_dnssec(qname, "DS", nameserver, timeout)
 
     def get_soa_serial(
-        self, zone_name: str, nameserver: str, timeout: Optional[float] = None
-    ) -> Optional[int]:
+        self, zone_name: str, nameserver: str, timeout: float | None = None
+    ) -> int | None:
         """Get the SOA serial number for a zone from a specific nameserver.
 
         Args:
@@ -607,7 +635,7 @@ class Resolver:
         return parent_text if parent_text == "." else parent_text.rstrip(".")
 
     @staticmethod
-    def get_reverse_name(ip_address: str) -> Optional[str] | None:
+    def get_reverse_name(ip_address: str) -> str | None | None:
         """Get the reverse DNS name for a given IP address.
 
         Args:
@@ -623,7 +651,7 @@ class Resolver:
             return None
 
     @staticmethod
-    def get_records_from_rrset(rrset: RRset) -> List[Dict[str, Any]]:
+    def get_records_from_rrset(rrset: RRset) -> list[dict[str, Any]]:
         """Extracts the records from a given RRset.
 
         Args:
@@ -737,7 +765,11 @@ class Resolver:
                 records.append({"options": rdata.options, "ttl": rrset.ttl})
             elif rdtype == "AFSDB":
                 records.append(
-                    {"subtype": rdata.subtype, "hostname": rdata.hostname, "ttl": rrset.ttl}
+                    {
+                        "subtype": rdata.subtype,
+                        "hostname": rdata.hostname,
+                        "ttl": rrset.ttl,
+                    }
                 )
             elif rdtype == "CERT":
                 records.append(
@@ -783,11 +815,20 @@ class Resolver:
                 )
             elif rdtype == "CAA":
                 records.append(
-                    {"flags": rdata.flags, "tag": rdata.tag, "value": rdata.value, "ttl": rrset.ttl}
+                    {
+                        "flags": rdata.flags,
+                        "tag": rdata.tag,
+                        "value": rdata.value,
+                        "ttl": rrset.ttl,
+                    }
                 )
             elif rdtype in ["SVCB", "HTTPS"]:
                 records.append(
-                    {"priority": rdata.priority, "target": rdata.target, "ttl": rrset.ttl}
+                    {
+                        "priority": rdata.priority,
+                        "target": rdata.target,
+                        "ttl": rrset.ttl,
+                    }
                 )
             else:
                 records.append(str(rdata))

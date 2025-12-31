@@ -172,7 +172,10 @@ class TestRecursionDetection:
             recursion_result = MagicMock()
             recursion_result.success = True
             recursion_result.response = MagicMock()
-            recursion_result.response.answer = [MagicMock(), MagicMock()]  # Multiple answers
+            recursion_result.response.answer = [
+                MagicMock(),
+                MagicMock(),
+            ]  # Multiple answers
             recursion_result.rcode = 0
 
             authority_result = MagicMock()
@@ -414,7 +417,8 @@ class TestNameserverRoleImpl:
         """Test implementation function with resolver result."""
         with patch("src.tools.validator.ns_role.verify_nameserver_role") as mock_test:
             mock_test.return_value = MagicMock(
-                success=True, output="192.168.1.1 is a *DNS resolver* (recursive server)."
+                success=True,
+                output="192.168.1.1 is a *DNS resolver* (recursive server).",
             )
 
             result = await verify_nameserver_role_impl("192.168.1.1", None, None)

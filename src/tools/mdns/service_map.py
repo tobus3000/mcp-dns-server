@@ -2,9 +2,7 @@
 Use `_services._dns-sd._udp.local.` to get the currently active services in the local subnet.
 """
 
-from typing import Dict
-
-SERVICE_MAP: Dict[str, Dict[str, str]] = {
+SERVICE_MAP: dict[str, dict[str, str]] = {
     # General Networking & Web
     "_http._tcp.local.": {
         "category": "General Networking & Web",
@@ -30,7 +28,10 @@ SERVICE_MAP: Dict[str, Dict[str, str]] = {
         "category": "General Networking & Web",
         "description": "Telnet servers (rare, but sometimes used in IoT)",
     },
-    "_ws._tcp.local.": {"category": "General Networking & Web", "description": "WebSocket servers"},
+    "_ws._tcp.local.": {
+        "category": "General Networking & Web",
+        "description": "WebSocket servers",
+    },
     "_wss._tcp.local.": {
         "category": "General Networking & Web",
         "description": "Secure WebSocket servers",
@@ -52,7 +53,10 @@ SERVICE_MAP: Dict[str, Dict[str, str]] = {
         "description": "Multicast DNS service that announces NUT-compatible UPS devices or servers on the local network.",
     },
     # Smart Home / IoT
-    "_hap._tcp.local.": {"category": "Smart Home / IoT", "description": "Apple HomeKit devices"},
+    "_hap._tcp.local.": {
+        "category": "Smart Home / IoT",
+        "description": "Apple HomeKit devices",
+    },
     "_esphome._tcp.local.": {
         "category": "Smart Home / IoT",
         "description": "ESPHome devices (used in Home Assistant)",
@@ -97,7 +101,10 @@ SERVICE_MAP: Dict[str, Dict[str, str]] = {
         "category": "Smart Home / IoT",
         "description": "Constrained Application Protocol for IoT devices",
     },
-    "_bluetooth._tcp.local.": {"category": "Smart Home / IoT", "description": "Bluetooth gateways"},
+    "_bluetooth._tcp.local.": {
+        "category": "Smart Home / IoT",
+        "description": "Bluetooth gateways",
+    },
     "_smartthings._tcp.local.": {
         "category": "Smart Home / IoT",
         "description": "Samsung SmartThings hubs",
@@ -164,7 +171,10 @@ SERVICE_MAP: Dict[str, Dict[str, str]] = {
         "category": "Media & Streaming",
         "description": "Google Cast / Chromecast devices",
     },
-    "_sonos._tcp.local.": {"category": "Media & Streaming", "description": "Sonos speakers"},
+    "_sonos._tcp.local.": {
+        "category": "Media & Streaming",
+        "description": "Sonos speakers",
+    },
     "_roku-remote._tcp.local.": {
         "category": "Media & Streaming",
         "description": "Roku TVs or streamers",
@@ -181,7 +191,10 @@ SERVICE_MAP: Dict[str, Dict[str, str]] = {
         "category": "Media & Streaming",
         "description": "Apple Airdrop service discovery",
     },
-    "_plex._tcp.local.": {"category": "Media & Streaming", "description": "Plex Media Server"},
+    "_plex._tcp.local.": {
+        "category": "Media & Streaming",
+        "description": "Plex Media Server",
+    },
     "_vnd.apple.mediastream._tcp.local.": {
         "category": "Media & Streaming",
         "description": "AirPlay 1 streaming",

@@ -78,7 +78,8 @@ class ServerLifecycleMixin:
 
                     try:
                         await asyncio.wait_for(
-                            asyncio.gather(*pending, return_exceptions=True), timeout=5.0
+                            asyncio.gather(*pending, return_exceptions=True),
+                            timeout=5.0,
                         )
                     except asyncio.TimeoutError:
                         self.logger.warning("Timeout waiting for tasks to stop")

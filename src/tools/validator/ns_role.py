@@ -15,8 +15,6 @@ Example usage:
     asyncio.run(main())
 """
 
-from typing import Optional
-
 import dns.flags
 
 from src.resolver import Resolver
@@ -26,7 +24,7 @@ from src.typedefs import ToolResult
 async def verify_nameserver_role(
     nameserver: str,
     domain: str = "example.com",
-    authority_test_domain: Optional[str] = None,
+    authority_test_domain: str | None = None,
 ) -> ToolResult:
     """
     Test whether a given DNS server is authoritative, a resolver, or mixed-mode.
@@ -101,5 +99,7 @@ async def verify_nameserver_role_impl(
     if not domain:
         domain = "example.com"
     return await verify_nameserver_role(
-        nameserver=nameserver, domain=domain, authority_test_domain=authority_test_domain
+        nameserver=nameserver,
+        domain=domain,
+        authority_test_domain=authority_test_domain,
     )

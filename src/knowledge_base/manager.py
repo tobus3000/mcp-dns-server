@@ -3,7 +3,6 @@
 import glob
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import yaml
 
@@ -11,7 +10,7 @@ import yaml
 class KnowledgeBaseManager:
     """Manages DNS knowledge base articles."""
 
-    def __init__(self, kb_dir: Optional[str] = None) -> None:
+    def __init__(self, kb_dir: str | None = None) -> None:
         """Initialize the knowledge base manager.
 
         Args:
@@ -30,7 +29,7 @@ class KnowledgeBaseManager:
         """Ensure the knowledge base directory exists."""
         Path(self.kb_dir).mkdir(parents=True, exist_ok=True)
 
-    def _load_all_articles(self) -> Dict[str, Dict]:
+    def _load_all_articles(self) -> dict[str, dict]:
         """Load all knowledge base articles from the directory.
 
         Returns:
@@ -44,7 +43,7 @@ class KnowledgeBaseManager:
 
         for file_path in yaml_files:
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     article_data = yaml.safe_load(f)
                     if article_data and "id" in article_data:
                         articles[article_data["id"]] = article_data
@@ -53,7 +52,7 @@ class KnowledgeBaseManager:
 
         return articles
 
-    def get_article_by_id(self, article_id: str) -> Optional[Dict]:
+    def get_article_by_id(self, article_id: str) -> dict | None:
         """Get a knowledge base article by its ID.
 
         Args:
@@ -64,7 +63,7 @@ class KnowledgeBaseManager:
         """
         return self.articles.get(article_id)
 
-    def get_articles_by_category(self, category: str) -> List[Dict]:
+    def get_articles_by_category(self, category: str) -> list[dict]:
         """Get all articles in a specific category.
 
         Args:
@@ -79,7 +78,7 @@ class KnowledgeBaseManager:
             if article.get("category", "").lower() == category.lower()
         ]
 
-    def search_articles(self, query: str) -> List[Dict]:
+    def search_articles(self, query: str) -> list[dict]:
         """Search for articles containing the query string.
 
         Args:
@@ -102,7 +101,7 @@ class KnowledgeBaseManager:
 
         return matching_articles
 
-    def get_all_categories(self) -> List[str]:
+    def get_all_categories(self) -> list[str]:
         """Get all unique categories in the knowledge base.
 
         Returns:
@@ -115,7 +114,7 @@ class KnowledgeBaseManager:
                 categories.add(category)
         return sorted(list(categories))
 
-    def get_all_articles(self) -> Dict[str, Dict]:
+    def get_all_articles(self) -> dict[str, dict]:
         """Get all articles.
 
         Returns:
@@ -123,7 +122,7 @@ class KnowledgeBaseManager:
         """
         return self.articles
 
-    def add_article(self, article_data: Dict) -> bool:
+    def add_article(self, article_data: dict) -> bool:
         """Add a new article to the knowledge base.
 
         Args:

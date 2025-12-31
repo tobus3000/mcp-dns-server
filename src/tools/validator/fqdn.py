@@ -1,10 +1,9 @@
 import re
-from typing import Tuple
 
 import idna
 
 
-async def validate_fqdn(domain: str) -> Tuple[bool, str]:
+async def validate_fqdn(domain: str) -> tuple[bool, str]:
     """
     Validate a Fully Qualified Domain Name (FQDN) according to DNS RFC rules.
     Covers RFC 1035, RFC 1123, and IDNA processing.

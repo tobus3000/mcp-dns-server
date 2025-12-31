@@ -3,7 +3,7 @@ Performs iterative DNS resolution from root servers down to the target domain,
 optionally following CNAME chains to final A/AAAA records.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import dns.name
 import dns.rdatatype
@@ -137,7 +137,7 @@ class Trace:
 
         return "\n".join(output_lines)
 
-    def _query_hierarchy_level(self, subdomain, servers) -> Optional[Any]:
+    def _query_hierarchy_level(self, subdomain, servers) -> Any | None:
         """Query a set of servers for a subdomain, return the response.
 
         Args:
@@ -166,7 +166,7 @@ class Trace:
 
         return None
 
-    def _extract_next_servers(self, response) -> List[str]:
+    def _extract_next_servers(self, response) -> list[str]:
         """Extract next authoritative servers from additional, authority, or answer sections.
 
         Args:
@@ -213,7 +213,7 @@ class Trace:
 
         return next_servers
 
-    def _format_rrset(self, rrsets) -> List[Dict[str, Any]]:
+    def _format_rrset(self, rrsets) -> list[dict[str, Any]]:
         """Convert RRset(s) into list of dicts with name, ttl, type, value.
 
         Args:
@@ -237,7 +237,7 @@ class Trace:
                 )
         return result
 
-    def _resolve_final_answer(self, response) -> List[Dict[str, Any]]:
+    def _resolve_final_answer(self, response) -> list[dict[str, Any]]:
         """Follow CNAME chain if enabled, otherwise return A/AAAA from the last response.
 
         Args:

@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.resolver import Resolver
 from src.typedefs import ToolResult
@@ -24,10 +24,10 @@ class RootServerDetector:
         "m.root-servers.net.",
     }
 
-    def __init__(self, nameservers: Optional[List[str]] = None):
+    def __init__(self, nameservers: list[str] | None = None):
         self.resolver = Resolver(nameservers=nameservers)
 
-    async def detect_root_servers(self) -> Dict[str, Any]:
+    async def detect_root_servers(self) -> dict[str, Any]:
         """
         Detect which root servers are returned by the configured resolver.
         """
@@ -65,7 +65,7 @@ class RootServerDetector:
                 "error": str(e),
             }
 
-    async def can_access_public_roots(self) -> Dict[str, Any]:
+    async def can_access_public_roots(self) -> dict[str, Any]:
         """
         Detect if the client can directly access the public root servers.
         """
@@ -139,7 +139,9 @@ class RootServerDetector:
 
         except Exception as e:
             return ToolResult(
-                success=False, error=str(e), details={"exception_type": type(e).__name__}
+                success=False,
+                error=str(e),
+                details={"exception_type": type(e).__name__},
             )
 
 

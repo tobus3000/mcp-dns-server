@@ -43,7 +43,11 @@ async def check_open_resolver(
             rcode=result.rcode,
             rcode_text=result.rcode_text,
             duration=duration,
-            details={"recursive answer": has_ra, "answer_count": answer_count, "note": note},
+            details={
+                "recursive answer": has_ra,
+                "answer_count": answer_count,
+                "note": note,
+            },
         )
     return OpenResolver(success=success, ip=target)
 

@@ -2,7 +2,7 @@
 Prompt Mixin classes for DNSMCPServer to separate concerns.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from resolver import Resolver
 
@@ -16,7 +16,7 @@ class PromptRegistrationMixin:
 
     # Type hints for attributes provided by the host class
     server: Any  # FastMCP instance
-    config: Dict[str, Any]  # Configuration dictionary
+    config: dict[str, Any]  # Configuration dictionary
 
     def register_tools_prompts(self) -> None:
         """Register prompts for tools with the server."""
@@ -122,7 +122,16 @@ class PromptRegistrationMixin:
         @self.server.prompt(
             name="dns_edns_test",
             description="Perform EDNS tests on a given domain and nameserver",
-            tags=set(("dns", "edns", "troubleshooting", "diagnostics", "server", "nameserver")),
+            tags=set(
+                (
+                    "dns",
+                    "edns",
+                    "troubleshooting",
+                    "diagnostics",
+                    "server",
+                    "nameserver",
+                )
+            ),
             enabled=self.config.get("features", {}).get("advanced_troubleshooting", False),
         )
         def dns_edns_test(domain: str, nameserver: str) -> str:

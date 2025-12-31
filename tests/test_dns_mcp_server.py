@@ -16,9 +16,8 @@ All network interactions are mocked to ensure fast, deterministic tests.
 import asyncio
 import os
 import signal
-import sys
 import tempfile
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
