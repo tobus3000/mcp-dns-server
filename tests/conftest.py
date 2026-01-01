@@ -7,7 +7,7 @@ import sys
 # This handles both local development and CI environments
 test_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(test_dir)
-src_dir = os.path.join(project_root, "src/dns_mcp_server")
+src_dir = os.path.join(project_root, "src")
 
 # Insert src directory at the beginning of sys.path if not already present
 if src_dir not in sys.path:
