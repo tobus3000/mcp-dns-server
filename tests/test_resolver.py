@@ -16,7 +16,6 @@ This test suite covers all aspects of the Resolver class including:
 All network interactions are mocked to ensure fast, deterministic tests.
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import dns.asyncquery
@@ -404,7 +403,7 @@ class TestResolverAsyncResolution:
     async def test_async_resolve_timeout_exception(self, resolver):
         """Test async_resolve handles timeout exception."""
         with patch("dns.asyncquery.udp", new_callable=AsyncMock) as mock_udp:
-            mock_udp.side_effect = asyncio.TimeoutError()
+            mock_udp.side_effect = TimeoutError()
 
             result = await resolver.async_resolve(
                 "example.com", "A", nameserver="8.8.8.8"

@@ -392,11 +392,11 @@ class TestDNSMCPServerLifecycle:
         with patch.object(
             server.server, "run_async", new_callable=AsyncMock
         ) as mock_run:
-            mock_run.side_effect = asyncio.TimeoutError("Test timeout")
+            mock_run.side_effect = TimeoutError("Test timeout")
 
             try:
                 await server.start(host="127.0.0.1", port=9999)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
             mock_run.assert_called_once_with(
@@ -414,7 +414,7 @@ class TestDNSMCPServerLifecycle:
 
             try:
                 await server.start()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
             mock_run.assert_called_once_with(

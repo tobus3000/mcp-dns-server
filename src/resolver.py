@@ -254,7 +254,7 @@ class Resolver:
                             error=str(e),
                             details={"exception_type": type(e).__name__},
                         )
-                except (OSError, asyncio.TimeoutError) as e:
+                except (TimeoutError, OSError) as e:
                     return QueryResult(
                         success=False,
                         error=str(e),
@@ -291,7 +291,7 @@ class Resolver:
                 error=str(e),
                 details={"exception_type": type(e).__name__},
             )
-        except (OSError, asyncio.TimeoutError) as e:
+        except (TimeoutError, OSError) as e:
             return QueryResult(
                 success=False,
                 error=str(e),

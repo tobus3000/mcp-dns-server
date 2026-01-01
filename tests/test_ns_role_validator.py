@@ -566,11 +566,10 @@ class TestNameserverRoleEdgeCases:
     async def test_test_nameserver_role_timeout(self):
         """Test handling of DNS query timeout."""
         with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
-            import asyncio
 
             mock_resolver = MagicMock()
             mock_resolver.async_resolve = AsyncMock(
-                side_effect=asyncio.TimeoutError("Query timeout")
+                side_effect=TimeoutError("Query timeout")
             )
             mock_resolver_class.return_value = mock_resolver
 
@@ -579,7 +578,7 @@ class TestNameserverRoleEdgeCases:
                 try:
                     result = await verify_nameserver_role("192.168.1.1")
                     assert isinstance(result, object)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # If timeout is not caught, that's also acceptable behavior
                     pass
 

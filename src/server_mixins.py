@@ -85,7 +85,7 @@ class ServerLifecycleMixin:
                             asyncio.gather(*pending, return_exceptions=True),
                             timeout=5.0,
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         self.logger.warning("Timeout waiting for tasks to stop")
                     except Exception as e:
                         self.logger.error("Error during task cleanup: %s", e)

@@ -11,7 +11,6 @@ Tests all aspects of the tld submodule including:
 from __future__ import annotations
 
 # Import asyncio for timeout tests
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -99,7 +98,7 @@ class TestIANATLDFetching:
         """Test timeout error handling."""
         with patch("aiohttp.ClientSession") as mock_session_class:
             mock_session = AsyncMock()
-            mock_session.get = MagicMock(side_effect=asyncio.TimeoutError())
+            mock_session.get = MagicMock(side_effect=TimeoutError())
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
             mock_session_class.return_value = mock_session
