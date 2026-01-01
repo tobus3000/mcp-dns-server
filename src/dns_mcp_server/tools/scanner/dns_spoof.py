@@ -2,10 +2,9 @@ import asyncio
 import time
 
 from scapy.layers.dns import DNS, DNSQR
-from scapy.layers.inet import IP, UDP, ICMP
+from scapy.layers.inet import ICMP, IP, UDP
 from scapy.layers.l2 import Ether
-from scapy.sendrecv import sr1
-from scapy.sendrecv import AsyncSniffer
+from scapy.sendrecv import AsyncSniffer, sr1
 
 from dns_mcp_server.typedefs import ToolResult
 

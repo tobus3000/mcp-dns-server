@@ -481,8 +481,10 @@ def assess_domain_risk(
     return {
         "domain": domain,
         "risk_score": risk_score,
-        "summary": (f"Estimated risk {risk_score:.3f} (variants={num_variants}, "
-                    f"resolving={num_resolving})"),
+        "summary": (
+            f"Estimated risk {risk_score:.3f} (variants={num_variants}, "
+            f"resolving={num_resolving})"
+        ),
         "details": details,
         "all_variants": sorted_candidates,
         "all_variants_count": num_variants,

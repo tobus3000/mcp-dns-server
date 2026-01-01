@@ -260,7 +260,7 @@ class Resolver:
                         error=str(e),
                         details={"exception_type": type(e).__name__},
                     )
-                except Exception as e: # pylint: disable=broad-except
+                except Exception as e:  # pylint: disable=broad-except
                     return QueryResult(
                         success=False,
                         error=f"Unexpected error: {str(e)}",
@@ -297,7 +297,7 @@ class Resolver:
                 error=str(e),
                 details={"exception_type": type(e).__name__},
             )
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e:  # pylint: disable=broad-except
             return QueryResult(
                 success=False,
                 error=f"Unexpected error: {str(e)}",

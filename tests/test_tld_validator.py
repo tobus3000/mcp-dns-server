@@ -17,7 +17,11 @@ import aiohttp
 import dns.rcode
 import pytest
 
-from dns_mcp_server.tools.validator.tld import fetch_iana_tlds, is_valid_tld, tld_check_impl
+from dns_mcp_server.tools.validator.tld import (
+    fetch_iana_tlds,
+    is_valid_tld,
+    tld_check_impl,
+)
 
 # ============================================================================
 # Test Class: IANA TLD Fetching and Caching
@@ -281,7 +285,9 @@ class TestEnterpriseTLDValidation:
     async def test_is_valid_tld_enterprise_roots(self):
         """Test validation against enterprise root servers."""
         with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
-            with patch("dns_mcp_server.tools.validator.tld.Resolver") as mock_resolver_class:
+            with patch(
+                "dns_mcp_server.tools.validator.tld.Resolver"
+            ) as mock_resolver_class:
                 mock_fetch.return_value = set()  # No IANA cache
 
                 mock_resolver = MagicMock()
@@ -304,7 +310,9 @@ class TestEnterpriseTLDValidation:
     async def test_is_valid_tld_enterprise_nxdomain(self):
         """Test handling of NXDOMAIN from enterprise roots."""
         with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
-            with patch("dns_mcp_server.tools.validator.tld.Resolver") as mock_resolver_class:
+            with patch(
+                "dns_mcp_server.tools.validator.tld.Resolver"
+            ) as mock_resolver_class:
                 mock_fetch.return_value = set()  # No IANA cache
 
                 mock_resolver = MagicMock()
@@ -325,7 +333,9 @@ class TestEnterpriseTLDValidation:
         alternative_roots = ["10.0.0.1", "10.0.0.2"]
 
         with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
-            with patch("dns_mcp_server.tools.validator.tld.Resolver") as mock_resolver_class:
+            with patch(
+                "dns_mcp_server.tools.validator.tld.Resolver"
+            ) as mock_resolver_class:
                 mock_fetch.return_value = set()  # No IANA cache
 
                 mock_resolver = MagicMock()
@@ -443,7 +453,9 @@ class TestTLDValidatorEdgeCases:
     async def test_is_valid_tld_multi_part_tlds(self):
         """Test multi-part TLDs like co.uk."""
         with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
-            with patch("dns_mcp_server.tools.validator.tld.Resolver") as mock_resolver_class:
+            with patch(
+                "dns_mcp_server.tools.validator.tld.Resolver"
+            ) as mock_resolver_class:
                 mock_fetch.return_value = set()  # Not in IANA
 
                 mock_resolver = MagicMock()
