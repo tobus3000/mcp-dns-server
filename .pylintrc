@@ -36,12 +36,9 @@ max-module-lines=2000
 confidence=
 
 # Enable all warnings except listed ones
-disable=C0111,   # Missing docstring
-        C0103,   # Invalid name
-        C0302,   # Too many lines in module
+disable=C0302,   # Too many lines in module
         C0413,   # Import location (needed for lazy imports)
         C0415,   # Import outside toplevel
-        C1803,   # Use implicit boolean check
         R0801,   # Similar lines
         R0902,   # Too many instance attributes
         R0903,   # Too few public methods
@@ -51,18 +48,10 @@ disable=C0111,   # Missing docstring
         R0914,   # Too many local variables
         R0915,   # Too many statements
         R1702,   # Too many nested blocks
-        R1705,   # Unnecessary else
-        R1710,   # Either all return with value or none
         R1722,   # Consider using contextlib.suppress
-        R1732,   # Consider using with
-        W0107,   # Unnecessary pass
-        W0201,   # Attribute defined outside __init__
         W0212,   # Protected member access
         W0511,   # FIXME/TODO
         W0603,   # Using globals
-        W0611,   # Unused imports (let isort handle this)
-        W0613,   # Unused argument
-        W1309,   # F-string without vars
         E0401,   # Unable to import (handled by install)
         E1101    # No member (dynamic attrs)
 
