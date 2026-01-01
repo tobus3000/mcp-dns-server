@@ -13,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Add coverage and CI badges to README
 - Clean Pyflakes and Pylint warnings
 - :art: Adding pytest markers to pyproject.toml
-- :art: Adjust code to python 3.11 standards.
 - :art: Reformat for python 3.11
 - :art: Refactor code into proper python package
 - :art: Cleanup test files
