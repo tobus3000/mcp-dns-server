@@ -1,5 +1,5 @@
-from src.resolver import Resolver
-from src.typedefs import ToolResult
+from dns_mcp_server.resolver import Resolver
+from dns_mcp_server.typedefs import ToolResult
 
 
 async def punycode_converter_impl(domain: str) -> ToolResult:

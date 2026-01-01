@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.dns_mcp_server import DNSMCPServer
+from dns_mcp_server.main import DNSMCPServer
 
 # Default config for testing
 DEFAULT_TEST_CONFIG = """

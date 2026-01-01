@@ -4,7 +4,7 @@ Prompt Mixin classes for DNSMCPServer to separate concerns.
 
 from typing import Any
 
-from resolver import Resolver
+from dns_mcp_server.resolver import Resolver
 
 
 class PromptRegistrationMixin:

@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import dns.flags
 import pytest
 
-from src.tools.validator.ns_role import (
+from dns_mcp_server.tools.validator.ns_role import (
     verify_nameserver_role,
     verify_nameserver_role_impl,
 )

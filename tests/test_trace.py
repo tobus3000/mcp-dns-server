@@ -19,12 +19,11 @@ from unittest.mock import MagicMock, patch
 
 import dns.message
 import dns.name
-import dns.rdataclass
 import dns.rdatatype
 import dns.rrset
 import pytest
 
-from src.tools.dns.trace import Trace, dns_trace_impl
+from dns_mcp_server.tools.dns.trace import Trace, dns_trace_impl
 
 # ============================================================================
 # Test Fixtures - Root server response with proper NS records

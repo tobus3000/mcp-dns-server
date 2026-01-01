@@ -3,8 +3,8 @@ import time
 import aiohttp
 import dns.rcode
 
-from src.resolver import Resolver
-from src.typedefs import ToolResult
+from dns_mcp_server.resolver import Resolver
+from dns_mcp_server.typedefs import ToolResult
 
 # Cache for IANA TLDs (memory-only)
 _IANA_TLD_CACHE: set[str] = set()
@@ -35,7 +35,7 @@ async def fetch_iana_tlds(force_refresh: bool = False) -> set[str]:
                 _IANA_TLD_CACHE = tlds
                 _IANA_TLD_LAST_FETCH = time.time()
                 return tlds
-    except Exception:
+    except Exception:  # pylint: disable=broad-except
         # Network unavailable or blocked → fall back later
         return set()
 

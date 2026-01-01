@@ -3,7 +3,7 @@
 import os
 import tempfile
 
-from src.knowledge_base.manager import KnowledgeBaseManager
+from dns_mcp_server.knowledge_base.manager import KnowledgeBaseManager
 
 
 class TestKnowledgeBaseManager:

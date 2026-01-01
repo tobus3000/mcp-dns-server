@@ -7,7 +7,7 @@ from typing import Any
 
 from fastmcp import Context
 
-from tools import (
+from dns_mcp_server.tools import (
     advanced_dns_lookup_impl,
     basic_dns_assistant_impl,
     check_dnssec_impl,
@@ -28,8 +28,8 @@ from tools import (
     validate_fqdn,
     verify_nameserver_role_impl,
 )
-from tools.mdns.browser import discover_mdns_services_impl
-from typedefs import ToolResult
+from dns_mcp_server.tools.mdns.browser import discover_mdns_services_impl
+from dns_mcp_server.typedefs import ToolResult
 
 
 class ToolRegistrationMixin:

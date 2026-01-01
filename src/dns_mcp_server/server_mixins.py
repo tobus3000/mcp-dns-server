@@ -87,9 +87,9 @@ class ServerLifecycleMixin:
                         )
                     except TimeoutError:
                         self.logger.warning("Timeout waiting for tasks to stop")
-                    except Exception as e:
+                    except Exception as e:  # pylint: disable=broad-except
                         self.logger.error("Error during task cleanup: %s", e)
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 self.logger.error("Error during server shutdown: %s", e)
 
         if sys.platform == "win32":

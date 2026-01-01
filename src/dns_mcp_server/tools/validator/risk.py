@@ -25,8 +25,8 @@ import random
 import string
 import unicodedata
 
-from src.resolver import Resolver
-from src.typedefs import ToolResult
+from dns_mcp_server.resolver import Resolver
+from dns_mcp_server.typedefs import ToolResult
 
 # ----- Configurable small datasets (keyboard adjacency + homoglyphs) -----
 # Keyboard adjacency (QWERTY) for simple substitution/insertion choices
@@ -196,8 +196,8 @@ def _mutations_repeat_char(s: str) -> set[str]:
         Set of strings with one character duplicated
     """
     out = set()
-    for i in range(len(s)):
-        out.add(s[:i] + s[i] + s[i:])  # duplicate
+    for i, c in enumerate(s):
+        out.add(s[:i] + c + s[i:])  # duplicate
     return out
 
 
@@ -481,7 +481,8 @@ def assess_domain_risk(
     return {
         "domain": domain,
         "risk_score": risk_score,
-        "summary": f"Estimated risk {risk_score:.3f} (variants={num_variants}, resolving={num_resolving})",
+        "summary": (f"Estimated risk {risk_score:.3f} (variants={num_variants}, "
+                    f"resolving={num_resolving})"),
         "details": details,
         "all_variants": sorted_candidates,
         "all_variants_count": num_variants,
@@ -499,17 +500,17 @@ async def lookalike_risk_impl(domain: str, check_dns: bool = False) -> ToolResul
     Returns:
         Dict[str, Any]: Risk assessment report.
     """
-    report = assess_domain_risk(domain, check_dns=check_dns)
+    lookalike_report = assess_domain_risk(domain, check_dns=check_dns)
     return ToolResult(
         success=True,
         output={
             "domain": domain,
-            "risk_score": report.get("risk_score", None),
-            "summary": f"{domain} → {report.get('summary', '')}",
-            "variants": report.get("all_variants", []),
-            "resolving_variants": report.get("resolving_variants", []),
+            "risk_score": lookalike_report.get("risk_score", None),
+            "summary": f"{domain} → {lookalike_report.get('summary', '')}",
+            "variants": lookalike_report.get("all_variants", []),
+            "resolving_variants": lookalike_report.get("resolving_variants", []),
         },
-        details=report.get("details", {}),
+        details=lookalike_report.get("details", {}),
     )
 
 
@@ -528,5 +529,5 @@ if __name__ == "__main__":
             )
             print(" sample:", report["sample_variants"][:6])
             print()
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             print("Error for", td, e)

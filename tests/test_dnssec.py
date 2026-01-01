@@ -14,16 +14,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import dns.dnssec
-import dns.exception
 import dns.message
 import dns.name
-import dns.rdataclass
 import dns.rdatatype
 import dns.rrset
 import pytest
 
-from src.tools.validator.dnssec import (
+from dns_mcp_server.tools.validator.dnssec import (
     check_authoritative_consistency,
     check_parent_ds,
     check_robustness,

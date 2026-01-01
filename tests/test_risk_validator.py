@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.tools.validator.risk import (
+from dns_mcp_server.tools.validator.risk import (
     _build_full_domains,
     _generate_variants_for_label,
     _mutations_deletion,

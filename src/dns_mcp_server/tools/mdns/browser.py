@@ -17,12 +17,12 @@ from zeroconf.asyncio import (
     AsyncZeroconfServiceTypes,
 )
 
-from typedefs import ToolResult
+from dns_mcp_server.typedefs import ToolResult
 
 try:
     from .service_map import SERVICE_MAP
 except ImportError:
-    from service_map import SERVICE_MAP
+    from dns_mcp_server.tools.mdns import SERVICE_MAP
 
 _PENDING_TASKS: set[asyncio.Task] = set()
 
@@ -66,7 +66,7 @@ async def discover_mdns_services_impl(
             },
         )
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         return ToolResult(
             success=False, error=f"mDNS service discovery failed: {str(e)}"
         )
@@ -174,7 +174,7 @@ class AsyncRunner:
 
             return True, None, self._discovered_services, self._discovered_service_types
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             return False, str(e), [], []
 
     async def stop_browsing(self) -> None:

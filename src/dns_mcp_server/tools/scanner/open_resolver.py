@@ -1,8 +1,8 @@
 import asyncio
 import ipaddress
 
-from src.resolver import Resolver
-from src.typedefs import OpenResolver, ToolResult
+from dns_mcp_server.resolver import Resolver
+from dns_mcp_server.typedefs import OpenResolver, ToolResult
 
 
 async def check_open_resolver(
@@ -76,7 +76,7 @@ async def detect_open_resolvers_in_subnet(
                 if scan_result.success:
                     open_res.append(ip)
                     open_res_details.append(scan_result)
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 pass  # Ignore single-host errors
 
     tasks = [asyncio.create_task(worker(ip)) for ip in hosts]
@@ -110,21 +110,24 @@ async def detect_open_resolvers_in_subnet(
     else:
         note.append(
             f"This network is publicly routed ({network.exploded}). "
-            + "The risk of these open resolvers being abused for DNS amplification attacks is HIGH, "
-            + "as they are directly accessible from the public internet and could be used in large-scale DDoS attacks."
+            + "The risk of these open resolvers being abused for DNS amplification "
+            + "attacks is HIGH, as they are directly accessible from the public "
+            + "internet and could be used in large-scale DDoS attacks."
         )
 
     if cnt > 2:
         if is_private:
             note.append(
-                "Although the risk of external abuse is low, it is still recommended to implement "
-                + "DNS filtering and/or appropriate firewall rules to prevent internal unauthorized access."
+                "Although the risk of external abuse is low, it is still recommended to "
+                + "implement DNS filtering and/or appropriate firewall rules to prevent "
+                + "internal unauthorized access."
             )
         else:
             note.append(
                 "Make sure to implement DNS filtering and/or appropriate firewall "
-                + "rules to prevent these devices from being abused for amplification attacks. "
-                + "Consider restricting recursive queries to authorized clients only."
+                + "rules to prevent these devices from being abused for amplification "
+                + "attacks. Consider restricting recursive queries to authorized "
+                + "clients only."
             )
     if cnt > 85:
         note.append(

@@ -3,7 +3,7 @@
 import os
 import tempfile
 
-from src.dns_mcp_server import DNSMCPServer
+from dns_mcp_server.main import DNSMCPServer
 
 
 class TestKnowledgeBaseResources:

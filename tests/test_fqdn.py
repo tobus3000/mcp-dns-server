@@ -10,7 +10,7 @@ Tests cover:
 
 import pytest
 
-from src.tools.validator.fqdn import validate_fqdn
+from dns_mcp_server.tools.validator.fqdn import validate_fqdn
 
 
 class TestFQDNValidation:

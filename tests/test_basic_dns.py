@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import dns.rdatatype
 import pytest
 
-from src.tools.dns.basic_dns import (
+from dns_mcp_server.tools.dns.basic_dns import (
     advanced_dns_lookup_impl,
     dns_troubleshooting_impl,
     reverse_dns_lookup_impl,

@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import dns.rdatatype
 import pytest
 
-from src.tools.dns.ns_tests import (
+from dns_mcp_server.tools.dns.ns_tests import (
     performance_test,
     verify_basic_records,
     verify_chaos_records,

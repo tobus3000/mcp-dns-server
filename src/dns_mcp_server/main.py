@@ -9,11 +9,11 @@ import yaml
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import get_logger
 
-from knowledge_base.manager import KnowledgeBaseManager
-from prompt_mixins import PromptRegistrationMixin
-from resource_mixins import ResourceRegistrationMixin
-from server_mixins import ServerLifecycleMixin
-from tool_mixins import ToolRegistrationMixin
+from dns_mcp_server.knowledge_base.manager import KnowledgeBaseManager
+from dns_mcp_server.prompt_mixins import PromptRegistrationMixin
+from dns_mcp_server.resource_mixins import ResourceRegistrationMixin
+from dns_mcp_server.server_mixins import ServerLifecycleMixin
+from dns_mcp_server.tool_mixins import ToolRegistrationMixin
 
 logger = get_logger(__name__)
 

@@ -1,8 +1,8 @@
 import asyncio
 from typing import Any
 
-from src.resolver import Resolver
-from src.typedefs import ToolResult
+from dns_mcp_server.resolver import Resolver
+from dns_mcp_server.typedefs import ToolResult
 
 
 class RootServerDetector:
@@ -80,6 +80,8 @@ class RootServerDetector:
         async def check_reachability(server_name: str) -> bool:
             try:
                 addr_result = await self.resolver.async_resolve(server_name, "A")
+                if addr_result.response is None:
+                    return False
                 if not addr_result.success or not addr_result.response.answer:
                     return False
                 ip = str(addr_result.response.answer[0][0])

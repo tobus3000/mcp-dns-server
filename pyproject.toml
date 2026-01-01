@@ -76,7 +76,7 @@ dns_mcp_server = ["config/*.yaml", "knowledge_base/data/*.yaml"]
 minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "-v --tb=short --cov=mcp-dns-server --cov-report=term"
+addopts = "-v --tb=short --cov=dns_mcp_server --cov-report=term"
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]

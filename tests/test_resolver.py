@@ -18,22 +18,14 @@ All network interactions are mocked to ensure fast, deterministic tests.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import dns.asyncquery
 import dns.exception
 import dns.flags
-import dns.message
-import dns.name
-import dns.query
 import dns.rcode
-import dns.rdataclass
 import dns.rdatatype
-import dns.reversename
-import dns.rrset
-import dns.zone
 import pytest
 
-from src.resolver import DEFAULT_TIMEOUT, Resolver
-from src.typedefs import AXFRResult, QueryResult
+from dns_mcp_server.resolver import DEFAULT_TIMEOUT, Resolver
+from dns_mcp_server.typedefs import AXFRResult, QueryResult
 
 
 class TestResolverInitialization:

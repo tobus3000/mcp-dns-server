@@ -4,8 +4,8 @@ Resource Mixin classes for DNSMCPServer to separate concerns.
 
 from typing import Any
 
-from tools import advanced_dns_lookup_impl, available_rdatatypes_impl
-from typedefs import ToolResult
+from dns_mcp_server.tools import advanced_dns_lookup_impl, available_rdatatypes_impl
+from dns_mcp_server.typedefs import ToolResult
 
 
 class ResourceRegistrationMixin:

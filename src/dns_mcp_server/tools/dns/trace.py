@@ -8,8 +8,8 @@ from typing import Any
 import dns.name
 import dns.rdatatype
 
-from src.resolver import Resolver
-from src.typedefs import ToolResult
+from dns_mcp_server.resolver import Resolver
+from dns_mcp_server.typedefs import ToolResult
 
 
 class Trace:
@@ -148,7 +148,7 @@ class Trace:
             DNS message response or None
         """
         for server in servers:
-            rrset, response = self.resolver.resolve(
+            _rrset, response = self.resolver.resolve(
                 str(subdomain), "NS", nameserver=server
             )
             if not response:

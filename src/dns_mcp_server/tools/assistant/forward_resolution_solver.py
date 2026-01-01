@@ -1,8 +1,8 @@
 from fastmcp import Context
 
-from src.tools.dns import simple_dns_lookup_impl
-from src.tools.validator import is_valid_tld
-from src.typedefs import ToolResult
+from dns_mcp_server.tools.dns import simple_dns_lookup_impl
+from dns_mcp_server.tools.validator import is_valid_tld
+from dns_mcp_server.typedefs import ToolResult
 
 
 async def basic_dns_assistant_impl(ctx: Context) -> ToolResult:

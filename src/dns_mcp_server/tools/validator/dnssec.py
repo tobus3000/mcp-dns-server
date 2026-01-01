@@ -24,9 +24,9 @@ from dns.rdtypes.ANY.NSEC import NSEC
 from dns.rdtypes.ANY.NSEC3 import NSEC3
 from dns.rdtypes.ANY.RRSIG import RRSIG
 
-from exceptions import handle_dns_error
-from src.resolver import Resolver
-from src.typedefs import ToolResult, ValidationResult
+from dns_mcp_server.exceptions import handle_dns_error
+from dns_mcp_server.resolver import Resolver
+from dns_mcp_server.typedefs import ToolResult, ValidationResult
 
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA
@@ -1859,7 +1859,7 @@ async def check_dnssec_impl(domain: str) -> ToolResult:
     """
     try:
         return ToolResult(success=True, output=pretty_report(validate_domain(domain)))
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         return ToolResult(
             success=False, error=str(e), details={"traceback": traceback.format_exc()}
         )

@@ -1,9 +1,13 @@
 import asyncio
 import time
 
-from scapy.all import DNS, DNSQR, ICMP, IP, UDP, AsyncSniffer, Ether, sr1
+from scapy.layers.dns import DNS, DNSQR
+from scapy.layers.inet import IP, UDP, ICMP
+from scapy.layers.l2 import Ether
+from scapy.sendrecv import sr1
+from scapy.sendrecv import AsyncSniffer
 
-from src.typedefs import ToolResult
+from dns_mcp_server.typedefs import ToolResult
 
 
 async def detect_dns_spoof_async(

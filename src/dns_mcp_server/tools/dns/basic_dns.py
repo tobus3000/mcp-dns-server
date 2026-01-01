@@ -5,8 +5,8 @@ import dns.rcode
 import dns.rdataclass
 import dns.rdatatype
 
-from resolver import Resolver
-from typedefs import ToolResult
+from dns_mcp_server.resolver import Resolver
+from dns_mcp_server.typedefs import ToolResult
 
 
 async def available_rdatatypes_impl() -> ToolResult:

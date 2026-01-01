@@ -26,8 +26,8 @@ import dns.rcode
 import dns.rdataclass
 import dns.rdatatype
 
-from src.resolver import Resolver
-from src.typedefs import QueryResult, ToolResult
+from dns_mcp_server.resolver import Resolver
+from dns_mcp_server.typedefs import QueryResult, ToolResult
 
 DEFAULT_TIMEOUT = 5.0
 MAX_UDP_SIZE = 4096
@@ -224,7 +224,7 @@ async def verify_edns_support(domain: str, nameserver: str) -> dict[str, Any]:
                 ),
             }
             results["summary"]["passed"] += 1
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             results["tests"][f"option_{option_name}"] = {
                 "success": False,
                 "error": str(e),
@@ -327,12 +327,12 @@ async def verify_tcp_behavior(domain: str, nameserver: str) -> dict[str, Any]:
             }
             results["summary"]["passed"] += 1
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             results["tests"]["pipelined_queries"] = {"success": False, "error": str(e)}
             results["summary"]["failed"] += 1
             results["summary"]["errors"].append(f"Pipelined queries failed: {str(e)}")
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         results["tests"]["pipelined_queries"] = {"success": False, "error": str(e)}
         results["summary"]["failed"] += 1
         results["summary"]["errors"].append(f"TCP setup failed: {str(e)}")
@@ -625,7 +625,7 @@ async def verify_any_queries(domain: str, nameserver: str) -> dict[str, Any]:
                 "No rate limiting detected for ANY queries"
             )
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         results["tests"]["rate_limiting"] = {"success": False, "error": str(e)}
         results["summary"]["errors"].append(f"Rate limiting test failed: {str(e)}")
     results["summary"]["total_tests"] = (
@@ -862,7 +862,7 @@ async def verify_open_resolver(domain: str, nameserver: str) -> dict[str, Any]:
         else:
             results["summary"]["passed"] += 1
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         results["tests"]["recursive_query"] = {"success": False, "error": str(e)}
 
     # Test 2: Try with different domain to verify behavior
@@ -890,7 +890,7 @@ async def verify_open_resolver(domain: str, nameserver: str) -> dict[str, Any]:
                 "configuration if recursive service is needed."
             )
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         results["tests"]["secondary_query"] = {"success": False, "error": str(e)}
     results["summary"]["total_tests"] = (
         results["summary"]["failed"] + results["summary"]["passed"]
@@ -966,7 +966,7 @@ async def verify_robustness(domain: str, nameserver: str) -> dict[str, Any]:
             "success": True,
             "handled_correctly": response.rcode() == dns.rcode.BADVERS,
         }
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         results["tests"]["invalid_edns"] = {
             "success": False,
             "error": str(e),
@@ -1074,7 +1074,7 @@ async def verify_dns_cookie(domain: str, nameserver: str) -> dict[str, Any]:
                 f"{nameserver} did not return a DNS Cookie"
             )
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         results["tests"]["dns_cookie"] = {"success": False, "error": str(e)}
         results["summary"]["failed"] += 1
         results["summary"]["errors"].append(
@@ -1122,7 +1122,7 @@ async def run_comprehensive_tests(domain: str, nameserver: str) -> dict[str, Any
         try:
             results = await test_func(domain, nameserver)
             return suite_name, results
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             return suite_name, {"error": str(e), "status": "failed"}
 
     suite_tasks = [run_suite(name, func) for name, func in test_suites.items()]

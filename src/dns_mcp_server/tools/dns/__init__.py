@@ -13,6 +13,7 @@ from .ns_tests import (
 )
 from .trace import dns_trace_impl
 
+
 __all__ = [
     "dns_trace_impl",
     "simple_dns_lookup_impl",

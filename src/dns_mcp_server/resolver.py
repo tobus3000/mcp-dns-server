@@ -26,7 +26,7 @@ import dns.reversename
 import dns.rrset
 import dns.zone
 
-from src.typedefs import AXFRResult, QueryResult
+from dns_mcp_server.typedefs import AXFRResult, QueryResult
 
 # Type aliases
 SOARecord = dns.rdtypes.ANY.SOA.SOA
@@ -260,7 +260,7 @@ class Resolver:
                         error=str(e),
                         details={"exception_type": type(e).__name__},
                     )
-                except Exception as e:
+                except Exception as e: # pylint: disable=broad-except
                     return QueryResult(
                         success=False,
                         error=f"Unexpected error: {str(e)}",
@@ -297,7 +297,7 @@ class Resolver:
                 error=str(e),
                 details={"exception_type": type(e).__name__},
             )
-        except Exception as e:
+        except Exception as e: # pylint: disable=broad-except
             return QueryResult(
                 success=False,
                 error=f"Unexpected error: {str(e)}",

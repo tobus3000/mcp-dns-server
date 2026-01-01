@@ -17,7 +17,7 @@ import aiohttp
 import dns.rcode
 import pytest
 
-from src.tools.validator.tld import fetch_iana_tlds, is_valid_tld, tld_check_impl
+from dns_mcp_server.tools.validator.tld import fetch_iana_tlds, is_valid_tld, tld_check_impl
 
 # ============================================================================
 # Test Class: IANA TLD Fetching and Caching
