@@ -566,7 +566,6 @@ class TestNameserverRoleEdgeCases:
     async def test_test_nameserver_role_timeout(self):
         """Test handling of DNS query timeout."""
         with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
-
             mock_resolver = MagicMock()
             mock_resolver.async_resolve = AsyncMock(
                 side_effect=TimeoutError("Query timeout")
