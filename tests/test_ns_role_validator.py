@@ -32,7 +32,7 @@ class TestNameserverRoleDetection:
 
     async def test_test_nameserver_role_authoritative_only(self):
         """Test detection of purely authoritative nameserver."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Mock recursion test failure
@@ -52,7 +52,7 @@ class TestNameserverRoleDetection:
             mock_resolver_class.return_value = mock_resolver
 
             with patch(
-                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"
             ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
@@ -68,7 +68,7 @@ class TestNameserverRoleDetection:
 
     async def test_test_nameserver_role_resolver_only(self):
         """Test detection of purely recursive resolver."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Mock recursion test success with answer
@@ -89,7 +89,7 @@ class TestNameserverRoleDetection:
             mock_resolver_class.return_value = mock_resolver
 
             with patch(
-                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"
             ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
@@ -104,7 +104,7 @@ class TestNameserverRoleDetection:
 
     async def test_test_nameserver_role_mixed_mode(self):
         """Test detection of mixed-mode nameserver (both authoritative and recursive)."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Mock recursion test success
@@ -126,7 +126,7 @@ class TestNameserverRoleDetection:
             mock_resolver_class.return_value = mock_resolver
 
             with patch(
-                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"
             ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
@@ -138,7 +138,7 @@ class TestNameserverRoleDetection:
 
     async def test_test_nameserver_role_neither_auth_nor_resolver(self):
         """Test detection when neither authoritative nor resolver characteristics found."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Mock recursion test failure
@@ -157,7 +157,7 @@ class TestNameserverRoleDetection:
             mock_resolver_class.return_value = mock_resolver
 
             with patch(
-                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"
             ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
@@ -178,7 +178,7 @@ class TestRecursionDetection:
 
     async def test_recursion_test_with_answer_section(self):
         """Test that recursion is detected when answer section is present."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Answer present = recursive capability
@@ -199,7 +199,7 @@ class TestRecursionDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 result = await verify_nameserver_role("8.8.8.8")
 
                 assert result.success is True
@@ -212,7 +212,7 @@ class TestRecursionDetection:
 
     async def test_recursion_test_without_answer_section(self):
         """Test that recursion is not detected without answer section."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # No answer = no recursion
@@ -230,7 +230,7 @@ class TestRecursionDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 result = await verify_nameserver_role("192.168.1.1")
 
                 # Should not be marked as resolver
@@ -241,7 +241,7 @@ class TestRecursionDetection:
 
     async def test_recursion_test_default_domain(self):
         """Test that default domain is used for recursion test."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             recursion_result = MagicMock()
@@ -255,7 +255,7 @@ class TestRecursionDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 _result = await verify_nameserver_role("192.168.1.1")
 
                 # Verify async_resolve was called with default domain "example.com"
@@ -266,7 +266,7 @@ class TestRecursionDetection:
 
     async def test_recursion_test_custom_domain(self):
         """Test that custom domain is used for recursion test."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             recursion_result = MagicMock()
@@ -280,7 +280,7 @@ class TestRecursionDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 custom_domain = "google.com"
                 _result = await verify_nameserver_role(
                     "192.168.1.1", domain=custom_domain
@@ -305,7 +305,7 @@ class TestAuthorityDetection:
 
     async def test_authority_test_aa_bit_set(self):
         """Test that authority is detected when AA bit is set."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             recursion_result = MagicMock()
@@ -323,7 +323,7 @@ class TestAuthorityDetection:
             mock_resolver_class.return_value = mock_resolver
 
             with patch(
-                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"
             ) as mock_reverse:
                 mock_reverse.return_value = "1.168.192.in-addr.arpa"
 
@@ -335,7 +335,7 @@ class TestAuthorityDetection:
 
     async def test_authority_test_aa_bit_not_set(self):
         """Test that authority is not detected without AA bit."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             recursion_result = MagicMock()
@@ -352,7 +352,7 @@ class TestAuthorityDetection:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 result = await verify_nameserver_role("192.168.1.1")
 
                 # Should not be marked as authoritative
@@ -364,7 +364,7 @@ class TestAuthorityDetection:
 
     async def test_authority_test_default_reverse_zone(self):
         """Test that reverse zone is used by default for authority test."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             recursion_result = MagicMock()
@@ -379,7 +379,7 @@ class TestAuthorityDetection:
             mock_resolver_class.return_value = mock_resolver
 
             with patch(
-                "src.tools.validator.ns_role.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"
             ) as mock_reverse:
                 mock_reverse.return_value = "expected.reverse.zone"
 
@@ -395,7 +395,7 @@ class TestAuthorityDetection:
 
     async def test_authority_test_custom_zone(self):
         """Test that custom zone is used for authority test when provided."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             recursion_result = MagicMock()
@@ -431,7 +431,7 @@ class TestNameserverRoleImpl:
 
     async def test_test_nameserver_role_impl_authoritative(self):
         """Test implementation function with authoritative result."""
-        with patch("src.tools.validator.ns_role.verify_nameserver_role") as mock_test:
+        with patch("dns_mcp_server.tools.validator.ns_role.verify_nameserver_role") as mock_test:
             mock_test.return_value = MagicMock(
                 success=True, output="192.168.1.1 is an *authoritative* nameserver."
             )
@@ -444,7 +444,7 @@ class TestNameserverRoleImpl:
 
     async def test_test_nameserver_role_impl_resolver(self):
         """Test implementation function with resolver result."""
-        with patch("src.tools.validator.ns_role.verify_nameserver_role") as mock_test:
+        with patch("dns_mcp_server.tools.validator.ns_role.verify_nameserver_role") as mock_test:
             mock_test.return_value = MagicMock(
                 success=True,
                 output="192.168.1.1 is a *DNS resolver* (recursive server).",
@@ -458,7 +458,7 @@ class TestNameserverRoleImpl:
 
     async def test_test_nameserver_role_impl_default_domain(self):
         """Test that default domain is used when None provided."""
-        with patch("src.tools.validator.ns_role.verify_nameserver_role") as mock_test:
+        with patch("dns_mcp_server.tools.validator.ns_role.verify_nameserver_role") as mock_test:
             mock_test.return_value = MagicMock(success=True, output="Test result")
 
             _result = await verify_nameserver_role_impl("192.168.1.1", None, None)
@@ -470,7 +470,7 @@ class TestNameserverRoleImpl:
 
     async def test_test_nameserver_role_impl_custom_domain(self):
         """Test that custom domain is used when provided."""
-        with patch("src.tools.validator.ns_role.verify_nameserver_role") as mock_test:
+        with patch("dns_mcp_server.tools.validator.ns_role.verify_nameserver_role") as mock_test:
             mock_test.return_value = MagicMock(success=True, output="Test result")
 
             custom_domain = "custom.domain"
@@ -485,7 +485,7 @@ class TestNameserverRoleImpl:
 
     async def test_test_nameserver_role_impl_custom_authority_zone(self):
         """Test that custom authority zone is passed through."""
-        with patch("src.tools.validator.ns_role.verify_nameserver_role") as mock_test:
+        with patch("dns_mcp_server.tools.validator.ns_role.verify_nameserver_role") as mock_test:
             mock_test.return_value = MagicMock(success=True, output="Test result")
 
             custom_zone = "internal.corp"
@@ -511,7 +511,7 @@ class TestNameserverRoleEdgeCases:
 
     async def test_test_nameserver_role_with_ipv6(self):
         """Test nameserver role detection with IPv6 address."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver.async_resolve = AsyncMock(
                 side_effect=[
@@ -521,7 +521,7 @@ class TestNameserverRoleEdgeCases:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 result = await verify_nameserver_role("2001:4860:4860::8888")
 
                 assert isinstance(result, object)
@@ -529,7 +529,7 @@ class TestNameserverRoleEdgeCases:
 
     async def test_test_nameserver_role_with_hostname(self):
         """Test nameserver role detection with hostname instead of IP."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver.async_resolve = AsyncMock(
                 side_effect=[
@@ -539,21 +539,21 @@ class TestNameserverRoleEdgeCases:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 result = await verify_nameserver_role("dns.example.com")
 
                 assert isinstance(result, object)
 
     async def test_test_nameserver_role_unreachable_server(self):
         """Test handling of unreachable nameserver."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver.async_resolve = AsyncMock(
                 side_effect=Exception("Connection refused")
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 # Should handle exception gracefully without raising
                 try:
                     result = await verify_nameserver_role("192.168.1.1")
@@ -565,14 +565,14 @@ class TestNameserverRoleEdgeCases:
 
     async def test_test_nameserver_role_timeout(self):
         """Test handling of DNS query timeout."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver.async_resolve = AsyncMock(
                 side_effect=TimeoutError("Query timeout")
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 # Should handle timeout gracefully without raising
                 try:
                     result = await verify_nameserver_role("192.168.1.1")
@@ -583,7 +583,7 @@ class TestNameserverRoleEdgeCases:
 
     async def test_test_nameserver_role_response_with_no_flags(self):
         """Test handling of response without flags attribute."""
-        with patch("src.tools.validator.ns_role.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.ns_role.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             recursion_result = MagicMock()
@@ -599,7 +599,7 @@ class TestNameserverRoleEdgeCases:
             )
             mock_resolver_class.return_value = mock_resolver
 
-            with patch("src.tools.validator.ns_role.Resolver.get_reverse_name"):
+            with patch("dns_mcp_server.tools.validator.ns_role.Resolver.get_reverse_name"):
                 # Should handle AttributeError gracefully without raising
                 try:
                     result = await verify_nameserver_role("192.168.1.1")

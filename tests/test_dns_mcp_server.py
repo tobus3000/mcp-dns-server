@@ -486,7 +486,7 @@ class TestDNSMCPServerEdgeCases:
         config2.close()
 
         try:
-            with patch("src.dns_mcp_server.DNSMCPServer.initialize_knowledge_base"):
+            with patch("dns_mcp_server.main.DNSMCPServer.initialize_knowledge_base"):
                 server1 = DNSMCPServer(config_path=config1.name)
                 server2 = DNSMCPServer(config_path=config2.name)
 
@@ -509,7 +509,7 @@ class TestDNSMCPServerEdgeCases:
         config.close()
 
         try:
-            with patch("src.dns_mcp_server.DNSMCPServer.initialize_knowledge_base"):
+            with patch("dns_mcp_server.main.DNSMCPServer.initialize_knowledge_base"):
                 server = DNSMCPServer(config_path=config.name)
                 assert server is not None
                 assert len(server.config.get("features", {})) >= 100

@@ -76,7 +76,7 @@ class TestFetchRootServers:
 
     def test_fetch_root_servers_success(self):
         """Test successful root server discovery."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
 
@@ -109,7 +109,7 @@ class TestFetchRootServers:
 
     def test_fetch_root_servers_no_rrset(self):
         """Test root server discovery when NS rrset is empty."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
             mock_resolver.resolve = MagicMock(return_value=(None, MagicMock()))
@@ -132,7 +132,7 @@ class TestQueryHierarchyLevel:
 
     def test_query_hierarchy_level_success(self):
         """Test successful query for a hierarchy level."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
 
@@ -154,7 +154,7 @@ class TestQueryHierarchyLevel:
 
     def test_query_hierarchy_level_no_response(self):
         """Test query when no response is received."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
             mock_resolver.resolve = MagicMock(return_value=(MagicMock(), None))
@@ -170,7 +170,7 @@ class TestQueryHierarchyLevel:
 
     def test_query_hierarchy_level_multiple_servers(self):
         """Test query tries multiple servers until success."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
 
@@ -194,7 +194,7 @@ class TestQueryHierarchyLevel:
 
     def test_query_hierarchy_level_all_servers_fail(self):
         """Test query when all servers fail."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
             mock_resolver.resolve = MagicMock(return_value=(MagicMock(), None))
@@ -221,7 +221,7 @@ class TestExtractNextServers:
 
     def test_extract_from_additional_section(self):
         """Test extracting servers from additional section."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             response = MagicMock(spec=dns.message.Message)
@@ -244,7 +244,7 @@ class TestExtractNextServers:
 
     def test_extract_with_none_response(self):
         """Test extracting servers when response is None."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
             servers = trace._extract_next_servers(None)
 
@@ -252,7 +252,7 @@ class TestExtractNextServers:
 
     def test_extract_multiple_servers(self):
         """Test extracting multiple servers from response."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             response = MagicMock(spec=dns.message.Message)
@@ -282,7 +282,7 @@ class TestExtractNextServers:
 
     def test_extract_servers_no_sections(self):
         """Test extracting servers when response has no populated sections."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             response = MagicMock(spec=dns.message.Message)
@@ -307,7 +307,7 @@ class TestPerformTrace:
 
     def test_perform_trace_single_level(self):
         """Test trace for root domain."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
 
@@ -330,7 +330,7 @@ class TestPerformTrace:
 
     def test_perform_trace_no_root_servers(self):
         """Test trace when root servers cannot be discovered."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
             mock_resolver.resolve = MagicMock(return_value=(None, MagicMock()))
@@ -345,7 +345,7 @@ class TestPerformTrace:
 
     def test_perform_trace_clears_previous_steps(self):
         """Test that trace_steps are cleared on new trace."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
 
@@ -388,7 +388,7 @@ class TestFormatOutput:
 
     def test_get_dig_style_basic(self):
         """Test dig-style output formatting."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             response = MagicMock()
@@ -415,7 +415,7 @@ class TestFormatOutput:
 
     def test_get_dig_style_multiple_hops(self):
         """Test dig-style output with multiple hops."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             response1 = MagicMock()
@@ -454,7 +454,7 @@ class TestFormatOutput:
 
     def test_get_dig_style_empty_trace(self):
         """Test dig-style output with no trace steps."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
             trace.trace_steps = []
 
@@ -475,7 +475,7 @@ class TestCNAMEResolution:
 
     def test_resolve_final_answer_with_a_records(self):
         """Test resolving final answer with A records."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             response = MagicMock(spec=dns.message.Message)
@@ -501,7 +501,7 @@ class TestCNAMEResolution:
 
     def test_resolve_final_answer_without_cname_follow(self):
         """Test resolving final answer with CNAME follow disabled."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=False)
             response = MagicMock(spec=dns.message.Message)
             response.answer = []
@@ -512,7 +512,7 @@ class TestCNAMEResolution:
 
     def test_resolve_final_answer_with_none_response(self):
         """Test resolving final answer when response is None."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
             result = trace._resolve_final_answer(None)
 
@@ -531,7 +531,7 @@ class TestTraceIntegration:
 
     def test_trace_format_rrset(self):
         """Test RRset formatting utility method."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             rrset = MagicMock(spec=dns.rrset.RRset)
@@ -553,7 +553,7 @@ class TestTraceIntegration:
 
     def test_trace_initialization(self):
         """Test Trace object initialization."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             assert trace.resolver is not None
@@ -562,7 +562,7 @@ class TestTraceIntegration:
 
     def test_trace_initialization_without_cname(self):
         """Test Trace initialization without CNAME following."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=False)
 
             assert trace.follow_cname is False
@@ -581,7 +581,7 @@ class TestDNSTraceImpl:
 
     async def test_dns_trace_impl_success(self):
         """Test successful async DNS trace implementation."""
-        with patch("src.tools.dns.trace.Trace") as mock_trace_class:
+        with patch("dns_mcp_server.tools.dns.trace.Trace") as mock_trace_class:
             mock_trace = MagicMock()
             mock_trace.get_dig_style = MagicMock(
                 return_value=";; TRACE OUTPUT\n;; Hop 1: Server 198.41.0.4"
@@ -598,7 +598,7 @@ class TestDNSTraceImpl:
 
     async def test_dns_trace_impl_whitespace_handling(self):
         """Test that dns_trace_impl handles whitespace in domain."""
-        with patch("src.tools.dns.trace.Trace") as mock_trace_class:
+        with patch("dns_mcp_server.tools.dns.trace.Trace") as mock_trace_class:
             mock_trace = MagicMock()
             mock_trace.get_dig_style = MagicMock(return_value=";; TRACE OUTPUT")
             mock_trace_class.return_value = mock_trace
@@ -620,7 +620,7 @@ class TestEdgeCases:
 
     def test_extract_mixed_record_types(self):
         """Test extracting servers with mixed record types."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             response = MagicMock(spec=dns.message.Message)
@@ -651,7 +651,7 @@ class TestEdgeCases:
 
     def test_perform_trace_with_complex_domain(self):
         """Test trace with deeply nested domain."""
-        with patch("src.tools.dns.trace.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.trace.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
             mock_resolver.resolve = MagicMock(
@@ -665,7 +665,7 @@ class TestEdgeCases:
 
     def test_query_hierarchy_with_empty_servers_list(self):
         """Test query hierarchy with empty servers list."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
             subdomain = dns.name.from_text("example.com.")
             servers = []
@@ -677,7 +677,7 @@ class TestEdgeCases:
 
     def test_format_empty_rrset(self):
         """Test formatting empty RRset."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
             result = trace._format_rrset([])
 
@@ -685,7 +685,7 @@ class TestEdgeCases:
 
     def test_extract_servers_no_sections(self):
         """Test extracting servers when response has no populated sections."""
-        with patch("src.tools.dns.trace.Resolver"):
+        with patch("dns_mcp_server.tools.dns.trace.Resolver"):
             trace = Trace(follow_cname=True)
 
             response = MagicMock(spec=dns.message.Message)

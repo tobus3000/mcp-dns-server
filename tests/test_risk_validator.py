@@ -515,7 +515,7 @@ class TestLookalikeRiskImpl:
 
     async def test_lookalike_risk_impl_returns_tool_result(self):
         """Test that implementation returns ToolResult."""
-        with patch("src.tools.validator.risk.assess_domain_risk") as mock_assess:
+        with patch("dns_mcp_server.tools.validator.risk.assess_domain_risk") as mock_assess:
             mock_assess.return_value = {
                 "domain": "example.com",
                 "risk_score": 0.5,
@@ -532,7 +532,7 @@ class TestLookalikeRiskImpl:
 
     async def test_lookalike_risk_impl_success(self):
         """Test successful risk assessment."""
-        with patch("src.tools.validator.risk.assess_domain_risk") as mock_assess:
+        with patch("dns_mcp_server.tools.validator.risk.assess_domain_risk") as mock_assess:
             mock_assess.return_value = {
                 "domain": "example.com",
                 "risk_score": 0.3,
@@ -548,7 +548,7 @@ class TestLookalikeRiskImpl:
 
     async def test_lookalike_risk_impl_check_dns_parameter(self):
         """Test check_dns parameter is passed through."""
-        with patch("src.tools.validator.risk.assess_domain_risk") as mock_assess:
+        with patch("dns_mcp_server.tools.validator.risk.assess_domain_risk") as mock_assess:
             mock_assess.return_value = {
                 "domain": "example.com",
                 "risk_score": 0.5,

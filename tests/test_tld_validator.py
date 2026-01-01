@@ -208,7 +208,7 @@ class TestTLDValidation:
 
     async def test_is_valid_tld_iana_valid(self):
         """Test valid IANA TLD detection."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
             mock_fetch.return_value = {"com", "org", "net"}
 
             result = await is_valid_tld("example.com")
@@ -219,7 +219,7 @@ class TestTLDValidation:
 
     async def test_is_valid_tld_iana_invalid(self):
         """Test invalid IANA TLD detection."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
             mock_fetch.return_value = {"com", "org", "net"}
 
             result = await is_valid_tld("example.invalidtld")
@@ -230,7 +230,7 @@ class TestTLDValidation:
 
     async def test_is_valid_tld_strips_trailing_dot(self):
         """Test that trailing dots are handled correctly."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
             mock_fetch.return_value = {"com", "org"}
 
             result1 = await is_valid_tld("example.com.")
@@ -257,7 +257,7 @@ class TestTLDValidation:
 
     async def test_is_valid_tld_case_insensitive(self):
         """Test that TLD check is case-insensitive."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
             mock_fetch.return_value = {"com", "org"}
 
             result1 = await is_valid_tld("EXAMPLE.COM")
@@ -280,8 +280,8 @@ class TestEnterpriseTLDValidation:
 
     async def test_is_valid_tld_enterprise_roots(self):
         """Test validation against enterprise root servers."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
-            with patch("src.tools.validator.tld.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+            with patch("dns_mcp_server.tools.validator.tld.Resolver") as mock_resolver_class:
                 mock_fetch.return_value = set()  # No IANA cache
 
                 mock_resolver = MagicMock()
@@ -303,8 +303,8 @@ class TestEnterpriseTLDValidation:
 
     async def test_is_valid_tld_enterprise_nxdomain(self):
         """Test handling of NXDOMAIN from enterprise roots."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
-            with patch("src.tools.validator.tld.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+            with patch("dns_mcp_server.tools.validator.tld.Resolver") as mock_resolver_class:
                 mock_fetch.return_value = set()  # No IANA cache
 
                 mock_resolver = MagicMock()
@@ -324,8 +324,8 @@ class TestEnterpriseTLDValidation:
         """Test validation with alternative root servers."""
         alternative_roots = ["10.0.0.1", "10.0.0.2"]
 
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
-            with patch("src.tools.validator.tld.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+            with patch("dns_mcp_server.tools.validator.tld.Resolver") as mock_resolver_class:
                 mock_fetch.return_value = set()  # No IANA cache
 
                 mock_resolver = MagicMock()
@@ -358,7 +358,7 @@ class TestTLDCheckImpl:
 
     async def test_tld_check_impl_valid_tld(self):
         """Test tld_check_impl with valid TLD."""
-        with patch("src.tools.validator.tld.is_valid_tld") as mock_validate:
+        with patch("dns_mcp_server.tools.validator.tld.is_valid_tld") as mock_validate:
             mock_validate.return_value = MagicMock(success=True, output="Valid TLD")
 
             result = await tld_check_impl("example.com")
@@ -368,7 +368,7 @@ class TestTLDCheckImpl:
 
     async def test_tld_check_impl_invalid_tld(self):
         """Test tld_check_impl with invalid TLD."""
-        with patch("src.tools.validator.tld.is_valid_tld") as mock_validate:
+        with patch("dns_mcp_server.tools.validator.tld.is_valid_tld") as mock_validate:
             mock_validate.return_value = MagicMock(success=False, error="Invalid TLD")
 
             result = await tld_check_impl("example.invalid")
@@ -377,7 +377,7 @@ class TestTLDCheckImpl:
 
     async def test_tld_check_impl_strips_whitespace(self):
         """Test that tld_check_impl strips whitespace."""
-        with patch("src.tools.validator.tld.is_valid_tld") as mock_validate:
+        with patch("dns_mcp_server.tools.validator.tld.is_valid_tld") as mock_validate:
             mock_validate.return_value = MagicMock(success=True, output="Valid TLD")
 
             _result = await tld_check_impl("  example.com  ")
@@ -400,7 +400,7 @@ class TestTLDValidatorEdgeCases:
 
     async def test_is_valid_tld_internationalized_domain(self):
         """Test IDN (internationalized domain name) handling."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
             mock_fetch.return_value = {"com", "org"}
 
             # xn--p1ai is the punycode for РФ (Russia)
@@ -412,7 +412,7 @@ class TestTLDValidatorEdgeCases:
         """Test domain with very long SLD."""
         long_sld = "a" * 63  # Max label length
 
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
             mock_fetch.return_value = {"com"}
 
             result = await is_valid_tld(f"{long_sld}.com")
@@ -421,7 +421,7 @@ class TestTLDValidatorEdgeCases:
 
     async def test_is_valid_tld_deep_subdomain(self):
         """Test deeply nested subdomains."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
             mock_fetch.return_value = {"com"}
 
             result = await is_valid_tld("a.b.c.d.e.f.example.com")
@@ -431,7 +431,7 @@ class TestTLDValidatorEdgeCases:
 
     async def test_is_valid_tld_special_tlds(self):
         """Test special/country-code TLDs."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
             mock_fetch.return_value = {"uk", "de", "jp", "us"}
 
             result_uk = await is_valid_tld("example.uk")
@@ -442,8 +442,8 @@ class TestTLDValidatorEdgeCases:
 
     async def test_is_valid_tld_multi_part_tlds(self):
         """Test multi-part TLDs like co.uk."""
-        with patch("src.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
-            with patch("src.tools.validator.tld.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.validator.tld.fetch_iana_tlds") as mock_fetch:
+            with patch("dns_mcp_server.tools.validator.tld.Resolver") as mock_resolver_class:
                 mock_fetch.return_value = set()  # Not in IANA
 
                 mock_resolver = MagicMock()

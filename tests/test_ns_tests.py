@@ -45,7 +45,7 @@ class TestBasicRecords:
 
     async def test_basic_records_success(self):
         """Test successful basic record testing."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Mock successful result
@@ -69,7 +69,7 @@ class TestBasicRecords:
 
     async def test_basic_records_structure(self):
         """Test that basic records returns proper structure."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -104,7 +104,7 @@ class TestQNameHandling:
 
     async def test_qname_handling_structure(self):
         """Test that qname handling returns proper structure."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -128,7 +128,7 @@ class TestQNameHandling:
 
     async def test_qname_handling_case_variations(self):
         """Test handling of case variations in QNAME."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -157,7 +157,7 @@ class TestEDNSSupport:
 
     async def test_edns_support_structure(self):
         """Test that EDNS support returns proper structure."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -179,7 +179,7 @@ class TestEDNSSupport:
 
     async def test_edns_support_tests_multiple_sizes(self):
         """Test that EDNS support tests various buffer sizes."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -209,7 +209,7 @@ class TestTCPBehavior:
 
     async def test_tcp_behavior_structure(self):
         """Test that TCP behavior returns proper structure."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -243,7 +243,7 @@ class TestPerformance:
 
     async def test_performance_structure(self):
         """Test that performance testing returns proper structure."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -272,7 +272,7 @@ class TestPerformance:
 
     async def test_performance_concurrent_queries(self):
         """Test performance testing with concurrent queries."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -308,7 +308,7 @@ class TestZoneTransfer:
 
     async def test_zone_transfer_denied(self):
         """Test zone transfer when denied."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -327,7 +327,7 @@ class TestZoneTransfer:
 
     async def test_zone_transfer_structure(self):
         """Test zone transfer returns proper structure."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -357,7 +357,7 @@ class TestCHAOSRecords:
 
     async def test_chaos_records_structure(self):
         """Test CHAOS records querying returns proper structure."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -380,7 +380,7 @@ class TestCHAOSRecords:
 
     async def test_chaos_records_checks_all_types(self):
         """Test CHAOS records checks all record types."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -414,7 +414,7 @@ class TestOpenResolver:
 
     async def test_open_resolver_structure(self):
         """Test open resolver returns proper structure."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -434,7 +434,7 @@ class TestOpenResolver:
 
     async def test_open_resolver_security_classification(self):
         """Test open resolver classifies security risk properly."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
             mock_resolver_class.return_value = mock_resolver
 
@@ -456,7 +456,7 @@ class TestNSTestsEdgeCases:
 
     async def test_basic_records_multiple_failures(self):
         """Test basic records when multiple queries fail."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Alternate between success and failure
@@ -488,7 +488,7 @@ class TestNSTestsEdgeCases:
 
     async def test_performance_with_failures(self):
         """Test performance calculation with some query failures."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Create results with some failures
@@ -521,7 +521,7 @@ class TestNSTestsEdgeCases:
 
     async def test_zone_transfer_allowed(self):
         """Test zone transfer when allowed (security risk)."""
-        with patch("src.tools.dns.ns_tests.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.ns_tests.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()

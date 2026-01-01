@@ -67,7 +67,7 @@ local_scheme = "no-local-version"
 version_scheme = "guess-next-dev"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["dns_mcp_server"]
 
 [tool.setuptools.package-data]
 dns_mcp_server = ["config/*.yaml", "knowledge_base/data/*.yaml"]
@@ -76,7 +76,7 @@ dns_mcp_server = ["config/*.yaml", "knowledge_base/data/*.yaml"]
 minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "-v --tb=short --cov=dns_mcp_server --cov-report=term"
+addopts = "-v --tb=short --cov=dns_mcp_server --cov-branch --cov-report=term"
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]

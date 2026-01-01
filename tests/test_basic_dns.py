@@ -37,7 +37,7 @@ class TestSimpleDNSLookup:
 
     async def test_simple_dns_lookup_success(self):
         """Test successful A record lookup."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Mock the async_resolve call
@@ -69,7 +69,7 @@ class TestSimpleDNSLookup:
 
     async def test_simple_dns_lookup_failure(self):
         """Test failed A record lookup."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -85,7 +85,7 @@ class TestSimpleDNSLookup:
 
     async def test_simple_dns_lookup_no_records(self):
         """Test A record lookup with no results."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -107,7 +107,7 @@ class TestSimpleDNSLookup:
 
     async def test_simple_dns_lookup_response_details(self):
         """Test that response details are properly captured."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -146,7 +146,7 @@ class TestAdvancedDNSLookup:
 
     async def test_advanced_dns_lookup_mx_record(self):
         """Test advanced MX record lookup."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Mock NS lookup
@@ -174,7 +174,7 @@ class TestAdvancedDNSLookup:
 
             # Properly mock the static method
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_records_from_rrset"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_records_from_rrset"
             ) as mock_get_records:
                 mock_get_records.return_value = ["10 mail.example.com."]
                 mock_resolver_class.return_value = mock_resolver
@@ -187,7 +187,7 @@ class TestAdvancedDNSLookup:
 
     async def test_advanced_dns_lookup_ns_record_skip_lookup(self):
         """Test advanced NS record lookup (no NS pre-lookup)."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             ns_result = MagicMock()
@@ -205,7 +205,7 @@ class TestAdvancedDNSLookup:
             mock_resolver.async_resolve = AsyncMock(return_value=ns_result)
 
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_records_from_rrset"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_records_from_rrset"
             ) as mock_get_records:
                 mock_get_records.return_value = ["ns1.example.com."]
                 mock_resolver_class.return_value = mock_resolver
@@ -218,7 +218,7 @@ class TestAdvancedDNSLookup:
 
     async def test_advanced_dns_lookup_no_records_found(self):
         """Test advanced lookup when no records are found."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             ns_result = MagicMock()
@@ -257,9 +257,9 @@ class TestReverseDNSLookup:
 
     async def test_reverse_dns_lookup_success_ipv4(self):
         """Test successful reverse DNS lookup for IPv4."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_reverse_name"
             ) as mock_rev_name:
                 mock_rev_name.return_value = "34.216.184.93.in-addr.arpa"
 
@@ -299,9 +299,9 @@ class TestReverseDNSLookup:
 
     async def test_reverse_dns_lookup_private_ip(self):
         """Test that private IPs are marked as local."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_reverse_name"
             ) as mock_rev_name:
                 mock_rev_name.return_value = "1.168.192.in-addr.arpa"
 
@@ -330,9 +330,9 @@ class TestReverseDNSLookup:
 
     async def test_reverse_dns_lookup_invalid_reverse_name(self):
         """Test reverse DNS lookup when reverse name cannot be computed."""
-        with patch("src.tools.dns.basic_dns.Resolver") as _mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as _mock_resolver_class:
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_reverse_name"
             ) as mock_rev_name:
                 mock_rev_name.return_value = None
 
@@ -355,7 +355,7 @@ class TestDNSTroubleshooting:
 
     async def test_dns_troubleshooting_all_record_types(self):
         """Test troubleshooting checks all common record types."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Create mock result for each record type
@@ -369,7 +369,7 @@ class TestDNSTroubleshooting:
             mock_resolver.async_resolve = AsyncMock(return_value=mock_result)
 
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_records_from_rrset"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_records_from_rrset"
             ) as mock_get_records:
                 mock_get_records.return_value = []
                 mock_resolver_class.return_value = mock_resolver
@@ -388,7 +388,7 @@ class TestDNSTroubleshooting:
 
     async def test_dns_troubleshooting_with_custom_nameserver(self):
         """Test troubleshooting with custom nameserver."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -401,7 +401,7 @@ class TestDNSTroubleshooting:
             mock_resolver.async_resolve = AsyncMock(return_value=mock_result)
 
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_records_from_rrset"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_records_from_rrset"
             ) as mock_get_records:
                 mock_get_records.return_value = []
                 mock_resolver_class.return_value = mock_resolver
@@ -418,7 +418,7 @@ class TestDNSTroubleshooting:
 
     async def test_dns_troubleshooting_output_structure(self):
         """Test that troubleshooting output has correct structure."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -431,7 +431,7 @@ class TestDNSTroubleshooting:
             mock_resolver.async_resolve = AsyncMock(return_value=mock_result)
 
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_records_from_rrset"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_records_from_rrset"
             ) as mock_get_records:
                 mock_get_records.return_value = []
                 mock_resolver_class.return_value = mock_resolver
@@ -457,7 +457,7 @@ class TestBasicDNSEdgeCases:
 
     async def test_simple_dns_lookup_with_no_response(self):
         """Test simple lookup when resolver returns None response."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -475,7 +475,7 @@ class TestBasicDNSEdgeCases:
 
     async def test_simple_dns_lookup_query_timeout(self):
         """Test simple lookup with query timeout."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             mock_result = MagicMock()
@@ -492,9 +492,9 @@ class TestBasicDNSEdgeCases:
 
     async def test_reverse_dns_lookup_loopback(self):
         """Test reverse DNS lookup for loopback address."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_reverse_name"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_reverse_name"
             ) as mock_rev_name:
                 mock_rev_name.return_value = "1.0.0.127.in-addr.arpa"
 
@@ -523,7 +523,7 @@ class TestBasicDNSEdgeCases:
 
     async def test_dns_troubleshooting_partial_failure(self):
         """Test troubleshooting when some queries fail."""
-        with patch("src.tools.dns.basic_dns.Resolver") as mock_resolver_class:
+        with patch("dns_mcp_server.tools.dns.basic_dns.Resolver") as mock_resolver_class:
             mock_resolver = MagicMock()
 
             # Create results that alternate between success and failure
@@ -551,7 +551,7 @@ class TestBasicDNSEdgeCases:
             )
 
             with patch(
-                "src.tools.dns.basic_dns.Resolver.get_records_from_rrset"
+                "dns_mcp_server.tools.dns.basic_dns.Resolver.get_records_from_rrset"
             ) as mock_get_records:
                 mock_get_records.return_value = []
                 mock_resolver_class.return_value = mock_resolver

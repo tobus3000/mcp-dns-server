@@ -68,7 +68,7 @@ content: "This is a test article."
             f.write(article_content)
 
         # Initialize server with the test directory
-        from src.knowledge_base.manager import KnowledgeBaseManager
+        from dns_mcp_server.knowledge_base.manager import KnowledgeBaseManager
 
         # Create a knowledge base manager with our test directory
         kb_manager = KnowledgeBaseManager(kb_dir=self.temp_dir)
