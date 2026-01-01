@@ -489,7 +489,9 @@ class TestNameserverRoleImpl:
             mock_test.return_value = MagicMock(success=True, output="Test result")
 
             custom_zone = "internal.corp"
-            _result = await verify_nameserver_role_impl("192.168.1.1", None, custom_zone)
+            _result = await verify_nameserver_role_impl(
+                "192.168.1.1", None, custom_zone
+            )
 
             # Verify verify_nameserver_role was called with custom zone
             mock_test.assert_called_once()
@@ -557,7 +559,7 @@ class TestNameserverRoleEdgeCases:
                     result = await verify_nameserver_role("192.168.1.1")
                     # If exception is caught internally, we get a result
                     assert isinstance(result, object)
-                except Exception: # pylint: disable=broad-except
+                except Exception:  # pylint: disable=broad-except
                     # If exception is not caught, that's also acceptable behavior
                     pass
 

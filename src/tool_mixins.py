@@ -52,7 +52,7 @@ class ToolRegistrationMixin:
                 "Use this tool to perform a forward DNS lookup that resolves "
                 "a hostname to its IP address"
             ),
-            tags=set(("dns", "forward", "query", "lookup", "a_record")),
+            tags={"dns", "forward", "query", "lookup", "a_record"},
             enabled=True,
         )
         async def simple_dns_lookup(hostname: str, ctx: Context) -> ToolResult:
@@ -66,7 +66,7 @@ class ToolRegistrationMixin:
                 "the supported DNS record types. Get the list of supported record "
                 "types from the `supported_dns_record_types` resource."
             ),
-            tags=set(("dns", "query", "lookup", "advanced")),
+            tags={"dns", "query", "lookup", "advanced"},
             enabled=self.config.get("features", {}).get(
                 "advanced_troubleshooting", False
             ),
@@ -85,7 +85,7 @@ class ToolRegistrationMixin:
                 "Use this tool to perform a DNS reverse lookup to get "
                 "a hostname from an IP address"
             ),
-            tags=set(("dns", "query", "lookup", "reverse")),
+            tags={"dns", "query", "lookup", "reverse"},
             enabled=self.config.get("features", {}).get("reverse_lookup", False),
         )
         async def reverse_dns_lookup(ip_address: str, ctx: Context) -> ToolResult:
@@ -95,7 +95,7 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="dns_domain_troubleshooting",
             description="Perform comprehensive DNS troubleshooting for a given domain",
-            tags=set(("dns", "troubleshooting", "diagnostics", "domain")),
+            tags={"dns", "troubleshooting", "diagnostics", "domain"},
             enabled=self.config.get("features", {}).get(
                 "advanced_troubleshooting", False
             ),
@@ -110,7 +110,7 @@ class ToolRegistrationMixin:
                 "Perform comprehensive DNS server troubleshooting for a given"
                 " domain and nameserver"
             ),
-            tags=set(("dns", "troubleshooting", "diagnostics", "server", "nameserver")),
+            tags={"dns", "troubleshooting", "diagnostics", "server", "nameserver"},
             enabled=self.config.get("features", {}).get(
                 "advanced_troubleshooting", False
             ),
@@ -129,7 +129,7 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="dns_trace",
             description="Perform a DNS trace to see the resolution path for a domain",
-            tags=set(("dns", "query", "troubleshooting", "trace")),
+            tags={"dns", "query", "troubleshooting", "trace"},
             enabled=self.config.get("features", {}).get(
                 "advanced_troubleshooting", False
             ),
@@ -141,16 +141,14 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="dns_server_edns_test",
             description="Perform EDNS tests on a given domain and nameserver",
-            tags=set(
-                (
-                    "dns",
-                    "edns",
-                    "troubleshooting",
-                    "diagnostics",
-                    "server",
-                    "nameserver",
-                )
-            ),
+            tags={
+                "dns",
+                "edns",
+                "troubleshooting",
+                "diagnostics",
+                "server",
+                "nameserver",
+            },
             enabled=self.config.get("features", {}).get(
                 "advanced_troubleshooting", False
             ),
@@ -170,9 +168,14 @@ class ToolRegistrationMixin:
                 "Use this tool to test that the given nameserver answers UDP and TCP "
                 "queries by using the specified domain."
             ),
-            tags=set(
-                ("dns", "troubleshooting", "diagnostics", "protocol", "udp", "tcp")
-            ),
+            tags={
+                "dns",
+                "troubleshooting",
+                "diagnostics",
+                "protocol",
+                "udp",
+                "tcp",
+            },
             enabled=self.config.get("features", {}).get(
                 "advanced_troubleshooting", False
             ),
@@ -189,7 +192,7 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="dns_cookie_test",
             description="Perform a DNS Cookie behavior test on a given domain and nameserver.",
-            tags=set(("dns", "cookie", "edns", "diagnostics", "troubleshooting")),
+            tags={"dns", "cookie", "edns", "diagnostics", "troubleshooting"},
             enabled=self.config.get("features", {}).get(
                 "advanced_troubleshooting", False
             ),
@@ -217,7 +220,7 @@ class ToolRegistrationMixin:
                 "(4) Broken NSEC chains that invalidate denial-of-existence proofs. "
                 "These issues directly indicate DNSSEC configuration problems."
             ),
-            tags=set(("dns", "security", "dnssec", "validation")),
+            tags={"dns", "security", "dnssec", "validation"},
             enabled=self.config.get("features", {}).get("dnssec_validation", False),
         )
         async def check_dnssec(domain: str, ctx: Context) -> ToolResult:
@@ -229,7 +232,7 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="lookalike_risk",
             description="Use this tool to assess the lookalike domain risk for a given domain.",
-            tags=set(("dns", "security", "lookalike", "typosquatting")),
+            tags={"dns", "security", "lookalike", "typosquatting"},
             enabled=self.config.get("features", {}).get("lookalike_risk_tool", False),
         )
         async def lookalike_risk(
@@ -246,7 +249,7 @@ class ToolRegistrationMixin:
                 "Use this tool to convert the specified internationalized domain name (IDN) "
                 "into punycode format."
             ),
-            tags=set(("dns", "idn", "punycode", "converter")),
+            tags={"dns", "idn", "punycode", "converter"},
             enabled=True,
         )
         async def punycode_converter(domain: str, ctx: Context) -> ToolResult:
@@ -256,9 +259,7 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="detect_open_resolvers",
             description="Use this tool to scan a given subnet for open DNS resolvers.",
-            tags=set(
-                ("dns", "security", "scanner", "open resolver", "subnet", "network")
-            ),
+            tags={"dns", "security", "scanner", "open resolver", "subnet", "network"},
             enabled=self.config.get("features", {}).get(
                 "open_resolver_scan_tool", False
             ),
@@ -287,7 +288,7 @@ class ToolRegistrationMixin:
                 "Use this tool to detect DNS interception/spoofing including MAC-level "
                 "fingerprinting."
             ),
-            tags=set(("dns", "spoofing", "mac", "fingerprinting")),
+            tags={"dns", "spoofing", "mac", "fingerprinting"},
             enabled=self.config.get("features", {}).get("detect_dns_spoofing", False),
         )
         async def detect_dns_spoofing(
@@ -307,9 +308,7 @@ class ToolRegistrationMixin:
                 "Use this tool to test whether a given DNS server is authoritative, a resolver, "
                 "or operates in mixed-mode."
             ),
-            tags=set(
-                ("dns", "authority", "caching", "recursion", "role", "nameserver")
-            ),
+            tags={"dns", "authority", "caching", "recursion", "role", "nameserver"},
             enabled=self.config.get("features", {}).get("nameserver_role_test", False),
         )
         async def detect_nameserver_role(
@@ -330,7 +329,7 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="detect_dns_root_environment",
             description="Detect the DNS root infrastructure that is used for name resolution.",
-            tags=set(("dns", "authority", "root", "nameserver")),
+            tags={"dns", "authority", "root", "nameserver"},
             enabled=self.config.get("features", {}).get(
                 "detect_dns_root_environment", False
             ),
@@ -345,7 +344,7 @@ class ToolRegistrationMixin:
                 "Use this tool to verify that the top-level domain of a specified domain "
                 "name is a valid global top-level domain (gTLD)."
             ),
-            tags=set(("dns", "authority", "root", "TLD", "gTLD")),
+            tags={"dns", "authority", "root", "TLD", "gTLD"},
             enabled=self.config.get("features", {}).get(
                 "top_level_domain_verification", False
             ),
@@ -359,7 +358,7 @@ class ToolRegistrationMixin:
         @self.server.tool(
             name="mdns_service_discovery",
             description="Use this tool to discover mDNS services on the local network.",
-            tags=set(("mdns", "discovery", "network")),
+            tags={"mdns", "discovery", "network"},
             enabled=self.config.get("features", {}).get(
                 "mdns_service_discovery", False
             ),
@@ -381,7 +380,7 @@ class ToolRegistrationMixin:
                 "Use this tool to validate a Fully Qualified Domain Name (FQDN) "
                 "according to DNS RFC rules."
             ),
-            tags=set(("dns", "validation", "FQDN")),
+            tags={"dns", "validation", "FQDN"},
             enabled=True,
         )
         async def validate_dns_fqdn(ctx: Context, domain: str) -> ToolResult:
@@ -402,9 +401,7 @@ class ToolRegistrationMixin:
                 "Use this tool to start a DNS support assistant that gathers information "
                 "progressively to help find a DNS-related problem."
             ),
-            tags=set(
-                ("interactive", "elicitation", "dns", "assistant", "problem", "help")
-            ),
+            tags={"interactive", "elicitation", "dns", "assistant", "problem", "help"},
             enabled=self.config.get("features", {}).get("basic_dns_assistant", False),
         )
         async def basic_dns_assistant(ctx: Context) -> ToolResult:

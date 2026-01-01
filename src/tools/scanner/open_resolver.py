@@ -93,7 +93,7 @@ async def detect_open_resolvers_in_subnet(
         rating = "very high"
     if cnt > 85:
         rating = "abnormaly high"
-    percent = "%.2f" % float((100 / network.num_addresses) * cnt)
+    percent = f"{(100 / network.num_addresses) * cnt:.2f}"
     note = [
         f"A {rating} count of {cnt} open DNS resolvers has been "
         + f"found in network {network.exploded}.",

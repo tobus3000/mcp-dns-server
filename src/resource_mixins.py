@@ -4,7 +4,7 @@ Resource Mixin classes for DNSMCPServer to separate concerns.
 
 from typing import Any
 
-from tools.dns.basic_dns import advanced_dns_lookup_impl, available_rdatatypes_impl
+from tools import advanced_dns_lookup_impl, available_rdatatypes_impl
 from typedefs import ToolResult
 
 
@@ -37,6 +37,17 @@ class ResourceRegistrationMixin:
             description="List of supported DNS record types.",
         )
         async def get_supported_dns_record_types() -> ToolResult:
+            return await available_rdatatypes_impl()
+
+    def register_available_record_types(self) -> None:
+        """Register resource for available DNS record types."""
+
+        @self.server.resource(
+            uri="resource://dns_record_types",
+            name="dns_record_types",
+            description="Retrieve a list of all available DNS record types.",
+        )
+        async def dns_record_types() -> ToolResult:
             return await available_rdatatypes_impl()
 
     def register_knowledge_base_resources(self) -> None:

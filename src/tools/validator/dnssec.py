@@ -578,8 +578,8 @@ def check_parent_ds(
     if result["denied_keys"]:
         result["denied_summary"] = {
             "count": len(result["denied_keys"]),
-            "algorithms": list(set(k["algorithm_name"] for k in result["denied_keys"])),
-            "flags": list(set(k["flags"] for k in result["denied_keys"])),
+            "algorithms": list({k["algorithm_name"] for k in result["denied_keys"]}),
+            "flags": list({k["flags"] for k in result["denied_keys"]}),
         }
 
     all_computed_ds = computed_sha256 + computed_sha1

@@ -160,7 +160,9 @@ class TestResolverSynchronousResolution:
                 else []
             )
 
-            rrset, _response = resolver.resolve("example.com", "A", nameserver="8.8.8.8")
+            rrset, _response = resolver.resolve(
+                "example.com", "A", nameserver="8.8.8.8"
+            )
 
             assert rrset is not None
             mock_resolve.assert_called_once()
