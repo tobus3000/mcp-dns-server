@@ -80,6 +80,13 @@ addopts = "-v --tb=short --cov=mcp-dns-server --cov-report=term"
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
+markers = [
+    "dns: DNS-related tests",
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests that may take longer to run",
+    "kb: Knowledge base related tests",
+]
 
 [tool.ruff]
 line-length = 88
